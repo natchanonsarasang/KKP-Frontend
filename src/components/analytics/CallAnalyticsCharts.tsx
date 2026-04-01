@@ -22,6 +22,7 @@ interface CallRecord {
   status: string;
   created_at: string;
   template_id: string | null;
+  ai_category?: string | null;
 }
 
 interface CallListItem {
@@ -33,6 +34,7 @@ interface CallListItem {
   called_at: string | null;
   created_at: string;
   template_id: string | null;
+  ai_category?: string | null;
 }
 
 interface Template {
@@ -422,6 +424,87 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
                 dot={{ r: 3 }}
               />
             </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
+  const chartColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+  const categoryData = useMemo(() => {
+    const categories: Record<string, number> = {
+      "ลูกค้าอยู่ที่เสียงดัง": 0,
+      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": 0,
+      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": 0,
+      "ลูกค้าสนใจปรับโครงสร้างหนี้": 0,
+      "ลูกค้าขอคุยกับเจ้าหน้าที่": 0,
+      "ลูกค่ายอมจ่าย + บอกวันที่": 0,
+      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": 0,
+      "ไม่รับสาย → โทรรอบ 2": 0,
+      "ไม่อยากคุยกับ Bot": 0,
+      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": 0,
+      "ลูกค้าพูดภาษาถิ่น": 0,
+      "ลูกค้าไม่พูด": 0,
+      "โทรแล้วปิดเครื่อง": 0,
+    };
+
+    callListItems.forEach((item) => {
+      if (item.ai_category && categories[item.ai_category] !== undefined) {
+        categories[item.ai_category]++;
+      } else if (item.ai_category) {
+        // Fallback for any other categories
+        categories[item.ai_category] = (categories[item.ai_category] || 0) + 1;
+      }
+    });
+
+    return Object.entries(categories)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [callListItems]);
+
+  return (
+    <Card className="col-span-1 md:col-span-2">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold">AI Customer Insights (Categories)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={categoryData}
+              layout="vertical"
+              margin={{ top: 10, right: 30, left: 160, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                width={150}
+                className="text-muted-foreground"
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+              <Bar
+                dataKey="value"
+                name="Calls"
+                radius={[0, 4, 4, 0]}
+                barSize={20}
+              >
+                {categoryData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </CardContent>

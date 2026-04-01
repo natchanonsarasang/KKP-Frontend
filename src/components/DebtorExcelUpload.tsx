@@ -30,6 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DEBTOR_CUSTOMER_VARIABLE_KEYS,
   parseDebtAmountForColumn,
+  parseDueDateForColumn,
 } from "@/lib/debtorVariables";
 
 interface DebtorRow {
@@ -215,14 +216,22 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
       for (let i = 0; i < debtorRows.length; i += batchSize) {
         const batch = debtorRows.slice(i, i + batchSize);
         
-        const insertData = batch.map((row) => ({
-          phone_number: row.phone_number,
-          variables: row.variables,
-          user_id: effectiveUserId,
-          workspace_id: currentWorkspace.id,
-          status: "active",
-          total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
-        }));
+        const insertData = batch.map((row) => {
+          const dueDate = parseDueDateForColumn(row.variables.due_date);
+          const variables = {
+            ...row.variables,
+            ...(dueDate ? { due_date: dueDate } : {}),
+          };
+          return {
+            phone_number: row.phone_number,
+            variables,
+            user_id: effectiveUserId,
+            workspace_id: currentWorkspace.id,
+            status: "active",
+            total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
+            due_date: dueDate,
+          };
+        });
 
         const { error } = await supabase.from("debtors").insert(insertData);
         if (error) {

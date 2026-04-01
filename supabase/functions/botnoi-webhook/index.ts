@@ -19,6 +19,105 @@ serve(async (req) => {
     const payload = await req.json();
     console.log('Received webhook payload:', JSON.stringify(payload, null, 2));
 
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
+    // Function to categorize conversation using AI
+    const categorizeConversation = async (log: string, status: string): Promise<string> => {
+      // 1. Check system-level statuses first
+      if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
+        return "ไม่รับสาย → โทรรอบ 2";
+      }
+      
+      if (status === 'failed' || status === 'error') {
+        return "โทรแล้วปิดเครื่อง";
+      }
+
+      // 2. If no log, and status is completed, it might be "ลูกค้าไม่พูด" or "เงียบ"
+      if (!log || log.trim().length < 5) {
+        if (status === 'completed') return "ลูกค้าไม่พูด";
+        return "ไม่รับสาย → โทรรอบ 2";
+      }
+
+      // 3. For behavioral categories, use OpenAI
+      if (!OPENAI_API_KEY) {
+        console.warn('OPENAI_API_KEY not found, skipping AI categorization');
+        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+      }
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `You are an AI that categorizes debt collection call transcripts into one of these 13 categories in Thai:
+1. ลูกค้าอยู่ที่เสียงดัง (Noisy environment)
+2. ลูกค้าอยู่ข้างทาง / ไม่สะดวก (Inconvenient/Roadside)
+3. ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก) (Refuses to pay/Silent/Interrupts)
+4. ลูกค้าสนใจปรับโครงสร้างหนี้ (Interested in debt restructuring)
+5. ลูกค้าขอคุยกับเจ้าหน้าที่ (Wants to talk to an agent)
+6. ลูกค่ายอมจ่าย + บอกวันที่ (Agrees to pay + date)
+7. ลูกค่ายอมจ่าย แต่ไม่บอกวันที่ (Agrees to pay but no date)
+8. ไม่รับสาย → โทรรอบ 2 (System result: No answer)
+9. ไม่อยากคุยกับ Bot (Refuses to talk to bot)
+10. ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต) (Irrelevant topics/Flood/Death)
+11. ลูกค้าพูดภาษาถิ่น (Local dialect)
+12. ลูกค้าไม่พูด (Silent customer)
+13. โทรแล้วปิดเครื่อง (System result: Failed/Phone off)
+
+Return ONLY the category name as a string, nothing else.`
+              },
+              {
+                role: 'user',
+                content: `Analyze this transcript: "${log}"`
+              }
+            ],
+            temperature: 0,
+          }),
+        });
+
+        const result = await response.json();
+        const category = result.choices?.[0]?.message?.content?.trim();
+        
+        // Ensure the returned category is one of the allowed ones
+        const AICATEGORIES = [
+          "ลูกค้าอยู่ที่เสียงดัง",
+          "ลูกค้าอยู่ข้างทาง / ไม่สะดวก",
+          "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)",
+          "ลูกค้าสนใจปรับโครงสร้างหนี้",
+          "ลูกค้าขอคุยกับเจ้าหน้าที่",
+          "ลูกค่ายอมจ่าย + บอกวันที่",
+          "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่",
+          "ไม่รับสาย → โทรรอบ 2",
+          "ไม่อยากคุยกับ Bot",
+          "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)",
+          "ลูกค้าพูดภาษาถิ่น",
+          "ลูกค้าไม่พูด",
+          "โทรแล้วปิดเครื่อง"
+        ];
+
+        if (category && AICATEGORIES.includes(category)) {
+          return category;
+        }
+
+        // Fallback or fuzzy match
+        for (const allowedCat of AICATEGORIES) {
+          if (category?.includes(allowedCat)) return allowedCat;
+        }
+
+        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+      } catch (err) {
+        console.error('Error calling OpenAI:', err);
+        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+      }
+    };
+
     // Extract call result data from webhook
     const callId = payload.outbound_id || payload.call_id || payload.callId;
     const status = payload.status;
@@ -78,6 +177,10 @@ serve(async (req) => {
       console.log('Conversation Log:', conversationLog);
       console.log('Picked up:', pickedUp);
 
+      // Perform AI categorization
+      const aiCategory = await categorizeConversation(conversationLog || '', status);
+      console.log('AI Category:', aiCategory);
+
       // Determine token deduction: 4 tokens if picked up, 1 token if not picked up
       const tokensToDeduct = pickedUp ? 4 : 1;
 
@@ -106,6 +209,7 @@ serve(async (req) => {
               status: mappedStatus,
               result_data: payload,
               call_duration: callDuration ? Math.round(Number(callDuration)) : null,
+              ai_category: aiCategory,
               updated_at: new Date().toISOString(),
             })
             .eq('id', callRecord.id);
@@ -162,6 +266,7 @@ serve(async (req) => {
                 call_outcome: callOutcome,
                 picked_up: pickedUp,
                 notes: notesData, // Store audio URL and transcription as JSON
+                ai_category: aiCategory,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', recentItem.id);

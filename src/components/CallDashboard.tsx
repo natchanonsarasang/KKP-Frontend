@@ -15,6 +15,7 @@ import {
   OutcomeDistributionChart,
   TemplatePerformanceChart,
   TrendChart,
+  AICategoryDistributionChart,
 } from "./analytics/CallAnalyticsCharts";
 import { BestTimeInsights } from "./analytics/BestTimeInsights";
 import { useAdmin } from "@/contexts/AdminContext";
@@ -29,6 +30,7 @@ interface CallRecord {
   created_at: string;
   updated_at: string;
   template_id: string | null;
+  ai_category?: string | null;
 }
 
 interface CallListItem {
@@ -40,6 +42,7 @@ interface CallListItem {
   called_at: string | null;
   created_at: string;
   template_id: string | null;
+  ai_category?: string | null;
 }
 
 interface Template {
@@ -206,6 +209,11 @@ const CallDashboard = () => {
           <TabsContent value="overview" className="space-y-6">
             {/* Stats */}
             <AnalyticsStats callListItems={callListItems || []} />
+
+            {/* AI Insights Chart */}
+            <div className="grid grid-cols-1 gap-4">
+              <AICategoryDistributionChart callListItems={callListItems || []} />
+            </div>
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

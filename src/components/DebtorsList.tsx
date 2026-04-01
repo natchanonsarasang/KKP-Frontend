@@ -73,11 +73,16 @@ import {
 
 function buildVariablesToSave(
   tv: Record<string, string>,
-  preserveTemplateFrom?: Record<string, unknown> | null
+  preserveTemplateFrom?: Record<string, unknown> | null,
+  dueDateIso?: string
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-    out[k] = tv[k] ?? "";
+    if (k === "due_date") {
+      out[k] = dueDateIso?.trim() ?? "";
+    } else {
+      out[k] = tv[k] ?? "";
+    }
   }
   const mt = preserveTemplateFrom?.message_template;
   if (typeof mt === "string" && mt.length > 0) {
@@ -310,7 +315,11 @@ const DebtorsList = () => {
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
       
-      const variablesData = buildVariablesToSave(data.variables, null);
+      const variablesData = buildVariablesToSave(
+        data.variables,
+        null,
+        data.formData.due_date
+      );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
       const { error } = await supabase.from("debtors").insert({
@@ -318,7 +327,7 @@ const DebtorsList = () => {
         status: data.formData.status,
         notes: data.formData.notes || null,
         total_debt: totalDebt,
-        due_date: data.formData.due_date || null,
+        due_date: data.formData.due_date,
         variables: variablesData,
         user_id: targetUserId,
         workspace_id: currentWorkspace.id,
@@ -350,7 +359,11 @@ const DebtorsList = () => {
       data: { formData: typeof formData; variables: Record<string, string> };
       existingVariables: Record<string, unknown> | null | undefined;
     }) => {
-      const variablesData = buildVariablesToSave(data.variables, existingVariables);
+      const variablesData = buildVariablesToSave(
+        data.variables,
+        existingVariables,
+        data.formData.due_date
+      );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
       const { error } = await supabase
@@ -360,7 +373,7 @@ const DebtorsList = () => {
           status: data.formData.status,
           notes: data.formData.notes || null,
           total_debt: totalDebt,
-          due_date: data.formData.due_date || null,
+          due_date: data.formData.due_date,
           variables: variablesData,
         })
         .eq("id", id);
@@ -592,10 +605,11 @@ const DebtorsList = () => {
       phone_number: debtor.phone_number,
       status: debtor.status,
       notes: debtor.notes || "",
-      due_date: debtor.due_date || "",
+      due_date: debtor.due_date ? debtor.due_date.slice(0, 10) : "",
     });
     const next = emptyDebtorCustomerVariables();
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
+      if (k === "due_date") continue;
       const v = debtorVars[k];
       next[k] = v != null && v !== undefined ? String(v) : "";
     }
@@ -606,6 +620,10 @@ const DebtorsList = () => {
     e.preventDefault();
     if (!formData.phone_number) {
       toast.error("Phone number is required");
+      return;
+    }
+    if (!formData.due_date?.trim()) {
+      toast.error("Due date is required");
       return;
     }
 
@@ -805,6 +823,10 @@ const DebtorsList = () => {
                   <code className="text-xs bg-muted px-1 rounded">
                     {"{total_debt}"}
                   </code>
+                  ,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">
+                    {"{due_date}"}
+                  </code>
                   , etc.
                 </p>
               </div>
@@ -813,38 +835,35 @@ const DebtorsList = () => {
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm">
                       {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
+                      {key === "due_date" ? " *" : ""}
                     </Label>
-                    <Input
-                      value={templateVariables[key] ?? ""}
-                      onChange={(e) =>
-                        setTemplateVariables((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
-                      }
-                      placeholder={key}
-                    />
+                    {key === "due_date" ? (
+                      <Input
+                        type="date"
+                        required
+                        value={formData.due_date || ""}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            due_date: e.target.value,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <Input
+                        value={templateVariables[key] ?? ""}
+                        onChange={(e) =>
+                          setTemplateVariables((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        placeholder={key}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm">Due date</Label>
-              <Input
-                type="date"
-                value={formData.due_date || ""}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, due_date: e.target.value }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Optional. Use{" "}
-                <code className="text-xs bg-muted px-1 rounded">
-                  {"{due_date}"}
-                </code>{" "}
-                in templates.
-              </p>
             </div>
 
             <div className="space-y-1.5">

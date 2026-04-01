@@ -8,6 +8,7 @@ export const DEBTOR_CUSTOMER_VARIABLE_KEYS = [
   "total_interest",
   "total_fine",
   "other_expense",
+  "due_date",
 ] as const;
 
 export type DebtorCustomerVariableKey =
@@ -25,19 +26,35 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   total_interest: "Total interest",
   total_fine: "Total fine",
   other_expense: "Other expense",
+  due_date: "Due date",
 };
 
-export function emptyDebtorCustomerVariables(): Record<
-  DebtorCustomerVariableKey,
-  string
-> {
+/** Text fields in `variables`; `due_date` is kept on the row + mirrored into variables at save. */
+export function emptyDebtorCustomerVariables(): Record<string, string> {
   return Object.fromEntries(
-    DEBTOR_CUSTOMER_VARIABLE_KEYS.map((k) => [k, ""])
-  ) as Record<DebtorCustomerVariableKey, string>;
+    DEBTOR_CUSTOMER_VARIABLE_KEYS.filter((k) => k !== "due_date").map((k) => [
+      k,
+      "",
+    ])
+  );
 }
 
 /** Parse amount for `debtors.total_debt` column from user-entered text (commas allowed). */
 export function parseDebtAmountForColumn(value: string): number {
   const n = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Normalize Excel / pasted dates to YYYY-MM-DD for Postgres `date` and `variables.due_date`. */
+export function parseDueDateForColumn(
+  raw: string | undefined | null
+): string | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const isoMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
 }
