@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
+import { toThaiPhonetic, shouldUsePhonetic, spellThaiName, isNameField } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber, maskLicensePlate, isLicensePlateField } from "@/lib/formatPhone";
 
 interface Debtor {
