@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { BotnoiGroupFooter } from "@/components/BotnoiGroupFooter";
@@ -11,7 +12,6 @@ const Landing = () => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Check session but don't redirect
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
@@ -24,15 +24,20 @@ const Landing = () => {
   }, []);
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`
-      }
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
     });
-    if (error) {
-      console.error('Login error:', error.message);
+
+    if (result.error) {
+      console.error('Login error:', result.error);
+      return;
     }
+
+    if (result.redirected) {
+      return;
+    }
+
+    navigate("/dashboard");
   };
 
   const features = [
