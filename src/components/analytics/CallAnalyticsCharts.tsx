@@ -477,52 +477,58 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
 
     return Object.entries(categories)
       .map(([name, value]) => ({ name, value }))
+      .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [callListItems]);
+
+  const maxValue = Math.max(...categoryData.map((d) => d.value), 1);
+
+  const CATEGORY_COLORS: Record<string, string> = {
+    "Customer refused to pay": "#ef4444",
+    "Customer not convenient to talk": "#f97316",
+    "Customer in noisy environment": "#eab308",
+    "Customer interested in debt restructuring": "#22c55e",
+    "Customer requested human agent": "#3b82f6",
+    "Customer promised to pay with date": "#10b981",
+    "Customer promised to pay (no date)": "#14b8a6",
+    "No answer – call back later": "#6b7280",
+    "Customer refused to talk to bot": "#f43f5e",
+    "Customer has hardship situation": "#a855f7",
+    "Language barrier": "#8b5cf6",
+    "Customer silent": "#94a3b8",
+    "Phone is turned off": "#64748b",
+  };
 
   return (
     <Card className="col-span-1 md:col-span-2">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">AI Customer Insights (Categories)</CardTitle>
+        <CardTitle className="text-base font-semibold">AI Customer Insights</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={categoryData}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 160, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} hide />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 11 }}
-                width={150}
-                className="text-muted-foreground"
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
-              />
-              <Bar
-                dataKey="value"
-                name="Calls"
-                radius={[0, 4, 4, 0]}
-                barSize={20}
-              >
-                {categoryData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {categoryData.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No categorized calls yet</p>
+        ) : (
+          <div className="space-y-3">
+            {categoryData.map((item) => {
+              const pct = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+              const color = CATEGORY_COLORS[item.name] || "#6366f1";
+              return (
+                <div key={item.name} className="group">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-foreground truncate mr-3">{item.name}</span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">{item.value}</span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
