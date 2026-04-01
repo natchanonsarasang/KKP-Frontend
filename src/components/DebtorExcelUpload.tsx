@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, Loader2, Trash2, X, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Trash2, X, AlertTriangle, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
