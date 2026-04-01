@@ -439,6 +439,10 @@ async function processSession(supabase: any, sessionId: string) {
       else if (phoneticFields.some(f => keyLower.includes(f))) {
         replacementValue = toThaiPhonetic(replacementValue);
       }
+      // Check if this is a name field - spell out difficult names
+      else if (nameFields.some(f => keyLower.includes(f))) {
+        replacementValue = spellThaiName(replacementValue);
+      }
       // For other numeric values, try to read as number
       else if (/^\d+$/.test(replacementValue)) {
         replacementValue = numberToThaiWords(parseInt(replacementValue, 10));
