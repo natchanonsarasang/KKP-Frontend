@@ -184,9 +184,8 @@ Return ONLY the category name as a string, nothing else.`
       // Determine token deduction: 4 tokens if picked up, 1 token if not picked up
       const tokensToDeduct = pickedUp ? 4 : 1;
 
-      // 1. Update call record by call ID (outbound_id from Botnoi) and get phone number
+      // 1. Update or create call record by call ID
       if (callId) {
-        // First, get the call record to find the phone number
         const { data: callRecord, error: fetchError } = await supabase
           .from('call_records')
           .select('id, phone_number')
@@ -196,20 +195,17 @@ Return ONLY the category name as a string, nothing else.`
         if (fetchError) {
           console.error('Error fetching call record:', fetchError);
         } else if (callRecord) {
-          // Use phone number from call record if not provided in webhook
           if (!phoneNumber && callRecord.phone_number) {
             phoneNumber = callRecord.phone_number;
             console.log('Phone number retrieved from call_record:', phoneNumber);
           }
 
-          // Now update the call record
           const { error } = await supabase
             .from('call_records')
             .update({
               status: mappedStatus,
               result_data: payload,
               call_duration: callDuration ? Math.round(Number(callDuration)) : null,
-              ai_category: aiCategory,
               updated_at: new Date().toISOString(),
             })
             .eq('id', callRecord.id);
@@ -219,8 +215,28 @@ Return ONLY the category name as a string, nothing else.`
           } else {
             console.log('Call record updated successfully');
           }
+        } else if (phoneNumber) {
+          // Auto-create call_record when not found
+          console.log('Auto-creating call_record for botnoi_call_id:', callId);
+          const { error: insertError } = await supabase
+            .from('call_records')
+            .insert({
+              botnoi_call_id: callId,
+              phone_number: phoneNumber,
+              status: mappedStatus,
+              result_data: payload,
+              call_duration: callDuration ? Math.round(Number(callDuration)) : null,
+              appointment_date: payload.appointment_date || null,
+              appointment_time: payload.appointment_time || null,
+            });
+
+          if (insertError) {
+            console.error('Error auto-creating call record:', insertError);
+          } else {
+            console.log('Call record auto-created successfully');
+          }
         } else {
-          console.log('No call record found for botnoi_call_id:', callId);
+          console.log('No call record found and no phone number to create one');
         }
       }
 
@@ -320,7 +336,28 @@ Return ONLY the category name as a string, nothing else.`
             console.log('No pending call_list_item found for debtor');
           }
         } else {
-          console.log('No debtors found with phone:', phoneNumber);
+          // Auto-create debtor when not found
+          console.log('Auto-creating debtor for phone:', phoneNumber);
+          const { data: newDebtor, error: createDebtorError } = await supabase
+            .from('debtors')
+            .insert({
+              phone_number: phoneNumber,
+              status: 'active',
+              call_outcome: callOutcome,
+              call_answered: pickedUp,
+              last_contact_at: new Date().toISOString(),
+              picked_up_count: pickedUp ? 1 : 0,
+              not_picked_up_count: pickedUp ? 0 : 1,
+              contact_attempts: 1,
+            })
+            .select('id')
+            .single();
+
+          if (createDebtorError) {
+            console.error('Error auto-creating debtor:', createDebtorError);
+          } else {
+            console.log('Debtor auto-created:', newDebtor.id);
+          }
         }
 
         // 3. Update debtor stats based on call result
