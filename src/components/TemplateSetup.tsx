@@ -10,6 +10,13 @@ import { toast } from "sonner";
 import { Plus, Loader2, MessageSquare, CheckCircle, XCircle, HelpCircle, Trash2, Eye, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
