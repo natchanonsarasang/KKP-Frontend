@@ -1260,7 +1260,7 @@ const DebtorsList = () => {
                                 variant="outline"
                                 className="h-8 gap-1.5"
                                 onClick={() => handleMakeCall(debtor)}
-                                disabled={isAdding || debtor.status === "paid"}
+                                disabled={isAdding || debtor.status === "paid" || (debtor as any).is_blocked}
                               >
                                 {isAdding ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

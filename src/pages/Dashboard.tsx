@@ -320,6 +320,7 @@ const Dashboard = () => {
         {activeTab === "call-list" && <CallList />}
         {activeTab === "templates" && <TemplateSetup />}
         {activeTab === "analytics" && <CallDashboard />}
+        {activeTab === "reports" && <CallReportDashboard />}
       </main>
     </div>
   );
