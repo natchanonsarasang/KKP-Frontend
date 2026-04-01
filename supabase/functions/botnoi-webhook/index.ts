@@ -184,28 +184,80 @@ Return ONLY the category name as a string, nothing else.`
       // Determine token deduction: 4 tokens if picked up, 1 token if not picked up
       const tokensToDeduct = pickedUp ? 4 : 1;
 
-      // 1. Update or create call record by call ID
+      // --- Resolve user_id and workspace_id ---
+      // Try to find from existing call_record first, then fall back to first workspace owner
+      let resolvedUserId: string | null = null;
+      let resolvedWorkspaceId: string | null = null;
+
+      // Check if there's already a call_record with this callId that has user/workspace
       if (callId) {
-        const { data: callRecord, error: fetchError } = await supabase
+        const { data: existingRecord } = await supabase
+          .from('call_records')
+          .select('user_id, workspace_id, phone_number')
+          .eq('botnoi_call_id', callId)
+          .maybeSingle();
+        
+        if (existingRecord) {
+          resolvedUserId = existingRecord.user_id;
+          resolvedWorkspaceId = existingRecord.workspace_id;
+          if (!phoneNumber && existingRecord.phone_number) {
+            phoneNumber = existingRecord.phone_number;
+          }
+        }
+      }
+
+      // If still no user, check debtor ownership
+      if (!resolvedUserId && phoneNumber) {
+        const { data: existingDebtor } = await supabase
+          .from('debtors')
+          .select('user_id, workspace_id')
+          .eq('phone_number', phoneNumber)
+          .not('user_id', 'is', null)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingDebtor) {
+          resolvedUserId = existingDebtor.user_id;
+          resolvedWorkspaceId = existingDebtor.workspace_id;
+        }
+      }
+
+      // Last resort: use the first workspace owner
+      if (!resolvedUserId) {
+        const { data: firstWorkspace } = await supabase
+          .from('workspaces')
+          .select('id, owner_id')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (firstWorkspace) {
+          resolvedUserId = firstWorkspace.owner_id;
+          resolvedWorkspaceId = firstWorkspace.id;
+        }
+      }
+
+      console.log('Resolved owner:', { resolvedUserId, resolvedWorkspaceId });
+
+      // 1. Update or create call record by call ID
+      let callRecordId: string | null = null;
+      if (callId) {
+        const { data: callRecord } = await supabase
           .from('call_records')
           .select('id, phone_number')
           .eq('botnoi_call_id', callId)
           .maybeSingle();
 
-        if (fetchError) {
-          console.error('Error fetching call record:', fetchError);
-        } else if (callRecord) {
-          if (!phoneNumber && callRecord.phone_number) {
-            phoneNumber = callRecord.phone_number;
-            console.log('Phone number retrieved from call_record:', phoneNumber);
-          }
-
+        if (callRecord) {
+          callRecordId = callRecord.id;
           const { error } = await supabase
             .from('call_records')
             .update({
               status: mappedStatus,
               result_data: payload,
               call_duration: callDuration ? Math.round(Number(callDuration)) : null,
+              user_id: resolvedUserId,
+              workspace_id: resolvedWorkspaceId,
               updated_at: new Date().toISOString(),
             })
             .eq('id', callRecord.id);
@@ -216,9 +268,8 @@ Return ONLY the category name as a string, nothing else.`
             console.log('Call record updated successfully');
           }
         } else if (phoneNumber) {
-          // Auto-create call_record when not found
           console.log('Auto-creating call_record for botnoi_call_id:', callId);
-          const { error: insertError } = await supabase
+          const { data: newRecord, error: insertError } = await supabase
             .from('call_records')
             .insert({
               botnoi_call_id: callId,
@@ -228,115 +279,37 @@ Return ONLY the category name as a string, nothing else.`
               call_duration: callDuration ? Math.round(Number(callDuration)) : null,
               appointment_date: payload.appointment_date || null,
               appointment_time: payload.appointment_time || null,
-            });
+              user_id: resolvedUserId,
+              workspace_id: resolvedWorkspaceId,
+            })
+            .select('id')
+            .single();
 
           if (insertError) {
             console.error('Error auto-creating call record:', insertError);
           } else {
-            console.log('Call record auto-created successfully');
+            callRecordId = newRecord?.id || null;
+            console.log('Call record auto-created:', callRecordId);
           }
-        } else {
-          console.log('No call record found and no phone number to create one');
         }
       }
 
-      // 2. Update call_list_items - find the most recent one for this phone
+      // 2. Find or create debtor, then update/create call_list_items
       if (phoneNumber) {
-        // First, find all debtors with this phone number
-        const { data: debtors, error: debtorFetchError } = await supabase
+        let debtorId: string | null = null;
+
+        // Find existing debtor
+        const { data: existingDebtors } = await supabase
           .from('debtors')
-          .select('id')
-          .eq('phone_number', phoneNumber);
+          .select('id, user_id, workspace_id')
+          .eq('phone_number', phoneNumber)
+          .limit(1)
+          .maybeSingle();
 
-        if (debtorFetchError) {
-          console.error('Error fetching debtors:', debtorFetchError);
-        } else if (debtors && debtors.length > 0) {
-          const debtorIds = debtors.map(d => d.id);
-          console.log('Found debtor IDs:', debtorIds);
-
-          // Find the most recent call_list_item that's in "calling" status (call was initiated, awaiting result)
-          const { data: recentItem, error: fetchError } = await supabase
-            .from('call_list_items')
-            .select('id')
-            .in('debtor_id', debtorIds)
-            .eq('status', 'calling')
-            .order('called_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (fetchError) {
-            console.error('Error fetching call_list_item:', fetchError);
-          } else if (recentItem) {
-            // Now update by ID - store status as Success if picked up
-            // Store audio URL and conversation log as JSON in notes field
-            const finalStatus = pickedUp ? 'success' : mappedStatus;
-            const notesData = JSON.stringify({ 
-              audio_url: audioUrl, 
-              conversation_log: conversationLog 
-            });
-            
-            const { error: cliError } = await supabase
-              .from('call_list_items')
-              .update({
-                status: finalStatus,
-                call_outcome: callOutcome,
-                picked_up: pickedUp,
-                notes: notesData, // Store audio URL and transcription as JSON
-                ai_category: aiCategory,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', recentItem.id);
-
-            if (cliError) {
-              console.error('Error updating call_list_item:', cliError);
-            } else {
-              console.log('Call list item updated successfully:', recentItem.id);
-              
-              // Deduct tokens based on call outcome
-              // Get the user_id from the call_list_item to deduct tokens
-              const { data: callItem } = await supabase
-                .from('call_list_items')
-                .select('user_id')
-                .eq('id', recentItem.id)
-                .single();
-              
-              if (callItem?.user_id) {
-                console.log(`Deducting ${tokensToDeduct} tokens for user ${callItem.user_id} (picked_up: ${pickedUp})`);
-                
-                const { data: deductResult, error: deductError } = await supabase
-                  .rpc('deduct_tokens', { p_user_id: callItem.user_id, p_amount: tokensToDeduct });
-                
-                if (deductError) {
-                  console.error('Error deducting tokens:', deductError);
-                } else {
-                  console.log(`Token deduction result: ${deductResult}`);
-                  
-                  // Update tokens_used in the active call session
-                  const { data: activeSession } = await supabase
-                    .from('call_sessions')
-                    .select('id, tokens_used')
-                    .eq('user_id', callItem.user_id)
-                    .eq('status', 'running')
-                    .order('started_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (activeSession) {
-                    const newTokensUsed = (activeSession.tokens_used || 0) + tokensToDeduct;
-                    await supabase
-                      .from('call_sessions')
-                      .update({ tokens_used: newTokensUsed })
-                      .eq('id', activeSession.id);
-                    console.log(`Updated session ${activeSession.id} tokens_used to ${newTokensUsed}`);
-                  }
-                }
-              }
-            }
-          } else {
-            console.log('No pending call_list_item found for debtor');
-          }
+        if (existingDebtors) {
+          debtorId = existingDebtors.id;
         } else {
-          // Auto-create debtor when not found
+          // Auto-create debtor
           console.log('Auto-creating debtor for phone:', phoneNumber);
           const { data: newDebtor, error: createDebtorError } = await supabase
             .from('debtors')
@@ -349,6 +322,8 @@ Return ONLY the category name as a string, nothing else.`
               picked_up_count: pickedUp ? 1 : 0,
               not_picked_up_count: pickedUp ? 0 : 1,
               contact_attempts: 1,
+              user_id: resolvedUserId,
+              workspace_id: resolvedWorkspaceId,
             })
             .select('id')
             .single();
@@ -356,7 +331,78 @@ Return ONLY the category name as a string, nothing else.`
           if (createDebtorError) {
             console.error('Error auto-creating debtor:', createDebtorError);
           } else {
-            console.log('Debtor auto-created:', newDebtor.id);
+            debtorId = newDebtor?.id || null;
+            console.log('Debtor auto-created:', debtorId);
+          }
+        }
+
+        // Now handle call_list_items
+        if (debtorId && resolvedUserId) {
+          // Try to find existing calling item
+          const { data: recentItem } = await supabase
+            .from('call_list_items')
+            .select('id')
+            .eq('debtor_id', debtorId)
+            .eq('status', 'calling')
+            .order('called_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const finalStatus = pickedUp ? 'success' : mappedStatus;
+          const notesData = JSON.stringify({ 
+            audio_url: audioUrl, 
+            conversation_log: conversationLog 
+          });
+
+          if (recentItem) {
+            // Update existing item
+            const { error: cliError } = await supabase
+              .from('call_list_items')
+              .update({
+                status: finalStatus,
+                call_outcome: callOutcome,
+                picked_up: pickedUp,
+                notes: notesData,
+                call_record_id: callRecordId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', recentItem.id);
+
+            if (cliError) {
+              console.error('Error updating call_list_item:', cliError);
+            } else {
+              console.log('Call list item updated:', recentItem.id);
+            }
+          } else {
+            // Auto-create call_list_item so Analytics can see the data
+            console.log('Auto-creating call_list_item for debtor:', debtorId);
+            const { error: createCliError } = await supabase
+              .from('call_list_items')
+              .insert({
+                debtor_id: debtorId,
+                user_id: resolvedUserId,
+                workspace_id: resolvedWorkspaceId,
+                status: finalStatus,
+                call_outcome: callOutcome,
+                picked_up: pickedUp,
+                notes: notesData,
+                call_record_id: callRecordId,
+                called_at: new Date().toISOString(),
+              });
+
+            if (createCliError) {
+              console.error('Error auto-creating call_list_item:', createCliError);
+            } else {
+              console.log('Call list item auto-created');
+            }
+          }
+
+          // Deduct tokens
+          console.log(`Deducting ${tokensToDeduct} tokens for user ${resolvedUserId}`);
+          const { error: deductError } = await supabase
+            .rpc('deduct_tokens', { p_user_id: resolvedUserId, p_amount: tokensToDeduct });
+          if (deductError) {
+            console.error('Error deducting tokens:', deductError);
           }
         }
 
