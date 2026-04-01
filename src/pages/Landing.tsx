@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
+import { BotnoiGroupFooter } from "@/components/BotnoiGroupFooter";
 import { Phone, BarChart3, Users, Zap, Shield, Clock, LayoutDashboard } from "lucide-react";
 
 const Landing = () => {
@@ -171,12 +172,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-6 border-t border-border/50">
-        <div className="max-w-7xl mx-auto text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Callecto. All rights reserved.
-        </div>
-      </footer>
+      <BotnoiGroupFooter />
     </div>
   );
 };
