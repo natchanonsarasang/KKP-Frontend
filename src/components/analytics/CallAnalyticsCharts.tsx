@@ -466,11 +466,12 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
     };
 
     callListItems.forEach((item) => {
-      if (item.ai_category && categories[item.ai_category] !== undefined) {
-        categories[item.ai_category]++;
-      } else if (item.ai_category) {
-        // Fallback for any other categories
-        categories[item.ai_category] = (categories[item.ai_category] || 0) + 1;
+      if (!item.ai_category) return;
+      const mapped = THAI_TO_EN[item.ai_category] || item.ai_category;
+      if (categories[mapped] !== undefined) {
+        categories[mapped]++;
+      } else {
+        categories[mapped] = (categories[mapped] || 0) + 1;
       }
     });
 
