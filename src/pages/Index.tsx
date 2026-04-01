@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Phone, Settings, BarChart3, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TemplateSetup from "@/components/TemplateSetup";
@@ -25,12 +26,12 @@ const Index = () => {
       <header className="h-14 flex items-center justify-between px-6 border-b border-border bg-card sticky top-0 z-40">
         <div className="flex items-center gap-6">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Phone className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-semibold text-lg tracking-tight">Callecto</span>
-          </div>
+          </Link>
 
           {/* Navigation Tabs */}
           <nav className="flex items-center gap-1">
