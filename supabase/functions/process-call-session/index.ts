@@ -355,6 +355,16 @@ async function processSession(supabase: any, sessionId: string) {
       return { success: false, failed: false };
     }
 
+    // Skip blocked debtors
+    if (debtor.is_blocked) {
+      console.log(`[Session ${sessionId}] Debtor ${debtor.phone_number} is blocked, skipping.`);
+      await supabase
+        .from("call_list_items")
+        .update({ status: "completed", call_outcome: "Blocked", picked_up: false })
+        .eq("id", item.id);
+      return { success: false, failed: false };
+    }
+
     const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
     if (!template?.template_id) {
       console.log(`[Session ${sessionId}] No template for item ${item.id}`);

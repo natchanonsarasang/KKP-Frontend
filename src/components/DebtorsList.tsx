@@ -448,6 +448,10 @@ const DebtorsList = () => {
         if (shouldUsePhonetic(key)) {
           processedValue = toThaiPhonetic(processedValue);
         }
+        // Spell out difficult Thai names phonetically
+        else if (isNameField(key)) {
+          processedValue = spellThaiName(processedValue);
+        }
         
         constructedMessage = constructedMessage.replace(placeholder, processedValue);
       });
