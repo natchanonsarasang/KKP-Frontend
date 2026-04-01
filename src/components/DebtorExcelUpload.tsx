@@ -320,6 +320,10 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
                 </Button>
               )}
             </div>
+            <Button variant="outline" size="sm" onClick={downloadTemplate} className="w-fit">
+              <Download className="w-4 h-4 mr-1" />
+              ดาวน์โหลด Template
+            </Button>
             {workspaceSchema && workspaceSchema.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 <strong>Expected columns:</strong> Phone Number, {workspaceSchema.join(", ")}
