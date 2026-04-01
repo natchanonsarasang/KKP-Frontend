@@ -27,6 +27,10 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  DEBTOR_CUSTOMER_VARIABLE_KEYS,
+  parseDebtAmountForColumn,
+} from "@/lib/debtorVariables";
 
 interface DebtorRow {
   phone_number: string;
@@ -72,9 +76,13 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
 
       // Extract column keys (excluding message_template)
       const variables = data.variables as Record<string, string>;
-      const columns = Object.keys(variables).filter(k => k !== "message_template");
-      
-      return columns.length > 0 ? columns : null;
+      const columns = Object.keys(variables).filter(
+        (k) => k !== "message_template"
+      );
+
+      return columns.length > 0
+        ? columns
+        : [...DEBTOR_CUSTOMER_VARIABLE_KEYS];
     },
     enabled: !!currentWorkspace?.id && open,
   });
@@ -213,7 +221,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
           user_id: effectiveUserId,
           workspace_id: currentWorkspace.id,
           status: "active",
-          total_debt: 0,
+          total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
         }));
 
         const { error } = await supabase.from("debtors").insert(insertData);
@@ -251,8 +259,11 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             Import Debtors from Excel
           </DialogTitle>
           <DialogDescription>
-            Upload an Excel file (.xlsx) with debtors. First column should be the phone number. 
-            Additional columns become variables you can use in message templates (e.g., {"{name}"}, {"{amount}"}).
+            Upload an Excel file (.xlsx). First column = phone number. Remaining columns should
+            match template variables such as{" "}
+            <code className="text-xs">agent_name</code>,{" "}
+            <code className="text-xs">customer_name</code>,{" "}
+            <code className="text-xs">total_debt</code>, etc.
           </DialogDescription>
         </DialogHeader>
 
@@ -281,7 +292,8 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             )}
             {!workspaceSchema && (
               <p className="text-xs text-muted-foreground">
-                Format: First column = Phone Number, Other columns = Custom variables
+                <strong>Suggested headers after phone:</strong>{" "}
+                {DEBTOR_CUSTOMER_VARIABLE_KEYS.join(", ")}
               </p>
             )}
           </div>

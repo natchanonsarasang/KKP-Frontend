@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,27 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toThaiPhonetic, shouldUsePhonetic, spellThaiName, isNameField } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber, maskLicensePlate, isLicensePlateField } from "@/lib/formatPhone";
+import {
+  DEBTOR_CUSTOMER_VARIABLE_KEYS,
+  DEBTOR_CUSTOMER_VARIABLE_LABELS,
+  emptyDebtorCustomerVariables,
+  parseDebtAmountForColumn,
+} from "@/lib/debtorVariables";
+
+function buildVariablesToSave(
+  tv: Record<string, string>,
+  preserveTemplateFrom?: Record<string, unknown> | null
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
+    out[k] = tv[k] ?? "";
+  }
+  const mt = preserveTemplateFrom?.message_template;
+  if (typeof mt === "string" && mt.length > 0) {
+    out.message_template = mt;
+  }
+  return out;
+}
 
 interface Debtor {
   id: string;
@@ -109,11 +130,11 @@ const DebtorsList = () => {
     phone_number: "",
     status: "active",
     notes: "",
-    total_debt: 0,
     due_date: "",
-    message_template: "สวัสดีค่ะ คุณมียอดค้างชำระจำนวน {debt} และมีกำหนดชำระในวันที่ {due_date} ไม่ทราบว่าสามารถชำระได้ก่อนวันครบกำหนดหรือไม่คะ",
   });
-  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [templateVariables, setTemplateVariables] = useState<
+    Record<string, string>
+  >(() => emptyDebtorCustomerVariables());
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -180,47 +201,25 @@ const DebtorsList = () => {
   const totalCount = debtorsData?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  // Extract all unique variable keys from debtors (excluding message_template)
-  const variableColumns = debtors 
-    ? [...new Set(
-        debtors.flatMap(d => 
-          d.variables 
-            ? Object.keys(d.variables).filter(k => k !== 'message_template')
-            : []
-        )
-      )]
-    : [];
-
-  // Fetch workspace schema (all variable columns used in this workspace)
-  const { data: workspaceSchema = [] } = useQuery({
-    queryKey: ["workspace-schema", currentWorkspace?.id],
-    queryFn: async () => {
-      if (!currentWorkspace?.id) return [];
-
-      const { data, error } = await supabase
-        .from("debtors")
-        .select("variables")
-        .eq("workspace_id", currentWorkspace.id)
-        .limit(100);
-
-      if (error) throw error;
-      
-      const allKeys = new Set<string>();
-      data?.forEach((d) => {
-        const vars = d.variables as Record<string, unknown> | null;
-        if (vars) {
-          Object.keys(vars).forEach((key) => {
-            if (key !== "message_template") {
-              allKeys.add(key);
-            }
-          });
-        }
-      });
-      
-      return Array.from(allKeys).sort();
-    },
-    enabled: !!currentWorkspace?.id,
-  });
+  // Variable columns: standard customer keys first, then any legacy keys
+  const variableColumns = useMemo(() => {
+    if (!debtors?.length) return [];
+    const allKeys = new Set(
+      debtors.flatMap((d) =>
+        d.variables
+          ? Object.keys(d.variables).filter((k) => k !== "message_template")
+          : []
+      )
+    );
+    const ordered: string[] = [];
+    for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
+      if (allKeys.has(k)) ordered.push(k);
+    }
+    const rest = [...allKeys]
+      .filter((k) => !DEBTOR_CUSTOMER_VARIABLE_KEYS.includes(k as (typeof DEBTOR_CUSTOMER_VARIABLE_KEYS)[number]))
+      .sort();
+    return [...ordered, ...rest];
+  }, [debtors]);
 
   const { data: templates } = useQuery({
     queryKey: ["templates-full"],
@@ -311,14 +310,14 @@ const DebtorsList = () => {
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
       
-      // Build variables object - include all template variables
-      const variablesData = { ...data.variables };
-      
+      const variablesData = buildVariablesToSave(data.variables, null);
+      const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
+
       const { error } = await supabase.from("debtors").insert({
         phone_number: data.formData.phone_number,
         status: data.formData.status,
         notes: data.formData.notes || null,
-        total_debt: data.formData.total_debt || 0,
+        total_debt: totalDebt,
         due_date: data.formData.due_date || null,
         variables: variablesData,
         user_id: targetUserId,
@@ -342,16 +341,27 @@ const DebtorsList = () => {
   });
 
   const updateDebtorMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { formData: typeof formData; variables: Record<string, string> } }) => {
+    mutationFn: async ({
+      id,
+      data,
+      existingVariables,
+    }: {
+      id: string;
+      data: { formData: typeof formData; variables: Record<string, string> };
+      existingVariables: Record<string, unknown> | null | undefined;
+    }) => {
+      const variablesData = buildVariablesToSave(data.variables, existingVariables);
+      const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
+
       const { error } = await supabase
         .from("debtors")
         .update({
           phone_number: data.formData.phone_number,
           status: data.formData.status,
           notes: data.formData.notes || null,
-          total_debt: data.formData.total_debt || 0,
+          total_debt: totalDebt,
           due_date: data.formData.due_date || null,
-          variables: { ...data.variables },
+          variables: variablesData,
         })
         .eq("id", id);
       if (error) throw error;
@@ -570,11 +580,9 @@ const DebtorsList = () => {
       phone_number: "",
       status: "active",
       notes: "",
-      total_debt: 0,
       due_date: "",
-      message_template: "สวัสดีค่ะ คุณมียอดค้างชำระจำนวน {debt} และมีกำหนดชำระในวันที่ {due_date} ไม่ทราบว่าสามารถชำระได้ก่อนวันครบกำหนดหรือไม่คะ",
     });
-    setTemplateVariables({});
+    setTemplateVariables(emptyDebtorCustomerVariables());
   };
 
   const handleEdit = (debtor: Debtor) => {
@@ -584,12 +592,14 @@ const DebtorsList = () => {
       phone_number: debtor.phone_number,
       status: debtor.status,
       notes: debtor.notes || "",
-      total_debt: debtor.total_debt || 0,
       due_date: debtor.due_date || "",
-      message_template: debtorVars.message_template || "สวัสดีค่ะ คุณมียอดค้างชำระจำนวน {debt} และมีกำหนดชำระในวันที่ {due_date} ไม่ทราบว่าสามารถชำระได้ก่อนวันครบกำหนดหรือไม่คะ",
     });
-    // Load variables from debtor
-    setTemplateVariables(debtorVars);
+    const next = emptyDebtorCustomerVariables();
+    for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
+      const v = debtorVars[k];
+      next[k] = v != null && v !== undefined ? String(v) : "";
+    }
+    setTemplateVariables(next);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -600,7 +610,11 @@ const DebtorsList = () => {
     }
 
     if (editingDebtor) {
-      updateDebtorMutation.mutate({ id: editingDebtor.id, data: { formData, variables: templateVariables } });
+      updateDebtorMutation.mutate({
+        id: editingDebtor.id,
+        data: { formData, variables: templateVariables },
+        existingVariables: editingDebtor.variables,
+      });
     } else {
       createDebtorMutation.mutate({ formData, variables: templateVariables });
     }
@@ -715,7 +729,8 @@ const DebtorsList = () => {
       // Sum Debt values from variables
       const totalDebt = allDebtData.reduce((sum, d) => {
         const vars = d.variables as Record<string, unknown> | null;
-        const debtValue = vars?.Debt || vars?.debt || 0;
+        const debtValue =
+          vars?.Debt || vars?.debt || vars?.total_debt || 0;
         const numericValue = Number(String(debtValue).replace(/,/g, '')) || 0;
         return sum + numericValue;
       }, 0) || 0;
@@ -756,7 +771,7 @@ const DebtorsList = () => {
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingDebtor ? "Edit Debtor" : "Add Debtor"}</DialogTitle>
             <DialogDescription>
@@ -774,52 +789,63 @@ const DebtorsList = () => {
               />
             </div>
 
-            {/* Dynamic fields from workspace schema */}
-            {workspaceSchema && workspaceSchema.length > 0 ? (
-              <div className="space-y-3">
-                <Label className="text-sm text-muted-foreground">Workspace Fields</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {workspaceSchema.map((fieldName) => (
-                    <div key={fieldName} className="space-y-1.5">
-                      <Label className="text-sm">{fieldName}</Label>
-                      <Input
-                        value={templateVariables[fieldName] || ""}
-                        onChange={(e) => 
-                          setTemplateVariables((prev) => ({ 
-                            ...prev, 
-                            [fieldName]: e.target.value 
-                          }))
-                        }
-                        placeholder={`Enter ${fieldName}`}
-                      />
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm">Customer data</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use in call templates as{" "}
+                  <code className="text-xs bg-muted px-1 rounded">
+                    {"{agent_name}"}
+                  </code>
+                  ,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">
+                    {"{customer_name}"}
+                  </code>
+                  ,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">
+                    {"{total_debt}"}
+                  </code>
+                  , etc.
+                </p>
               </div>
-            ) : (
-              <>
-                {/* Fallback to default fields if no schema exists */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm">Total Debt (฿)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-sm">
+                      {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
+                    </Label>
                     <Input
-                      type="number"
-                      value={formData.total_debt || ""}
-                      onChange={(e) => setFormData((p) => ({ ...p, total_debt: e.target.value ? Number(e.target.value) : 0 }))}
-                      placeholder="0"
+                      value={templateVariables[key] ?? ""}
+                      onChange={(e) =>
+                        setTemplateVariables((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      placeholder={key}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm">Due Date</Label>
-                    <Input
-                      type="date"
-                      value={formData.due_date || ""}
-                      onChange={(e) => setFormData((p) => ({ ...p, due_date: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm">Due date</Label>
+              <Input
+                type="date"
+                value={formData.due_date || ""}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, due_date: e.target.value }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Use{" "}
+                <code className="text-xs bg-muted px-1 rounded">
+                  {"{due_date}"}
+                </code>{" "}
+                in templates.
+              </p>
+            </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Status</Label>
