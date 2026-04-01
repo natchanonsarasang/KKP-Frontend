@@ -105,6 +105,7 @@ serve(async (req) => {
             .update({
               status: mappedStatus,
               result_data: payload,
+              call_duration: callDuration ? Math.round(Number(callDuration)) : null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', callRecord.id);
