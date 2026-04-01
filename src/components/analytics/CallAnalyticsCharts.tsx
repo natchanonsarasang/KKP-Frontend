@@ -434,20 +434,35 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
 export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const chartColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
   const categoryData = useMemo(() => {
+    const THAI_TO_EN: Record<string, string> = {
+      "ลูกค้าอยู่ที่เสียงดัง": "Customer in noisy environment",
+      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": "Customer not convenient to talk",
+      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": "Customer refused to pay",
+      "ลูกค้าสนใจปรับโครงสร้างหนี้": "Customer interested in debt restructuring",
+      "ลูกค้าขอคุยกับเจ้าหน้าที่": "Customer requested human agent",
+      "ลูกค่ายอมจ่าย + บอกวันที่": "Customer promised to pay with date",
+      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": "Customer promised to pay (no date)",
+      "ไม่รับสาย → โทรรอบ 2": "No answer – call back later",
+      "ไม่อยากคุยกับ Bot": "Customer refused to talk to bot",
+      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": "Customer has hardship situation",
+      "ลูกค้าพูดภาษาถิ่น": "Language barrier",
+      "ลูกค้าไม่พูด": "Customer silent",
+      "โทรแล้วปิดเครื่อง": "Phone is turned off",
+    };
     const categories: Record<string, number> = {
-      "ลูกค้าอยู่ที่เสียงดัง": 0,
-      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": 0,
-      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": 0,
-      "ลูกค้าสนใจปรับโครงสร้างหนี้": 0,
-      "ลูกค้าขอคุยกับเจ้าหน้าที่": 0,
-      "ลูกค่ายอมจ่าย + บอกวันที่": 0,
-      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": 0,
-      "ไม่รับสาย → โทรรอบ 2": 0,
-      "ไม่อยากคุยกับ Bot": 0,
-      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": 0,
-      "ลูกค้าพูดภาษาถิ่น": 0,
-      "ลูกค้าไม่พูด": 0,
-      "โทรแล้วปิดเครื่อง": 0,
+      "Customer in noisy environment": 0,
+      "Customer not convenient to talk": 0,
+      "Customer refused to pay": 0,
+      "Customer interested in debt restructuring": 0,
+      "Customer requested human agent": 0,
+      "Customer promised to pay with date": 0,
+      "Customer promised to pay (no date)": 0,
+      "No answer – call back later": 0,
+      "Customer refused to talk to bot": 0,
+      "Customer has hardship situation": 0,
+      "Language barrier": 0,
+      "Customer silent": 0,
+      "Phone is turned off": 0,
     };
 
     callListItems.forEach((item) => {
