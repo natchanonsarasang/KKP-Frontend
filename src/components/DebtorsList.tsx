@@ -1280,6 +1280,17 @@ const DebtorsList = () => {
                                     <Pencil className="w-4 h-4 mr-2" />
                                     Edit
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      const newBlocked = !(debtor as any).is_blocked;
+                                      const { error } = await supabase.from("debtors").update({ is_blocked: newBlocked } as any).eq("id", debtor.id);
+                                      if (error) { toast.error("Failed to update block status"); return; }
+                                      queryClient.invalidateQueries({ queryKey: ["debtors"] });
+                                      toast.success(newBlocked ? "Blocked - จะไม่โทรหาลูกค้านี้" : "Unblocked - สามารถโทรได้อีกครั้ง");
+                                    }}
+                                  >
+                                    {(debtor as any).is_blocked ? "🔓 Unblock" : "🚫 Block (ห้ามโทร)"}
+                                  </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onClick={() => deleteDebtorMutation.mutate(debtor.id)}
