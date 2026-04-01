@@ -367,6 +367,7 @@ Return ONLY the category name as a string, nothing else.`
                 picked_up: pickedUp,
                 notes: notesData,
                 call_record_id: callRecordId,
+                ai_category: aiCategory,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', recentItem.id);
