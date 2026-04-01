@@ -1160,7 +1160,7 @@ const DebtorsList = () => {
                       return (
                         <TableRow 
                           key={debtor.id} 
-                          className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`
+                          className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`}
                         >
                           <TableCell>
                             <Checkbox
