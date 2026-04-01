@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-type TabType = "debtors" | "call-list" | "templates" | "analytics";
+type TabType = "debtors" | "call-list" | "templates" | "analytics" | "reports";
 
 interface DashboardNavLinkProps {
   active: boolean;
