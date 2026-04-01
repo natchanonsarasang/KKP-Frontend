@@ -59,6 +59,9 @@ const TemplateSetup = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showTestCallDialog, setShowTestCallDialog] = useState(false);
+  const [testCallPhone, setTestCallPhone] = useState("");
+  const [testCallTemplateId, setTestCallTemplateId] = useState<string>("");
   
   const [formData, setFormData] = useState({
     message:
