@@ -336,7 +336,28 @@ Return ONLY the category name as a string, nothing else.`
             console.log('No pending call_list_item found for debtor');
           }
         } else {
-          console.log('No debtors found with phone:', phoneNumber);
+          // Auto-create debtor when not found
+          console.log('Auto-creating debtor for phone:', phoneNumber);
+          const { data: newDebtor, error: createDebtorError } = await supabase
+            .from('debtors')
+            .insert({
+              phone_number: phoneNumber,
+              status: 'active',
+              call_outcome: callOutcome,
+              call_answered: pickedUp,
+              last_contact_at: new Date().toISOString(),
+              picked_up_count: pickedUp ? 1 : 0,
+              not_picked_up_count: pickedUp ? 0 : 1,
+              contact_attempts: 1,
+            })
+            .select('id')
+            .single();
+
+          if (createDebtorError) {
+            console.error('Error auto-creating debtor:', createDebtorError);
+          } else {
+            console.log('Debtor auto-created:', newDebtor.id);
+          }
         }
 
         // 3. Update debtor stats based on call result
