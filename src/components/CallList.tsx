@@ -179,7 +179,7 @@ const CallList = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [previewPayload, setPreviewPayload] = useState<{ phone: string; templateId: string; message: string; item: CallListItem } | null>(null);
   const [nextBatchCountdown, setNextBatchCountdown] = useState<number>(0);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null } | null>(null);
