@@ -95,6 +95,32 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     }
   }, [open]);
 
+  const downloadTemplate = () => {
+    const headers = ["phone_number", ...(workspaceSchema ?? [...DEBTOR_CUSTOMER_VARIABLE_KEYS])];
+    const sampleRow = headers.map((h) => {
+      switch (h) {
+        case "phone_number": return "0891234567";
+        case "agent_name": return "สมชาย";
+        case "customer_name": return "สมหญิง";
+        case "car_detail": return "Toyota Vios 2020";
+        case "overdue_installment": return "3";
+        case "total_debt": return "150000";
+        case "total_interest": return "5000";
+        case "total_fine": return "2000";
+        case "other_expense": return "500";
+        case "due_date": return "2025-12-31";
+        default: return "ตัวอย่าง";
+      }
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Debtors");
+    XLSX.writeFile(wb, "debtor_template.xlsx");
+    toast.success("ดาวน์โหลด Template สำเร็จ!");
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
