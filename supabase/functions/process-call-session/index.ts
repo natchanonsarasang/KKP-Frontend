@@ -451,9 +451,9 @@ async function processSession(supabase: any, sessionId: string) {
       constructedMessage = constructedMessage.replace(regex, replacementValue);
     });
 
-    // Replace name
+    // Replace name (with phonetic spelling for difficult names)
     if (debtor.name) {
-      constructedMessage = constructedMessage.replace(/\{name\}/gi, debtor.name);
+      constructedMessage = constructedMessage.replace(/\{name\}/gi, spellThaiName(debtor.name));
     }
     
     // Also replace standard placeholders that might not be in variables
