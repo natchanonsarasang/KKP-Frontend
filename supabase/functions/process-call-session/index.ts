@@ -171,6 +171,36 @@ function toThaiPhonetic(text: string): string {
   return parts.length > 0 ? `|${parts.join('|')}` : '';
 }
 
+// Spell out Thai name phonetically for difficult names
+const uncommonChars = new Set(['ฆ', 'ฌ', 'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ', 'ธ', 'ภ', 'ศ', 'ษ', 'ฬ', 'ญ']);
+const thaiModifiers = /[\u0E30-\u0E3A\u0E40-\u0E4E\u0E47-\u0E4F]/;
+
+function spellThaiName(name: string): string {
+  if (!name || name.trim().length === 0) return name;
+  const needsSpelling = [...name].some(c => uncommonChars.has(c));
+  if (!needsSpelling) return name;
+
+  const parts: string[] = [];
+  for (const char of name) {
+    if (thaiConsonants[char]) {
+      parts.push(`${thaiConsonants[char][0]}|${thaiConsonants[char][1]}`);
+    } else if (thaiNumbers[char]) {
+      parts.push(thaiNumbers[char]);
+    } else if (!thaiModifiers.test(char) && char.trim()) {
+      parts.push(char);
+    } else {
+      if (parts.length > 0) {
+        parts[parts.length - 1] += char;
+      } else {
+        parts.push(char);
+      }
+    }
+  }
+  return `${name} สะกดว่า ${parts.join(' ')}`;
+}
+
+const nameFields = ['name', 'ชื่อ', 'first_name', 'last_name', 'นามสกุล', 'ชื่อจริง'];
+
 // Convert amount string to Thai words (WITHOUT "บาท" - template already has it)
 function amountToThaiWords(amountStr: string): string {
   const num = parseFloat(amountStr.replace(/,/g, ""));
