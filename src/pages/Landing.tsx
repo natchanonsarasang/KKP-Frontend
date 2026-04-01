@@ -40,6 +40,23 @@ const Landing = () => {
     navigate("/dashboard");
   };
 
+  const handleMicrosoftLogin = async () => {
+    const result = await lovable.auth.signInWithOAuth("microsoft", {
+      redirect_uri: window.location.origin,
+    });
+
+    if (result.error) {
+      console.error('Login error:', result.error);
+      return;
+    }
+
+    if (result.redirected) {
+      return;
+    }
+
+    navigate("/dashboard");
+  };
+
   const features = [
     {
       icon: Phone,
