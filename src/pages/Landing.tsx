@@ -110,9 +110,14 @@ const Landing = () => {
               Go to Dashboard
             </Button>
           ) : (
-            <Button onClick={handleGoogleLogin} variant="outline" size="sm">
-              Sign In
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleGoogleLogin} variant="outline" size="sm">
+                Google Sign In
+              </Button>
+              <Button onClick={handleMicrosoftLogin} variant="outline" size="sm">
+                O365 Sign In
+              </Button>
+            </div>
           )}
         </header>
 
