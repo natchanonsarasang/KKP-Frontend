@@ -97,3 +97,50 @@ export const shouldUsePhonetic = (fieldName: string): boolean => {
   ];
   return phoneticFields.some(f => fieldName.toLowerCase().includes(f.toLowerCase()));
 };
+
+/**
+ * Check if a field name is a Thai name field that may need spelling out
+ */
+export const isNameField = (fieldName: string): boolean => {
+  const nameFields = ['name', 'ชื่อ', 'first_name', 'last_name', 'นามสกุล', 'ชื่อจริง'];
+  return nameFields.some(f => fieldName.toLowerCase().includes(f.toLowerCase()));
+};
+
+/**
+ * Spell out a Thai name phonetically for difficult names
+ * Example: "ณัฐพงศ์" -> "ณัฐพงศ์ สะกดว่า นอ|เนน|อัด|ถอ|ถุง|พอ|พาน|งอ|งู|สอ|ศาลา|อ์"
+ * Only spells if the name contains uncommon consonants
+ */
+export const spellThaiName = (name: string): string => {
+  if (!name || name.trim().length === 0) return name;
+
+  // Uncommon consonants that might cause confusion
+  const uncommonChars = new Set(['ฆ', 'ฌ', 'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ', 'ธ', 'ภ', 'ศ', 'ษ', 'ฬ', 'ญ']);
+  // Thai vowels and tone marks (not consonants)
+  const thaiModifiers = /[\u0E30-\u0E3A\u0E40-\u0E4E\u0E47-\u0E4F]/;
+
+  // Check if spelling is needed (contains uncommon consonants)
+  const needsSpelling = [...name].some(c => uncommonChars.has(c));
+  if (!needsSpelling) return name;
+
+  // Build phonetic spelling
+  const parts: string[] = [];
+  for (const char of name) {
+    if (thaiConsonants[char]) {
+      parts.push(`${thaiConsonants[char][0]}|${thaiConsonants[char][1]}`);
+    } else if (thaiNumbers[char]) {
+      parts.push(thaiNumbers[char]);
+    } else if (!thaiModifiers.test(char) && char.trim()) {
+      parts.push(char);
+    } else {
+      // vowels/tone marks - attach to previous
+      if (parts.length > 0) {
+        parts[parts.length - 1] += char;
+      } else {
+        parts.push(char);
+      }
+    }
+  }
+
+  return `${name} สะกดว่า ${parts.join(' ')}`;
+};

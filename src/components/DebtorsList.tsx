@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
+import { toThaiPhonetic, shouldUsePhonetic, spellThaiName, isNameField } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber, maskLicensePlate, isLicensePlateField } from "@/lib/formatPhone";
 
 interface Debtor {
@@ -447,6 +447,10 @@ const DebtorsList = () => {
         // Convert license plate fields to Thai phonetic reading (karaoke style)
         if (shouldUsePhonetic(key)) {
           processedValue = toThaiPhonetic(processedValue);
+        }
+        // Spell out difficult Thai names phonetically
+        else if (isNameField(key)) {
+          processedValue = spellThaiName(processedValue);
         }
         
         constructedMessage = constructedMessage.replace(placeholder, processedValue);

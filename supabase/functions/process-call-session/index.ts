@@ -36,6 +36,7 @@ interface Debtor {
   due_date: string | null;
   total_debt: number | null;
   variables: Record<string, string> | null;
+  is_blocked: boolean;
 }
 
 interface Template {
@@ -170,6 +171,36 @@ function toThaiPhonetic(text: string): string {
   return parts.length > 0 ? `|${parts.join('|')}` : '';
 }
 
+// Spell out Thai name phonetically for difficult names
+const uncommonChars = new Set(['ฆ', 'ฌ', 'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ', 'ธ', 'ภ', 'ศ', 'ษ', 'ฬ', 'ญ']);
+const thaiModifiers = /[\u0E30-\u0E3A\u0E40-\u0E4E\u0E47-\u0E4F]/;
+
+function spellThaiName(name: string): string {
+  if (!name || name.trim().length === 0) return name;
+  const needsSpelling = [...name].some(c => uncommonChars.has(c));
+  if (!needsSpelling) return name;
+
+  const parts: string[] = [];
+  for (const char of name) {
+    if (thaiConsonants[char]) {
+      parts.push(`${thaiConsonants[char][0]}|${thaiConsonants[char][1]}`);
+    } else if (thaiNumbers[char]) {
+      parts.push(thaiNumbers[char]);
+    } else if (!thaiModifiers.test(char) && char.trim()) {
+      parts.push(char);
+    } else {
+      if (parts.length > 0) {
+        parts[parts.length - 1] += char;
+      } else {
+        parts.push(char);
+      }
+    }
+  }
+  return `${name} สะกดว่า ${parts.join(' ')}`;
+}
+
+const nameFields = ['name', 'ชื่อ', 'first_name', 'last_name', 'นามสกุล', 'ชื่อจริง'];
+
 // Convert amount string to Thai words (WITHOUT "บาท" - template already has it)
 function amountToThaiWords(amountStr: string): string {
   const num = parseFloat(amountStr.replace(/,/g, ""));
@@ -298,7 +329,7 @@ async function processSession(supabase: any, sessionId: string) {
   const debtorIds = pendingItems.map((item: { debtor_id: string }) => item.debtor_id);
   const { data: debtors } = await supabase
     .from("debtors")
-    .select("id, phone_number, name, due_date, total_debt, variables")
+    .select("id, phone_number, name, due_date, total_debt, variables, is_blocked")
     .in("id", debtorIds);
 
   const debtorMap = new Map((debtors as Debtor[] || []).map(d => [d.id, d]));
@@ -354,6 +385,16 @@ async function processSession(supabase: any, sessionId: string) {
       return { success: false, failed: false };
     }
 
+    // Skip blocked debtors
+    if (debtor.is_blocked) {
+      console.log(`[Session ${sessionId}] Debtor ${debtor.phone_number} is blocked, skipping.`);
+      await supabase
+        .from("call_list_items")
+        .update({ status: "completed", call_outcome: "Blocked", picked_up: false })
+        .eq("id", item.id);
+      return { success: false, failed: false };
+    }
+
     const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
     if (!template?.template_id) {
       console.log(`[Session ${sessionId}] No template for item ${item.id}`);
@@ -398,6 +439,10 @@ async function processSession(supabase: any, sessionId: string) {
       else if (phoneticFields.some(f => keyLower.includes(f))) {
         replacementValue = toThaiPhonetic(replacementValue);
       }
+      // Check if this is a name field - spell out difficult names
+      else if (nameFields.some(f => keyLower.includes(f))) {
+        replacementValue = spellThaiName(replacementValue);
+      }
       // For other numeric values, try to read as number
       else if (/^\d+$/.test(replacementValue)) {
         replacementValue = numberToThaiWords(parseInt(replacementValue, 10));
@@ -406,9 +451,9 @@ async function processSession(supabase: any, sessionId: string) {
       constructedMessage = constructedMessage.replace(regex, replacementValue);
     });
 
-    // Replace name
+    // Replace name (with phonetic spelling for difficult names)
     if (debtor.name) {
-      constructedMessage = constructedMessage.replace(/\{name\}/gi, debtor.name);
+      constructedMessage = constructedMessage.replace(/\{name\}/gi, spellThaiName(debtor.name));
     }
     
     // Also replace standard placeholders that might not be in variables
