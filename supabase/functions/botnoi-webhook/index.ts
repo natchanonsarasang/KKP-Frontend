@@ -71,8 +71,8 @@ serve(async (req) => {
 
       const pickedUp = mappedStatus === 'confirmed' || mappedStatus === 'declined' || mappedStatus === 'no_response';
       const audioUrl = payload.audio_url || null;
-      // Extract conversation log - Botnoi sends it as conversation_log
       const conversationLog = payload.conversation_log || payload.transcript || payload.transcription || null;
+      const callDuration = payload.duration || payload.call_duration || payload.talk_time || null;
 
       console.log('Audio URL:', audioUrl);
       console.log('Conversation Log:', conversationLog);
@@ -105,6 +105,7 @@ serve(async (req) => {
             .update({
               status: mappedStatus,
               result_data: payload,
+              call_duration: callDuration ? Math.round(Number(callDuration)) : null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', callRecord.id);

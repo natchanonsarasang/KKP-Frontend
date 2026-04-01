@@ -100,6 +100,7 @@ export type Database = {
           appointment_date: string | null
           appointment_time: string | null
           botnoi_call_id: string | null
+          call_duration: number | null
           created_at: string
           due_date: string | null
           id: string
@@ -116,6 +117,7 @@ export type Database = {
           appointment_date?: string | null
           appointment_time?: string | null
           botnoi_call_id?: string | null
+          call_duration?: number | null
           created_at?: string
           due_date?: string | null
           id?: string
@@ -132,6 +134,7 @@ export type Database = {
           appointment_date?: string | null
           appointment_time?: string | null
           botnoi_call_id?: string | null
+          call_duration?: number | null
           created_at?: string
           due_date?: string | null
           id?: string
@@ -312,6 +315,7 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          is_blocked: boolean
           last_contact_at: string | null
           last_name: string | null
           last_response: string | null
@@ -340,6 +344,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_blocked?: boolean
           last_contact_at?: string | null
           last_name?: string | null
           last_response?: string | null
@@ -368,6 +373,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_blocked?: boolean
           last_contact_at?: string | null
           last_name?: string | null
           last_response?: string | null

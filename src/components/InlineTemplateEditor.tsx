@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -282,15 +289,26 @@ const InlineTemplateEditor = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="speaker_id" className="text-sm">Speaker ID</Label>
-                    <Input
-                      id="speaker_id"
+                    <Label htmlFor="speaker_id" className="text-sm">Speaker Voice</Label>
+                    <Select
                       value={formData.speaker_id}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, speaker_id: e.target.value }))
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, speaker_id: value }))
                       }
-                      placeholder="523"
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select voice" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="523">👩 เสียงผู้หญิง 1 (523)</SelectItem>
+                        <SelectItem value="524">👩 เสียงผู้หญิง 2 (524)</SelectItem>
+                        <SelectItem value="525">👩 เสียงผู้หญิง 3 (525)</SelectItem>
+                        <SelectItem value="500">👨 เสียงผู้ชาย 1 (500)</SelectItem>
+                        <SelectItem value="501">👨 เสียงผู้ชาย 2 (501)</SelectItem>
+                        <SelectItem value="502">👨 เสียงผู้ชาย 3 (502)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">เลือกเสียง Bot</p>
                   </div>
                 </div>
 

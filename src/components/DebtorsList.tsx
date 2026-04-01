@@ -1160,7 +1160,7 @@ const DebtorsList = () => {
                       return (
                         <TableRow 
                           key={debtor.id} 
-                          className={isSelected ? "bg-muted/30" : ""}
+                          className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`}
                         >
                           <TableCell>
                             <Checkbox
@@ -1260,7 +1260,7 @@ const DebtorsList = () => {
                                 variant="outline"
                                 className="h-8 gap-1.5"
                                 onClick={() => handleMakeCall(debtor)}
-                                disabled={isAdding || debtor.status === "paid"}
+                                disabled={isAdding || debtor.status === "paid" || (debtor as any).is_blocked}
                               >
                                 {isAdding ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1279,6 +1279,17 @@ const DebtorsList = () => {
                                   <DropdownMenuItem onClick={() => handleEdit(debtor)}>
                                     <Pencil className="w-4 h-4 mr-2" />
                                     Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      const newBlocked = !(debtor as any).is_blocked;
+                                      const { error } = await supabase.from("debtors").update({ is_blocked: newBlocked } as any).eq("id", debtor.id);
+                                      if (error) { toast.error("Failed to update block status"); return; }
+                                      queryClient.invalidateQueries({ queryKey: ["debtors"] });
+                                      toast.success(newBlocked ? "Blocked - จะไม่โทรหาลูกค้านี้" : "Unblocked - สามารถโทรได้อีกครั้ง");
+                                    }}
+                                  >
+                                    {(debtor as any).is_blocked ? "🔓 Unblock" : "🚫 Block (ห้ามโทร)"}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem

@@ -10,6 +10,13 @@ import { toast } from "sonner";
 import { Plus, Loader2, MessageSquare, CheckCircle, XCircle, HelpCircle, Trash2, Eye, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -347,14 +354,26 @@ const TemplateSetup = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="speaker_id">Speaker ID</Label>
-                  <Input
-                    id="speaker_id"
+                  <Label htmlFor="speaker_id">Speaker Voice</Label>
+                  <Select
                     value={formData.speaker_id}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, speaker_id: e.target.value }))
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, speaker_id: value }))
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select voice" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      <SelectItem value="523">👩 เสียงผู้หญิง 1 (ID: 523)</SelectItem>
+                      <SelectItem value="524">👩 เสียงผู้หญิง 2 (ID: 524)</SelectItem>
+                      <SelectItem value="525">👩 เสียงผู้หญิง 3 (ID: 525)</SelectItem>
+                      <SelectItem value="500">👨 เสียงผู้ชาย 1 (ID: 500)</SelectItem>
+                      <SelectItem value="501">👨 เสียงผู้ชาย 2 (ID: 501)</SelectItem>
+                      <SelectItem value="502">👨 เสียงผู้ชาย 3 (ID: 502)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">เลือกเสียง Bot สำหรับการโทร</p>
                 </div>
               </div>
 
