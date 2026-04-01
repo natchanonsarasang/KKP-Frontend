@@ -23,26 +23,36 @@ serve(async (req) => {
 
     // Function to categorize conversation using Lovable AI
     const categorizeConversation = async (log: string, status: string): Promise<string> => {
-      // 1. Check system-level statuses first
       if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
-        return "ไม่รับสาย → โทรรอบ 2";
+        return "No answer – call back later";
       }
-      
       if (status === 'failed' || status === 'error') {
-        return "โทรแล้วปิดเครื่อง";
+        return "Phone is turned off";
       }
-
-      // 2. If no log, and status is completed, it might be "ลูกค้าไม่พูด"
       if (!log || log.trim().length < 5) {
-        if (status === 'completed') return "ลูกค้าไม่พูด";
-        return "ไม่รับสาย → โทรรอบ 2";
+        if (status === 'completed') return "Customer silent";
+        return "No answer – call back later";
       }
-
-      // 3. For behavioral categories, use Lovable AI
       if (!LOVABLE_API_KEY) {
         console.warn('LOVABLE_API_KEY not found, skipping AI categorization');
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return "Customer has hardship situation";
       }
+
+      const AICATEGORIES = [
+        "Customer in noisy environment",
+        "Customer not convenient to talk",
+        "Customer refused to pay",
+        "Customer interested in debt restructuring",
+        "Customer requested human agent",
+        "Customer promised to pay with date",
+        "Customer promised to pay (no date)",
+        "No answer – call back later",
+        "Customer refused to talk to bot",
+        "Customer has hardship situation",
+        "Language barrier",
+        "Customer silent",
+        "Phone is turned off"
+      ];
 
       try {
         const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -56,22 +66,21 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: `You are an AI that categorizes debt collection call transcripts into one of these 13 categories in Thai:
-1. ลูกค้าอยู่ที่เสียงดัง (Noisy environment)
-2. ลูกค้าอยู่ข้างทาง / ไม่สะดวก (Inconvenient/Roadside)
-3. ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก) (Refuses to pay/Silent/Interrupts)
-4. ลูกค้าสนใจปรับโครงสร้างหนี้ (Interested in debt restructuring)
-5. ลูกค้าขอคุยกับเจ้าหน้าที่ (Wants to talk to an agent)
-6. ลูกค่ายอมจ่าย + บอกวันที่ (Agrees to pay + date)
-7. ลูกค่ายอมจ่าย แต่ไม่บอกวันที่ (Agrees to pay but no date)
-8. ไม่รับสาย → โทรรอบ 2 (System result: No answer)
-9. ไม่อยากคุยกับ Bot (Refuses to talk to bot)
-10. ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต) (Irrelevant topics/Flood/Death)
-11. ลูกค้าพูดภาษาถิ่น (Local dialect)
-12. ลูกค้าไม่พูด (Silent customer)
-13. โทรแล้วปิดเครื่อง (System result: Failed/Phone off)
+                content: `You categorize debt collection call transcripts into exactly one of these 13 categories. Return ONLY the category string, nothing else.
 
-Return ONLY the category name as a string, nothing else.`
+1. Customer in noisy environment
+2. Customer not convenient to talk
+3. Customer refused to pay
+4. Customer interested in debt restructuring
+5. Customer requested human agent
+6. Customer promised to pay with date
+7. Customer promised to pay (no date)
+8. No answer – call back later
+9. Customer refused to talk to bot
+10. Customer has hardship situation
+11. Language barrier
+12. Customer silent
+13. Phone is turned off`
               },
               {
                 role: 'user',
@@ -84,40 +93,22 @@ Return ONLY the category name as a string, nothing else.`
 
         if (!response.ok) {
           console.error('Lovable AI error:', response.status, await response.text());
-          return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+          return "Customer has hardship situation";
         }
 
         const result = await response.json();
         const category = result.choices?.[0]?.message?.content?.trim();
-        
-        const AICATEGORIES = [
-          "ลูกค้าอยู่ที่เสียงดัง",
-          "ลูกค้าอยู่ข้างทาง / ไม่สะดวก",
-          "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)",
-          "ลูกค้าสนใจปรับโครงสร้างหนี้",
-          "ลูกค้าขอคุยกับเจ้าหน้าที่",
-          "ลูกค่ายอมจ่าย + บอกวันที่",
-          "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่",
-          "ไม่รับสาย → โทรรอบ 2",
-          "ไม่อยากคุยกับ Bot",
-          "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)",
-          "ลูกค้าพูดภาษาถิ่น",
-          "ลูกค้าไม่พูด",
-          "โทรแล้วปิดเครื่อง"
-        ];
 
         if (category && AICATEGORIES.includes(category)) {
           return category;
         }
-
-        for (const allowedCat of AICATEGORIES) {
-          if (category?.includes(allowedCat)) return allowedCat;
+        for (const c of AICATEGORIES) {
+          if (category?.includes(c)) return c;
         }
-
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return "Customer has hardship situation";
       } catch (err) {
         console.error('Error calling Lovable AI:', err);
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return "Customer has hardship situation";
       }
     };
 
