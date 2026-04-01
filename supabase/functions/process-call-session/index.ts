@@ -36,6 +36,7 @@ interface Debtor {
   due_date: string | null;
   total_debt: number | null;
   variables: Record<string, string> | null;
+  is_blocked: boolean;
 }
 
 interface Template {
