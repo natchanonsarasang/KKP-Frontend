@@ -299,7 +299,7 @@ async function processSession(supabase: any, sessionId: string) {
   const debtorIds = pendingItems.map((item: { debtor_id: string }) => item.debtor_id);
   const { data: debtors } = await supabase
     .from("debtors")
-    .select("id, phone_number, name, due_date, total_debt, variables")
+    .select("id, phone_number, name, due_date, total_debt, variables, is_blocked")
     .in("id", debtorIds);
 
   const debtorMap = new Map((debtors as Debtor[] || []).map(d => [d.id, d]));
