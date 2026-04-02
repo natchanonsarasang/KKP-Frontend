@@ -89,15 +89,6 @@ serve(async (req) => {
       }
 
       const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
-      if (!template || !template.template_id) {
-        console.log(`Template not found for item ${item.id}`);
-        await supabase
-          .from("call_list_items")
-          .update({ status: "failed", notes: "Template not found" })
-          .eq("id", item.id);
-        results.push({ id: item.id, success: false, error: "Template not found" });
-        continue;
-      }
 
       console.log(`Processing call for: ${debtor.phone_number}`);
 
