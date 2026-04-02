@@ -481,11 +481,16 @@ const DebtorsList = () => {
       
       console.log("Constructed message:", constructedMessage);
 
+      // Build variables from debtor data
+      const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
+      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
+      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
+      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
+
       const { data, error } = await supabase.functions.invoke("botnoi-make-call", {
         body: {
           phone_number: debtor.phone_number,
-          template_id: workspaceTemplate.template_id,
-          constructed_message: constructedMessage,
+          variables: callVariables,
         },
       });
 

@@ -182,8 +182,7 @@ const ExcelUpload = () => {
             {
               body: {
                 phone_number: row.phone_number,
-                template_id: template.template_id,
-                constructed_message: constructedMessage,
+                variables: { sentence1: constructedMessage },
               },
             }
           );

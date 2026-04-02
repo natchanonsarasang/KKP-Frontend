@@ -1169,15 +1169,20 @@ const CallList = () => {
         .update({ call_record_id: callRecord.id })
         .eq("id", item.id);
 
-      // Make call via edge function - use hardcoded template ID and send constructed message
-      console.log("Sending to Botnoi - template_id:", BOTNOI_TEMPLATE_ID, "constructed_message:", constructedMessage);
+      // Make call via edge function - send debtor variables directly
+      const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
+      // Add standard fields
+      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
+      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
+      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
+      
+      console.log("Sending to Voicebot API - variables:", callVariables);
       const { data: callResponse, error: callError } = await supabase.functions.invoke(
         "botnoi-make-call",
         {
           body: {
             phone_number: debtor.phone_number,
-            template_id: BOTNOI_TEMPLATE_ID,
-            constructed_message: constructedMessage,
+            variables: callVariables,
           },
         }
       );
