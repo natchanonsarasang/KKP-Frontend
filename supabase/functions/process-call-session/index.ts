@@ -375,7 +375,11 @@ async function processSession(supabase: any, sessionId: string) {
     const debtor = debtorMap.get(item.debtor_id);
     if (!debtor) {
       console.log(`[Session ${sessionId}] Debtor not found for item ${item.id}`);
-      return { success: false, failed: false };
+      await supabase
+        .from("call_list_items")
+        .update({ status: "failed", call_outcome: "Debtor not found", picked_up: false })
+        .eq("id", item.id);
+      return { success: false, failed: true, confirmed: false, tokensUsed: 0 };
     }
 
     // Skip blocked debtors
@@ -385,7 +389,7 @@ async function processSession(supabase: any, sessionId: string) {
         .from("call_list_items")
         .update({ status: "completed", call_outcome: "Blocked", picked_up: false })
         .eq("id", item.id);
-      return { success: false, failed: false };
+      return { success: false, failed: false, confirmed: false, tokensUsed: 0 };
     }
 
     const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
