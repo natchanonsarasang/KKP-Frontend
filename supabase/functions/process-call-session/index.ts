@@ -654,24 +654,38 @@ async function processSession(supabase: any, sessionId: string) {
     .eq("user_id", typedSession.user_id)
     .in("status", ["pending", "retry_pending"]);
 
-  // Check current calling count
+  // Check current calling count (with stale detection)
   const { data: currentCalling } = await supabase
     .from("call_list_items")
-    .select("id")
+    .select("id, called_at")
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
     .eq("status", "calling");
 
-  const callingNow = currentCalling?.length || 0;
+  // Reset any stale calls at the end too
+  const endNow = Date.now();
+  const endStaleItems = (currentCalling || []).filter(item => {
+    if (!item.called_at) return true;
+    return endNow - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
+  });
+
+  if (endStaleItems.length > 0) {
+    const endStaleIds = endStaleItems.map(item => item.id);
+    console.log(`[Session ${sessionId}] End-of-batch: resetting ${endStaleIds.length} stale items`);
+    await supabase
+      .from("call_list_items")
+      .update({ status: "failed", call_outcome: "Call timed out", picked_up: false })
+      .in("id", endStaleIds);
+  }
+
+  const callingNow = (currentCalling?.length || 0) - endStaleItems.length;
   const slotsAvailable = maxConcurrent - callingNow;
 
   if (count && count > 0 && slotsAvailable > 0) {
     console.log(`[Session ${sessionId}] ${count} more items, ${slotsAvailable} slots available, continuing...`);
-    // Continue processing immediately to fill available slots
     await processSession(supabase, sessionId);
   } else if (count && count > 0) {
     console.log(`[Session ${sessionId}] ${count} more items but no slots available, waiting for webhook...`);
-    // Don't recurse - webhook will trigger us when a call completes
   } else if (callingNow === 0) {
     console.log(`[Session ${sessionId}] All items processed, completing.`);
     await supabase
