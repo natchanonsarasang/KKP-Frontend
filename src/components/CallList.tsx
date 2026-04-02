@@ -226,7 +226,7 @@ const CallList = () => {
   // Handle viewing transcript
   const handleViewTranscript = useCallback((notes: string | null) => {
     const data = parseNotesData(notes);
-    setTranscriptData({ conversationLog: data.conversationLog });
+    setTranscriptData({ conversationLog: data.conversationLog, audioUrl: data.audioUrl });
     setShowTranscriptDialog(true);
   }, [parseNotesData]);
 
