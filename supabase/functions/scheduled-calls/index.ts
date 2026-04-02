@@ -107,7 +107,7 @@ serve(async (req) => {
             amount: debtor.total_debt?.toString() || "",
             due_date: debtor.due_date,
             status: "calling",
-            template_id: template.id,
+            template_id: template?.id || null,
             user_id: item.user_id,
           })
           .select()
