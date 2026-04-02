@@ -353,16 +353,8 @@ async function processSession(supabase: any, sessionId: string) {
   const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
 
   const isTestMode = typedSession.settings.testMode === true;
-  const botnoiToken = Deno.env.get("BOTNOI_API_TOKEN");
-  
-  if (!isTestMode && !botnoiToken) {
-    console.error(`[Session ${sessionId}] BOTNOI_API_TOKEN not configured`);
-    await supabase
-      .from("call_sessions")
-      .update({ status: "stopped", error_message: "BOTNOI_API_TOKEN not configured" })
-      .eq("id", sessionId);
-    return;
-  }
+  const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
+  const BOT_ID = "69ccfae9b875327d960ef1bb";
   
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
