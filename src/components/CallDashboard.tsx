@@ -109,7 +109,7 @@ const CallDashboard = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as CallListItem[];
+      return (data ?? []) as unknown as CallListItem[];
     },
     refetchInterval: 10000,
     enabled: !!effectiveUserId,
