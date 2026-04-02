@@ -94,13 +94,6 @@ interface CallListItem {
   debtor?: Debtor;
 }
 
-interface Template {
-  id: string;
-  template_id: string | null;
-  org_name: string;
-  message: string;
-  is_system_default: boolean;
-}
 
 interface CallSession {
   id: string;
