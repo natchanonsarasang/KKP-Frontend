@@ -45,21 +45,6 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       bgColor: "bg-primary/10",
     },
     {
-      label: "Confirmed",
-      value: confirmed.length,
-      subValue: `${conversionRate}% conv.`,
-      icon: CheckCircle,
-      color: "text-success",
-      bgColor: "bg-success/10",
-    },
-    {
-      label: "Declined",
-      value: declined.length,
-      icon: XCircle,
-      color: "text-destructive",
-      bgColor: "bg-destructive/10",
-    },
-    {
       label: "No Answer",
       value: noAnswer.length,
       icon: PhoneOff,
