@@ -94,6 +94,13 @@ interface CallListItem {
   debtor?: Debtor;
 }
 
+interface Template {
+  id: string;
+  template_id: string | null;
+  org_name: string;
+  message: string;
+  is_system_default: boolean;
+}
 
 interface CallSession {
   id: string;
@@ -163,13 +170,14 @@ const CallList = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [selectedDebtors, setSelectedDebtors] = useState<string[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [scheduledTime, setScheduledTime] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"pending" | "calling" | "completed">("pending");
   // Unused legacy state - kept for backwards compatibility but session-based now
   const stopAutoDialRef = useRef(false);
   const [filterMatchCount, setFilterMatchCount] = useState<number | undefined>(undefined);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
-  const [previewPayload, setPreviewPayload] = useState<{ phone: string; variables: Record<string, string>; variablesSummary: string; item: CallListItem } | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<{ phone: string; templateId: string; message: string; item: CallListItem } | null>(null);
   const [nextBatchCountdown, setNextBatchCountdown] = useState<number>(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -478,7 +486,33 @@ const CallList = () => {
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
 
-  // Templates removed - bot_id handles the script now
+  // Fetch templates
+  const { data: templates } = useQuery({
+    queryKey: ["templates-for-call-list", effectiveUserId, currentWorkspace?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from("call_templates")
+        .select("*")
+        .not("template_id", "is", null)
+        .order("created_at", { ascending: false });
+
+      // For templates, also show system defaults
+      if (effectiveUserId) {
+        query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
+      }
+
+      // Filter by workspace if available
+      if (currentWorkspace?.id) {
+        query = query.or(`workspace_id.eq.${currentWorkspace.id},is_system_default.eq.true`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data as Template[];
+    },
+    enabled: !!effectiveUserId,
+  });
 
   // Fetch active call session for this workspace
   const { data: activeSession, refetch: refetchSession } = useQuery({
@@ -560,6 +594,16 @@ const CallList = () => {
         throw new Error("No new debtors to queue");
       }
 
+      const preferredTemplate = selectedTemplateId
+        ? templates?.find((t) => t.id === selectedTemplateId)
+        : undefined;
+
+      const defaultTemplate =
+        preferredTemplate ||
+        templates?.find((t) => !t.is_system_default) ||
+        templates?.find((t) => t.is_system_default) ||
+        templates?.[0];
+
       // Insert in chunks to avoid request size limits
       const chunkSize = 500;
       let inserted = 0;
@@ -570,6 +614,7 @@ const CallList = () => {
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
+          template_id: defaultTemplate?.id || null,
           status: "pending",
         }));
 
@@ -616,6 +661,16 @@ const CallList = () => {
         throw new Error("No uncalled debtors to queue");
       }
 
+      const preferredTemplate = selectedTemplateId
+        ? templates?.find((t) => t.id === selectedTemplateId)
+        : undefined;
+
+      const defaultTemplate =
+        preferredTemplate ||
+        templates?.find((t) => !t.is_system_default) ||
+        templates?.find((t) => t.is_system_default) ||
+        templates?.[0];
+
       // Insert in chunks to avoid request size limits
       const chunkSize = 500;
       let inserted = 0;
@@ -626,6 +681,7 @@ const CallList = () => {
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
+          template_id: defaultTemplate?.id || null,
           status: "pending",
         }));
 
@@ -656,6 +712,7 @@ const CallList = () => {
         debtor_id: debtorId,
         user_id: targetUserId,
         workspace_id: currentWorkspace.id,
+        template_id: selectedTemplateId || null,
         scheduled_at: scheduledTime ? new Date(scheduledTime).toISOString() : null,
         status: "pending",
       }));
@@ -837,6 +894,16 @@ const CallList = () => {
         filteredDebtors = shuffled.slice(0, conditions.maxDebtors);
       }
 
+      const preferredTemplate = selectedTemplateId
+        ? templates?.find((t) => t.id === selectedTemplateId)
+        : undefined;
+
+      const defaultTemplate =
+        preferredTemplate ||
+        templates?.find((t) => !t.is_system_default) ||
+        templates?.find((t) => t.is_system_default) ||
+        templates?.[0];
+
       // Insert in chunks
       const chunkSize = 500;
       let inserted = 0;
@@ -847,6 +914,7 @@ const CallList = () => {
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
+          template_id: defaultTemplate?.id || null,
           status: "pending",
         }));
 
@@ -967,25 +1035,52 @@ const CallList = () => {
     return result;
   };
 
-  // Build the payload for preview/call - now just sends debtor variables to bot
+  // BOTNOI TEMPLATE ID - registered with "{Appointment Date}" placeholder
+  const BOTNOI_TEMPLATE_ID = "2015208747";
+
+  // Build the payload for preview/call
   const buildCallPayload = useCallback((item: CallListItem) => {
-    if (!item.debtor) return null;
+    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
+    if (!selectedTemplate?.message || !item.debtor) return null;
 
     const debtor = item.debtor;
     const debtorVars = debtor.variables || {};
     
-    // Build variables summary for preview
-    const variablesSummary = Object.entries(debtorVars)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n');
+    // Construct the full message by replacing placeholders with debtor variables
+    let constructedMessage = selectedTemplate.message;
+    
+    // Replace all {placeholder} with actual values from debtor variables
+    Object.entries(debtorVars).forEach(([key, value]) => {
+      const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
+      let processedValue = String(value);
+      
+      // Convert license plate fields to Thai phonetic reading
+      if (shouldUsePhonetic(key)) {
+        processedValue = toThaiPhonetic(processedValue);
+      }
+      
+      constructedMessage = constructedMessage.replace(placeholder, processedValue);
+    });
+    
+    // Also replace standard placeholders
+    const debtAmount = debtor.total_debt 
+      ? numberToThaiText(debtor.total_debt) + "บาท"
+      : "-";
+    const formattedDueDate = debtor.due_date
+      ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
+      : "-";
+    
+    constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
+    constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
+    constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
 
     return {
       phone: debtor.phone_number,
-      variables: debtorVars,
-      variablesSummary,
+      templateId: BOTNOI_TEMPLATE_ID,
+      message: constructedMessage,
       item,
     };
-  }, []);
+  }, [templates]);
 
   // Show preview before calling
   const handlePreviewCall = useCallback((item: CallListItem) => {
@@ -994,25 +1089,54 @@ const CallList = () => {
       setPreviewPayload(payload);
       setShowPreviewDialog(true);
     } else {
-      toast.error("Cannot build call payload - missing debtor data");
+      toast.error("Cannot build call payload - missing template or debtor data");
     }
   }, [buildCallPayload]);
 
-  // Make a single call - now uses bot_id directly, no template needed
+  // Make a single call
   const makeCall = useCallback(async (item: CallListItem, isRetry: boolean = false): Promise<{ success: boolean; shouldRetry: boolean }> => {
-    if (!item.debtor) return { success: false, shouldRetry: false };
+    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
+    if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
 
     try {
       const debtor = item.debtor;
       const debtorVars = debtor.variables || {};
+      
+      // Construct the full message by replacing placeholders with debtor variables
+      // Use the selected template's message as the base
+      let constructedMessage = selectedTemplate.message;
+      
+      // Replace all {placeholder} with actual values from debtor variables
+      // Apply Thai phonetic conversion for license plate fields
+      Object.entries(debtorVars).forEach(([key, value]) => {
+        const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
+        let processedValue = String(value);
+        
+        // Convert license plate fields to Thai phonetic reading (karaoke style)
+        if (shouldUsePhonetic(key)) {
+          processedValue = toThaiPhonetic(processedValue);
+        }
+        
+        constructedMessage = constructedMessage.replace(placeholder, processedValue);
+      });
+      
+      // Also replace standard placeholders
+      const debtAmount = debtor.total_debt 
+        ? numberToThaiText(debtor.total_debt) + "บาท"
+        : "-";
+      const formattedDueDate = debtor.due_date
+        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
+        : "-";
+      
+      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
+      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
+      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
+      
+      console.log("Constructed message:", constructedMessage);
 
-      // Build variables from debtor data
-      const callVariables: Record<string, string> = { ...(debtorVars || {}) };
-      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
-      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
-
-      console.log("Sending to Voicebot API - variables:", callVariables);
+      const callRecordDueDate = debtor.due_date
+        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
+        : "";
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -1029,8 +1153,9 @@ const CallList = () => {
         .insert({
           phone_number: debtor.phone_number,
           amount: debtor.total_debt?.toString() || "",
-          due_date: debtor.due_date ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" }) : "",
+          due_date: callRecordDueDate,
           status: "calling",
+          template_id: selectedTemplate.id,
           user_id: user.id,
         })
         .select()
@@ -1044,13 +1169,15 @@ const CallList = () => {
         .update({ call_record_id: callRecord.id })
         .eq("id", item.id);
 
-      // Make call via edge function - send debtor variables directly
+      // Make call via edge function - use hardcoded template ID and send constructed message
+      console.log("Sending to Botnoi - template_id:", BOTNOI_TEMPLATE_ID, "constructed_message:", constructedMessage);
       const { data: callResponse, error: callError } = await supabase.functions.invoke(
-        "voicebot-make-call",
+        "botnoi-make-call",
         {
           body: {
             phone_number: debtor.phone_number,
-            variables: callVariables,
+            template_id: BOTNOI_TEMPLATE_ID,
+            constructed_message: constructedMessage,
           },
         }
       );
@@ -1085,9 +1212,11 @@ const CallList = () => {
         })
         .eq("id", debtor.id);
 
+      // Wait for call to complete
       const maxWaitTime = 5 * 60 * 1000;
       const pollInterval = 3000;
       const startTime = Date.now();
+
       while (Date.now() - startTime < maxWaitTime) {
         if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
 
@@ -1103,6 +1232,7 @@ const CallList = () => {
           const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
           if (finalStatuses.includes(updatedRecord.status || "")) {
             const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
+            // Update call list item with final status
             await supabase
               .from("call_list_items")
               .update({ 
@@ -1130,7 +1260,7 @@ const CallList = () => {
         .eq("id", item.id);
       return { success: false, shouldRetry: true };
     }
-  }, []);
+  }, [templates]);
 
   // Start calling using backend session (persists even if page closed)
   const startCallingSession = useCallback(async () => {
@@ -2093,6 +2223,26 @@ const CallList = () => {
           </DialogHeader>
           
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            {/* Template Selection */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Template</Label>
+              <Select
+                value={selectedTemplateId}
+                onValueChange={setSelectedTemplateId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select template" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {templates?.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.org_name} {t.is_system_default && "(Default)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Schedule Time (Optional) */}
             <div className="space-y-1.5">
               <Label className="text-sm">Schedule (Optional)</Label>
@@ -2402,20 +2552,24 @@ const CallList = () => {
                   <span className="text-foreground font-semibold">{previewPayload.phone}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block mb-1">Variables (sent to Bot): </span>
+                  <span className="text-muted-foreground">Template ID: </span>
+                  <span className="text-foreground font-semibold">{previewPayload.templateId}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block mb-1">Appointment Date (Message): </span>
                   <div className="bg-background border rounded p-3 whitespace-pre-wrap break-words text-foreground">
-                    {previewPayload.variablesSummary || "No variables"}
+                    {previewPayload.message}
                   </div>
                 </div>
               </div>
 
               <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Voicebot:</h4>
+                <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Botnoi:</h4>
                 <pre className="text-xs bg-background border rounded p-3 overflow-x-auto">
 {JSON.stringify({
-  bot_id: "69ccce0db875327d960ef0cf",
-  tel_number: previewPayload.phone,
-  variables: previewPayload.variables,
+  "Tel. Number": previewPayload.phone,
+  "template_id": previewPayload.templateId,
+  "Appointment Date": previewPayload.message
 }, null, 2)}
                 </pre>
               </div>

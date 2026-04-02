@@ -39,7 +39,12 @@ interface Debtor {
   is_blocked: boolean;
 }
 
-// Template interface removed - bot handles its own script
+interface Template {
+  id: string;
+  template_id: string | null;
+  org_name: string;
+  message: string;
+}
 
 // Thai number words for phonetic conversion (digit by digit for license plates)
 const thaiNumbers: Record<string, string> = {
@@ -329,9 +334,35 @@ async function processSession(supabase: any, sessionId: string) {
 
   const debtorMap = new Map((debtors as Debtor[] || []).map(d => [d.id, d]));
 
+  // Get templates
+  const templateIds = [...new Set(pendingItems.map((item: { template_id: string | null }) => item.template_id).filter(Boolean))];
+  const { data: templates } = await supabase
+    .from("call_templates")
+    .select("id, template_id, org_name, message")
+    .in("id", templateIds);
+
+  const templateMap = new Map((templates as Template[] || []).map(t => [t.id, t]));
+
+  // Get default template
+  const { data: defaultTemplates } = await supabase
+    .from("call_templates")
+    .select("id, template_id, org_name, message")
+    .eq("is_system_default", true)
+    .limit(1);
+
+  const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
+
   const isTestMode = typedSession.settings.testMode === true;
-  const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
-  const BOT_ID = "69ccce0db875327d960ef0cf";
+  const botnoiToken = Deno.env.get("BOTNOI_API_TOKEN");
+  
+  if (!isTestMode && !botnoiToken) {
+    console.error(`[Session ${sessionId}] BOTNOI_API_TOKEN not configured`);
+    await supabase
+      .from("call_sessions")
+      .update({ status: "stopped", error_message: "BOTNOI_API_TOKEN not configured" })
+      .eq("id", sessionId);
+    return;
+  }
   
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -347,7 +378,7 @@ async function processSession(supabase: any, sessionId: string) {
   console.log(`[Session ${sessionId}] Marked ${itemIds.length} items as 'calling'`);
 
   // Process items concurrently
-  const processItem = async (item: { id: string; debtor_id: string }) => {
+  const processItem = async (item: { id: string; debtor_id: string; template_id: string | null }) => {
     const debtor = debtorMap.get(item.debtor_id);
     if (!debtor) {
       console.log(`[Session ${sessionId}] Debtor not found for item ${item.id}`);
@@ -364,24 +395,88 @@ async function processSession(supabase: any, sessionId: string) {
       return { success: false, failed: false };
     }
 
-    // Build variables from debtor data - bot has its own script
+    const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
+    if (!template?.template_id) {
+      console.log(`[Session ${sessionId}] No template for item ${item.id}`);
+      return { success: false, failed: false };
+    }
+
+    // Build message with variables
+    let constructedMessage = template.message;
     const vars = debtor.variables || {};
 
-    // Build call variables - send raw debtor data, bot handles the script
-    const callVariables: Record<string, string> = {};
+    // Replace variables in message with proper Thai reading
+    // Fields that should be read as amounts (currency)
+    const amountFields = ["debt", "amount", "ยอด", "เงิน", "installment", "งวด"];
+    // Fields that should be read digit by digit (license plates, phone numbers)
+    const phoneticFields = ["licenseplate", "license_plate", "ทะเบียน", "plate", "phone", "เบอร์"];
+    // Fields that should be formatted as dates
+    const dateFields = ["date", "วันที่", "due", "นัด", "appointment"];
+    
     Object.entries(vars).forEach(([key, value]) => {
-      callVariables[key] = String(value);
+      const regex = new RegExp(`\\{${key}\\}`, "gi");
+      const keyLower = key.toLowerCase();
+      
+      let replacementValue = String(value);
+      
+      // Check if this is a date field - format as Thai date
+      if (dateFields.some(f => keyLower.includes(f))) {
+        // Try to parse as date and format in Thai
+        const dateValue = new Date(replacementValue);
+        if (!isNaN(dateValue.getTime())) {
+          replacementValue = dateValue.toLocaleDateString("th-TH", { 
+            day: "numeric", 
+            month: "long", 
+            year: "numeric" 
+          });
+        }
+      }
+      // Check if this is an amount field - convert to Thai currency words
+      else if (amountFields.some(f => keyLower.includes(f))) {
+        replacementValue = amountToThaiWords(replacementValue);
+      }
+      // Check if this is a phonetic field (license plate) - read digit by digit with consonants
+      else if (phoneticFields.some(f => keyLower.includes(f))) {
+        replacementValue = toThaiPhonetic(replacementValue);
+      }
+      // Check if this is a name field - spell out difficult names
+      else if (nameFields.some(f => keyLower.includes(f))) {
+        replacementValue = spellThaiName(replacementValue);
+      }
+      // For other numeric values, try to read as number
+      else if (/^\d+$/.test(replacementValue)) {
+        replacementValue = numberToThaiWords(parseInt(replacementValue, 10));
+      }
+      
+      constructedMessage = constructedMessage.replace(regex, replacementValue);
     });
-    // Add standard fields
-    if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-    if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || String(debtor.total_debt);
-    if (debtor.due_date) {
-      callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", {
-        day: "numeric", month: "long", year: "numeric",
-      });
+
+    // Replace name (with phonetic spelling for difficult names)
+    if (debtor.name) {
+      constructedMessage = constructedMessage.replace(/\{name\}/gi, spellThaiName(debtor.name));
     }
     
-    console.log(`[Session ${sessionId}] Variables for ${debtor.phone_number}:`, JSON.stringify(callVariables));
+    // Also replace standard placeholders that might not be in variables
+    // Replace {due_date}, {Appointment Date}, etc. with debtor's due_date if available
+    if (debtor.due_date) {
+      const formattedDueDate = new Date(debtor.due_date).toLocaleDateString("th-TH", { 
+        day: "numeric", 
+        month: "long", 
+        year: "numeric" 
+      });
+      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
+      constructedMessage = constructedMessage.replace(/\{Appointment Date\}/gi, formattedDueDate);
+      constructedMessage = constructedMessage.replace(/\{appointment_date\}/gi, formattedDueDate);
+    }
+    
+    // Replace debt placeholders if not already replaced
+    if (debtor.total_debt) {
+      const debtInThai = numberToThaiWords(Math.floor(debtor.total_debt)) + "บาท";
+      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtInThai);
+      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtInThai);
+    }
+    
+    console.log(`[Session ${sessionId}] Constructed message for ${debtor.phone_number}: ${constructedMessage.substring(0, 100)}...`);
 
     try {
       if (isTestMode) {
@@ -430,6 +525,7 @@ async function processSession(supabase: any, sessionId: string) {
         // Create mock call record
         await supabase.from("call_records").insert({
           phone_number: debtor.phone_number,
+          template_id: template.id,
           botnoi_call_id: `test_${Date.now()}_${Math.random().toString(36).substring(7)}`,
           status: mockStatus,
           user_id: typedSession.user_id,
@@ -497,37 +593,46 @@ async function processSession(supabase: any, sessionId: string) {
         
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
-        // REAL MODE: Make actual call via Voicebot API using bot_id
-        // Use the callVariables already built above
-
-        const callPayload = {
-          bot_id: BOT_ID,
-          bot_type: "in_init_conversation",
-          tel_number: debtor.phone_number,
-          variables: callVariables,
-          interruptible: "true",
+        // REAL MODE: Make actual call
+        const callPayload: Record<string, string> = {
+          "Tel. Number": debtor.phone_number,
+          template_id: template.template_id,
         };
+
+        if (constructedMessage) {
+          callPayload["Appointment Date"] = constructedMessage;
+        }
 
         console.log(`[Session ${sessionId}] Calling ${debtor.phone_number}...`);
 
-        const response = await fetch(CALL_API_URL, {
+        const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {
           method: "POST",
           headers: {
+            accept: "application/json",
+            "botnoi-token": botnoiToken!,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(callPayload),
         });
 
         const data = await response.json();
-        console.log(`[Session ${sessionId}] Voicebot response:`, JSON.stringify(data));
+        console.log(`[Session ${sessionId}] Botnoi response:`, JSON.stringify(data));
 
-        const botnoiCallId = data.outbound_id || null;
-        const isSuccess = response.ok && botnoiCallId;
+        // Botnoi API returns success in different ways - check for success indicators
+        const isSuccess = response.ok && (
+          data.call_id || 
+          data.status === "success" || 
+          (data.message && data.message.toLowerCase().includes("success"))
+        );
         
         if (isSuccess) {
+          // Use outbound_id from Botnoi response (this is what comes back in webhook)
+          const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
+          
           // Create call record
           await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
+            template_id: template.id,
             botnoi_call_id: botnoiCallId,
             status: "pending",
             user_id: typedSession.user_id,
@@ -554,9 +659,9 @@ async function processSession(supabase: any, sessionId: string) {
             })
             .eq("id", item.debtor_id);
 
-          return { success: true, failed: false, confirmed: false, tokensUsed: 0 };
+          return { success: true, failed: false, confirmed: false, tokensUsed: 0 }; // Tokens deducted in webhook for real calls
         } else {
-          throw new Error(data.message || JSON.stringify(data) || "Call failed");
+          throw new Error(data.message || "Call failed");
         }
       }
     } catch (error) {

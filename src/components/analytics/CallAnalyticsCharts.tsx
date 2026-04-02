@@ -434,101 +434,79 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
 export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const chartColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
   const categoryData = useMemo(() => {
-    const THAI_TO_EN: Record<string, string> = {
-      "ลูกค้าอยู่ที่เสียงดัง": "Customer in noisy environment",
-      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": "Customer not convenient to talk",
-      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": "Customer refused to pay",
-      "ลูกค้าสนใจปรับโครงสร้างหนี้": "Customer interested in debt restructuring",
-      "ลูกค้าขอคุยกับเจ้าหน้าที่": "Customer requested human agent",
-      "ลูกค่ายอมจ่าย + บอกวันที่": "Customer promised to pay with date",
-      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": "Customer promised to pay (no date)",
-      "ไม่รับสาย → โทรรอบ 2": "No answer – call back later",
-      "ไม่อยากคุยกับ Bot": "Customer refused to talk to bot",
-      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": "Customer has hardship situation",
-      "ลูกค้าพูดภาษาถิ่น": "Language barrier",
-      "ลูกค้าไม่พูด": "Customer silent",
-      "โทรแล้วปิดเครื่อง": "Phone is turned off",
-    };
     const categories: Record<string, number> = {
-      "Customer in noisy environment": 0,
-      "Customer not convenient to talk": 0,
-      "Customer refused to pay": 0,
-      "Customer interested in debt restructuring": 0,
-      "Customer requested human agent": 0,
-      "Customer promised to pay with date": 0,
-      "Customer promised to pay (no date)": 0,
-      "No answer – call back later": 0,
-      "Customer refused to talk to bot": 0,
-      "Customer has hardship situation": 0,
-      "Language barrier": 0,
-      "Customer silent": 0,
-      "Phone is turned off": 0,
+      "ลูกค้าอยู่ที่เสียงดัง": 0,
+      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": 0,
+      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": 0,
+      "ลูกค้าสนใจปรับโครงสร้างหนี้": 0,
+      "ลูกค้าขอคุยกับเจ้าหน้าที่": 0,
+      "ลูกค่ายอมจ่าย + บอกวันที่": 0,
+      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": 0,
+      "ไม่รับสาย → โทรรอบ 2": 0,
+      "ไม่อยากคุยกับ Bot": 0,
+      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": 0,
+      "ลูกค้าพูดภาษาถิ่น": 0,
+      "ลูกค้าไม่พูด": 0,
+      "โทรแล้วปิดเครื่อง": 0,
     };
 
     callListItems.forEach((item) => {
-      if (!item.ai_category) return;
-      const mapped = THAI_TO_EN[item.ai_category] || item.ai_category;
-      if (categories[mapped] !== undefined) {
-        categories[mapped]++;
-      } else {
-        categories[mapped] = (categories[mapped] || 0) + 1;
+      if (item.ai_category && categories[item.ai_category] !== undefined) {
+        categories[item.ai_category]++;
+      } else if (item.ai_category) {
+        // Fallback for any other categories
+        categories[item.ai_category] = (categories[item.ai_category] || 0) + 1;
       }
     });
 
     return Object.entries(categories)
       .map(([name, value]) => ({ name, value }))
-      .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [callListItems]);
-
-  const maxValue = Math.max(...categoryData.map((d) => d.value), 1);
-
-  const CATEGORY_COLORS: Record<string, string> = {
-    "Customer refused to pay": "#ef4444",
-    "Customer not convenient to talk": "#f97316",
-    "Customer in noisy environment": "#eab308",
-    "Customer interested in debt restructuring": "#22c55e",
-    "Customer requested human agent": "#3b82f6",
-    "Customer promised to pay with date": "#10b981",
-    "Customer promised to pay (no date)": "#14b8a6",
-    "No answer – call back later": "#6b7280",
-    "Customer refused to talk to bot": "#f43f5e",
-    "Customer has hardship situation": "#a855f7",
-    "Language barrier": "#8b5cf6",
-    "Customer silent": "#94a3b8",
-    "Phone is turned off": "#64748b",
-  };
 
   return (
     <Card className="col-span-1 md:col-span-2">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">AI Customer Insights</CardTitle>
+        <CardTitle className="text-base font-semibold">AI Customer Insights (Categories)</CardTitle>
       </CardHeader>
       <CardContent>
-        {categoryData.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No categorized calls yet</p>
-        ) : (
-          <div className="space-y-3">
-            {categoryData.map((item) => {
-              const pct = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
-              const color = CATEGORY_COLORS[item.name] || "#6366f1";
-              return (
-                <div key={item.name} className="group">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-foreground truncate mr-3">{item.name}</span>
-                    <span className="text-sm font-semibold text-foreground tabular-nums">{item.value}</span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, backgroundColor: color }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={categoryData}
+              layout="vertical"
+              margin={{ top: 10, right: 30, left: 160, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                width={150}
+                className="text-muted-foreground"
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+              <Bar
+                dataKey="value"
+                name="Calls"
+                radius={[0, 4, 4, 0]}
+                barSize={20}
+              >
+                {categoryData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );

@@ -168,7 +168,7 @@ const CallDashboard = () => {
     );
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voicebot-webhook`;
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/botnoi-webhook`;
 
   const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);

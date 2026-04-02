@@ -137,52 +137,56 @@ serve(async (req) => {
           .update({ call_record_id: callRecord.id })
           .eq("id", item.id);
 
-        // Make the call via new Voicebot API
-        const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
-        const BOT_ID = "69ccce0db875327d960ef0cf";
-
-        {
-          // Build variables from debtor data
-          const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
-          if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-          if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || String(debtor.total_debt);
+        // Make the call via Botnoi API
+        if (botnoiApiToken) {
+          // Build message from debtor variables
+          const debtorVars = debtor.variables || {};
+          const messageTemplate = debtorVars.message_template || 
+            "สวัสดีค่ะ คุณมียอดค้างชำระจำนวน {debt} และมีกำหนดชำระในวันที่ {due_date} ไม่ทราบว่าสามารถชำระได้ก่อนวันครบกำหนดหรือไม่คะ";
+          
+          let appointmentMessage = messageTemplate;
+          if (debtor.total_debt) {
+            appointmentMessage = appointmentMessage.replace(/\{debt\}/gi, `${debtor.total_debt}บาท`);
+          }
           if (debtor.due_date) {
-            const formattedDate = new Date(debtor.due_date).toLocaleDateString("th-TH", {
-              day: "numeric", month: "long", year: "numeric",
+            const formattedDate = new Date(debtor.due_date).toLocaleDateString("th-TH", { 
+              day: "numeric", month: "long", year: "numeric" 
             });
-            callVariables.due_date = callVariables.due_date || formattedDate;
+            appointmentMessage = appointmentMessage.replace(/\{due_date\}/gi, formattedDate);
           }
 
-          const callPayload = {
-            bot_id: BOT_ID,
-            bot_type: "in_init_conversation",
-            tel_number: debtor.phone_number,
-            variables: callVariables,
-            interruptible: "true",
+          const callPayload: Record<string, unknown> = {
+            template_id: template.template_id,
+            tel_no: debtor.phone_number,
+            "Appointment Date": appointmentMessage,
           };
 
-          const callResponse = await fetch(CALL_API_URL, {
+          const callResponse = await fetch("https://api.botnoi.ai/voice/outbound", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${botnoiApiToken}`,
+            },
             body: JSON.stringify(callPayload),
           });
 
           const callData = await callResponse.json();
-          console.log(`Voicebot response for ${debtor.phone_number}:`, callData);
+          console.log(`Botnoi response for ${debtor.phone_number}:`, callData);
 
-          // Update call record with outbound ID if available
+          // Update call record with Botnoi ID
           await supabase
             .from("call_records")
             .update({
               botnoi_call_id: callData.outbound_id || null,
-              status: callData.outbound_id ? "pending" : (callResponse.ok ? "pending" : "failed"),
+              status: callData.outbound_id ? "pending" : "failed",
             })
             .eq("id", callRecord.id);
 
-          if (!callResponse.ok) {
+          // Update call list item status
+          if (!callData.outbound_id) {
             await supabase
               .from("call_list_items")
-              .update({ status: "failed", notes: JSON.stringify(callData) })
+              .update({ status: "failed", notes: "No outbound_id returned" })
               .eq("id", item.id);
           }
         }

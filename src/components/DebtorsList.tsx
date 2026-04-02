@@ -32,7 +32,7 @@ import {
   Send,
 } from "lucide-react";
 import DebtorExcelUpload from "./DebtorExcelUpload";
-
+import InlineTemplateEditor from "./InlineTemplateEditor";
 import {
   Dialog,
   DialogContent,
@@ -481,16 +481,11 @@ const DebtorsList = () => {
       
       console.log("Constructed message:", constructedMessage);
 
-      // Build variables from debtor data
-      const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
-      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
-      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
-
-      const { data, error } = await supabase.functions.invoke("voicebot-make-call", {
+      const { data, error } = await supabase.functions.invoke("botnoi-make-call", {
         body: {
           phone_number: debtor.phone_number,
-          variables: callVariables,
+          template_id: workspaceTemplate.template_id,
+          constructed_message: constructedMessage,
         },
       });
 
@@ -1028,6 +1023,8 @@ const DebtorsList = () => {
         </Card>
       </div>
 
+      {/* Inline Template Editor */}
+      <InlineTemplateEditor />
 
       {/* Filters & Auto-Dial */}
       <div className="flex flex-col gap-3">
