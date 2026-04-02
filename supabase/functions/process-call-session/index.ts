@@ -372,78 +372,21 @@ async function processSession(supabase: any, sessionId: string) {
     // Build variables from debtor data - bot has its own script
     const vars = debtor.variables || {};
 
-    // Replace variables in message with proper Thai reading
-    // Fields that should be read as amounts (currency)
-    const amountFields = ["debt", "amount", "ยอด", "เงิน", "installment", "งวด"];
-    // Fields that should be read digit by digit (license plates, phone numbers)
-    const phoneticFields = ["licenseplate", "license_plate", "ทะเบียน", "plate", "phone", "เบอร์"];
-    // Fields that should be formatted as dates
-    const dateFields = ["date", "วันที่", "due", "นัด", "appointment"];
-    
+    // Build call variables - send raw debtor data, bot handles the script
+    const callVariables: Record<string, string> = {};
     Object.entries(vars).forEach(([key, value]) => {
-      const regex = new RegExp(`\\{${key}\\}`, "gi");
-      const keyLower = key.toLowerCase();
-      
-      let replacementValue = String(value);
-      
-      // Check if this is a date field - format as Thai date
-      if (dateFields.some(f => keyLower.includes(f))) {
-        // Try to parse as date and format in Thai
-        const dateValue = new Date(replacementValue);
-        if (!isNaN(dateValue.getTime())) {
-          replacementValue = dateValue.toLocaleDateString("th-TH", { 
-            day: "numeric", 
-            month: "long", 
-            year: "numeric" 
-          });
-        }
-      }
-      // Check if this is an amount field - convert to Thai currency words
-      else if (amountFields.some(f => keyLower.includes(f))) {
-        replacementValue = amountToThaiWords(replacementValue);
-      }
-      // Check if this is a phonetic field (license plate) - read digit by digit with consonants
-      else if (phoneticFields.some(f => keyLower.includes(f))) {
-        replacementValue = toThaiPhonetic(replacementValue);
-      }
-      // Check if this is a name field - spell out difficult names
-      else if (nameFields.some(f => keyLower.includes(f))) {
-        replacementValue = spellThaiName(replacementValue);
-      }
-      // For other numeric values, try to read as number
-      else if (/^\d+$/.test(replacementValue)) {
-        replacementValue = numberToThaiWords(parseInt(replacementValue, 10));
-      }
-      
-      constructedMessage = constructedMessage.replace(regex, replacementValue);
+      callVariables[key] = String(value);
     });
-
-    // Replace name (with phonetic spelling for difficult names)
-    if (debtor.name) {
-      constructedMessage = constructedMessage.replace(/\{name\}/gi, spellThaiName(debtor.name));
-    }
-    
-    // Also replace standard placeholders that might not be in variables
-    // Replace {due_date}, {Appointment Date}, etc. with debtor's due_date if available
+    // Add standard fields
+    if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
+    if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || String(debtor.total_debt);
     if (debtor.due_date) {
-      const formattedDueDate = new Date(debtor.due_date).toLocaleDateString("th-TH", { 
-        day: "numeric", 
-        month: "long", 
-        year: "numeric" 
+      callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", {
+        day: "numeric", month: "long", year: "numeric",
       });
-      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
-      constructedMessage = constructedMessage.replace(/\{Appointment Date\}/gi, formattedDueDate);
-      constructedMessage = constructedMessage.replace(/\{appointment_date\}/gi, formattedDueDate);
     }
     
-    // Replace debt placeholders if not already replaced
-    if (debtor.total_debt) {
-      const debtInThai = numberToThaiWords(Math.floor(debtor.total_debt)) + "บาท";
-      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtInThai);
-      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtInThai);
-    }
-    
-    console.log(`[Session ${sessionId}] Constructed message for ${debtor.phone_number}: ${constructedMessage.substring(0, 100)}...`);
+    console.log(`[Session ${sessionId}] Variables for ${debtor.phone_number}:`, JSON.stringify(callVariables));
 
     try {
       if (isTestMode) {
