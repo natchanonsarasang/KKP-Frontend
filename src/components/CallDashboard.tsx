@@ -1,10 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall, CheckCircle, XCircle, Clock, AlertCircle, PhoneOff, RefreshCw, Copy } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  PhoneCall, CheckCircle, XCircle, Clock, AlertCircle,
+  PhoneOff, RefreshCw, Copy, Search, Download,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +30,8 @@ import {
 } from "./analytics/CallAnalyticsCharts";
 import { BestTimeInsights } from "./analytics/BestTimeInsights";
 import { useAdmin } from "@/contexts/AdminContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import * as XLSX from "xlsx";
 
 interface CallRecord {
   id: string;
@@ -48,6 +61,14 @@ interface CallListItem {
   created_at: string;
   template_id: string | null;
   ai_category?: string | null;
+  debtor_id: string;
+}
+
+interface Debtor {
+  id: string;
+  name: string | null;
+  last_name: string | null;
+  phone_number: string;
 }
 
 interface Template {
@@ -55,6 +76,8 @@ interface Template {
   message: string;
   org_name: string;
 }
+
+type DateRange = "today" | "week" | "month" | "year" | "all";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   pending: { label: "Pending", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -70,89 +93,155 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 const CallDashboard = () => {
   const queryClient = useQueryClient();
   const { effectiveUserId } = useAdmin();
+  const { currentWorkspace } = useWorkspace();
+
+  const [dateRange, setDateRange] = useState<DateRange>("month");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const getDateFilter = useCallback(() => {
+    const now = new Date();
+    switch (dateRange) {
+      case "today": {
+        const s = new Date(now); s.setHours(0, 0, 0, 0);
+        return s.toISOString();
+      }
+      case "week": {
+        const s = new Date(now); s.setDate(s.getDate() - 7);
+        return s.toISOString();
+      }
+      case "month": {
+        const s = new Date(now); s.setMonth(s.getMonth() - 1);
+        return s.toISOString();
+      }
+      case "year": {
+        const s = new Date(now); s.setFullYear(s.getFullYear() - 1);
+        return s.toISOString();
+      }
+      default:
+        return undefined;
+    }
+  }, [dateRange]);
 
   const { data: callRecords, isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
-    queryKey: ["call-records", effectiveUserId],
+    queryKey: ["call-records", effectiveUserId, currentWorkspace?.id, dateRange],
     queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
       let query = supabase
         .from("call_records")
         .select("*")
+        .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: false });
 
-      // Filter by effective user if admin is impersonating
-      if (effectiveUserId) {
-        query = query.eq("user_id", effectiveUserId);
-      }
+      if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
+      const dateFilter = getDateFilter();
+      if (dateFilter) query = query.gte("created_at", dateFilter);
 
       const { data, error } = await query;
-      
       if (error) throw error;
       return (data ?? []) as unknown as CallRecord[];
     },
     refetchInterval: 10000,
-    enabled: !!effectiveUserId,
+    enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
 
   const { data: callListItems, isLoading: loadingItems, refetch: refetchItems } = useQuery({
-    queryKey: ["call-list-items-analytics", effectiveUserId],
+    queryKey: ["call-list-items-analytics", effectiveUserId, currentWorkspace?.id, dateRange],
     queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
       let query = supabase
         .from("call_list_items")
         .select("*")
+        .eq("workspace_id", currentWorkspace.id)
         .order("created_at", { ascending: false });
 
-      // Filter by effective user if admin is impersonating
-      if (effectiveUserId) {
-        query = query.eq("user_id", effectiveUserId);
-      }
+      if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
+      const dateFilter = getDateFilter();
+      if (dateFilter) query = query.gte("created_at", dateFilter);
 
       const { data, error } = await query;
-      
       if (error) throw error;
       return (data ?? []) as unknown as CallListItem[];
     },
     refetchInterval: 10000,
-    enabled: !!effectiveUserId,
+    enabled: !!effectiveUserId && !!currentWorkspace?.id,
+  });
+
+  const { data: debtors } = useQuery({
+    queryKey: ["analytics-debtors", currentWorkspace?.id],
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return [];
+      const { data, error } = await supabase
+        .from("debtors")
+        .select("id, name, last_name, phone_number")
+        .eq("workspace_id", currentWorkspace.id);
+      if (error) throw error;
+      return data as Debtor[];
+    },
+    enabled: !!currentWorkspace?.id,
   });
 
   const { data: templates } = useQuery({
     queryKey: ["templates-analytics", effectiveUserId],
     queryFn: async () => {
-      let query = supabase
-        .from("call_templates")
-        .select("id, message, org_name");
-
-      // Filter by effective user if admin is impersonating
-      if (effectiveUserId) {
-        query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
-      }
-
+      let query = supabase.from("call_templates").select("id, message, org_name");
+      if (effectiveUserId) query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
       const { data, error } = await query;
-      
       if (error) throw error;
       return data as Template[];
     },
     enabled: !!effectiveUserId,
   });
 
+  // Debtor lookup maps
+  const debtorMap = useMemo(() => new Map((debtors || []).map((d) => [d.id, d])), [debtors]);
+  const debtorByPhone = useMemo(() => {
+    const map = new Map<string, Debtor>();
+    (debtors || []).forEach((d) => map.set(d.phone_number, d));
+    return map;
+  }, [debtors]);
+
+  // Enriched call history: join call_records with debtor info + call_list_items
+  const enrichedRecords = useMemo(() => {
+    if (!callRecords) return [];
+    // Build a map from call_record_id -> call_list_item for outcome/pickup
+    const cliByRecordId = new Map<string, CallListItem>();
+    (callListItems || []).forEach((item) => {
+      const recordId = (item as unknown as Record<string, unknown>).call_record_id as string | null;
+      if (recordId) cliByRecordId.set(recordId, item);
+    });
+
+    return callRecords.map((record) => {
+      const debtor = debtorByPhone.get(record.phone_number);
+      const cli = cliByRecordId.get(record.id);
+      return {
+        ...record,
+        debtor_name: debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "",
+        picked_up: cli?.picked_up ?? null,
+        call_outcome: cli?.call_outcome ?? null,
+      };
+    });
+  }, [callRecords, callListItems, debtorByPhone]);
+
+  // Filtered by search
+  const filteredRecords = useMemo(() => {
+    if (!searchQuery) return enrichedRecords;
+    const q = searchQuery.toLowerCase();
+    return enrichedRecords.filter(
+      (r) =>
+        r.phone_number.includes(q) ||
+        r.debtor_name.toLowerCase().includes(q)
+    );
+  }, [enrichedRecords, searchQuery]);
+
   useEffect(() => {
     const channel = supabase
       .channel("analytics-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "call_records" },
-        () => queryClient.invalidateQueries({ queryKey: ["call-records"] })
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "call_list_items" },
-        () => queryClient.invalidateQueries({ queryKey: ["call-list-items-analytics"] })
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "call_records" },
+        () => queryClient.invalidateQueries({ queryKey: ["call-records"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "call_list_items" },
+        () => queryClient.invalidateQueries({ queryKey: ["call-list-items-analytics"] }))
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
   const handleRefresh = () => {
@@ -164,7 +253,6 @@ const CallDashboard = () => {
   const getStatusBadge = (status: string) => {
     const config = statusConfig[status] || statusConfig.pending;
     const Icon = config.icon;
-    
     return (
       <Badge variant="secondary" className={`${config.color} gap-1 font-normal`}>
         <Icon className="w-3 h-3" />
@@ -173,8 +261,31 @@ const CallDashboard = () => {
     );
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/botnoi-webhook`;
+  const getOutcomeBadge = (outcome: string | null, pickedUp: boolean | null) => {
+    if (!outcome && pickedUp === false) return getStatusBadge("no_answer");
+    if (!outcome) return <span className="text-muted-foreground text-xs">-</span>;
+    return getStatusBadge(outcome.toLowerCase());
+  };
 
+  const exportToExcel = () => {
+    const rows = filteredRecords.map((r) => ({
+      "เบอร์โทร": r.phone_number,
+      "ชื่อ": r.debtor_name || "-",
+      "วันครบกำหนด": r.due_date || "-",
+      "จำนวนเงิน": r.amount || "-",
+      "สถานะ": r.status || "pending",
+      "รับสาย": r.picked_up === true ? "ใช่" : r.picked_up === false ? "ไม่" : "-",
+      "ผลการโทร": r.call_outcome || "-",
+      "วันที่โทร": new Date(r.created_at).toLocaleString("th-TH"),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Call History");
+    XLSX.writeFile(wb, `call-history-${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("ส่งออก Excel เรียบร้อย");
+  };
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/botnoi-webhook`;
   const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
     toast.success("Webhook URL copied");
@@ -185,17 +296,31 @@ const CallDashboard = () => {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-semibold">Analytics</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Monitor call performance, trends, and insights
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+            <SelectTrigger className="w-[140px] h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">วันนี้</SelectItem>
+              <SelectItem value="week">7 วัน</SelectItem>
+              <SelectItem value="month">30 วัน</SelectItem>
+              <SelectItem value="year">1 ปี</SelectItem>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -212,22 +337,15 @@ const CallDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats */}
             <AnalyticsStats callListItems={callListItems || []} />
-
-            {/* AI Insights Chart */}
             <div className="grid grid-cols-1 gap-4">
               <AICategoryDistributionChart callListItems={callListItems || []} />
             </div>
-
-            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <OutcomeDistributionChart callListItems={callListItems || []} />
               <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
               <BestTimeInsights callListItems={callListItems || []} />
             </div>
-
-            {/* Trend Chart */}
             <div className="grid grid-cols-1 gap-4">
               <TrendChart callListItems={callListItems || []} />
             </div>
@@ -238,42 +356,66 @@ const CallDashboard = () => {
               <HourlyPickupChart callListItems={callListItems || []} />
               <DayOfWeekChart callListItems={callListItems || []} />
             </div>
-            
             <BestTimeInsights callListItems={callListItems || []} />
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
-            {/* Call History */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Recent Calls</CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-base">Recent Calls</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="ค้นหาเบอร์หรือชื่อ..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-9 w-[200px] text-sm"
+                      />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={exportToExcel} disabled={filteredRecords.length === 0}>
+                      <Download className="w-4 h-4 mr-1" />
+                      Excel
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                {callRecords && callRecords.length > 0 ? (
+                {filteredRecords.length > 0 ? (
                   <div className="rounded-md border overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">Phone</TableHead>
-                          <TableHead className="text-xs">Due Date</TableHead>
-                          <TableHead className="text-xs">Amount</TableHead>
-                          <TableHead className="text-xs">Status</TableHead>
-                          <TableHead className="text-xs">Time</TableHead>
+                          <TableHead className="text-xs">เบอร์โทร</TableHead>
+                          <TableHead className="text-xs">ชื่อ</TableHead>
+                          <TableHead className="text-xs">ยอด</TableHead>
+                          <TableHead className="text-xs">รับสาย</TableHead>
+                          <TableHead className="text-xs">ผลการโทร</TableHead>
+                          <TableHead className="text-xs">สถานะ</TableHead>
+                          <TableHead className="text-xs">เวลา</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {callRecords.slice(0, 50).map((record) => (
+                        {filteredRecords.slice(0, 100).map((record) => (
                           <TableRow key={record.id}>
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
-                            <TableCell className="text-sm">{record.due_date || "-"}</TableCell>
+                            <TableCell className="text-sm">{record.debtor_name || "-"}</TableCell>
                             <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
+                            <TableCell>
+                              {record.picked_up === true ? (
+                                <Badge variant="secondary" className="bg-success/10 text-success text-xs">ใช่</Badge>
+                              ) : record.picked_up === false ? (
+                                <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs">ไม่</Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{getOutcomeBadge(record.call_outcome, record.picked_up)}</TableCell>
                             <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(record.created_at).toLocaleString("th-TH", {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
+                                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                               })}
                             </TableCell>
                           </TableRow>
@@ -284,8 +426,8 @@ const CallDashboard = () => {
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <PhoneCall className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                    <p>No calls yet</p>
-                    <p className="text-sm">Start a campaign to see results here</p>
+                    <p>{searchQuery ? "ไม่พบผลลัพธ์" : "ยังไม่มีประวัติการโทร"}</p>
+                    <p className="text-sm">{searchQuery ? "ลองค้นหาด้วยคำอื่น" : "เริ่มแคมเปญเพื่อดูผลลัพธ์ที่นี่"}</p>
                   </div>
                 )}
               </CardContent>
@@ -293,7 +435,6 @@ const CallDashboard = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            {/* Webhook */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Webhook URL</CardTitle>
