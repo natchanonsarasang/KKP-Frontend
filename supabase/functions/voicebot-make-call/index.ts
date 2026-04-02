@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BOT_ID = "69ccfae9b875327d960ef1bb";
+const BOT_ID = "69ccce0db875327d960ef0cf";
 const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
 serve(async (req) => {

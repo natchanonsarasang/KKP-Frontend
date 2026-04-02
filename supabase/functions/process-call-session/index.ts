@@ -331,7 +331,7 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
   const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
-  const BOT_ID = "69ccfae9b875327d960ef1bb";
+  const BOT_ID = "69ccce0db875327d960ef0cf";
   
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);

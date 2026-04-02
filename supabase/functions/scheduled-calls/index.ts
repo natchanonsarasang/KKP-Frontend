@@ -139,7 +139,7 @@ serve(async (req) => {
 
         // Make the call via new Voicebot API
         const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
-        const BOT_ID = "69ccfae9b875327d960ef1bb";
+        const BOT_ID = "69ccce0db875327d960ef0cf";
 
         {
           // Build variables from debtor data
