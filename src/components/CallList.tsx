@@ -34,6 +34,7 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
+  Volume2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
