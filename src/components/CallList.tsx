@@ -213,6 +213,20 @@ const CallList = () => {
     }
   });
 
+  useEffect(() => {
+    try {
+      const savedVersion = Number(localStorage.getItem("autoDialSettingsVersion") ?? "0");
+      if (savedVersion < 2) {
+        setSettings((prev) => ({
+          ...prev,
+          concurrentCalls: DEFAULT_SETTINGS.concurrentCalls,
+        }));
+      }
+    } catch {
+      // Ignore storage parsing issues and keep in-memory defaults
+    }
+  }, []);
+
   // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem("autoDialSettings", JSON.stringify(settings));
