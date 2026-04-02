@@ -485,33 +485,7 @@ const CallList = () => {
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
 
-  // Fetch templates
-  const { data: templates } = useQuery({
-    queryKey: ["templates-for-call-list", effectiveUserId, currentWorkspace?.id],
-    queryFn: async () => {
-      let query = supabase
-        .from("call_templates")
-        .select("*")
-        .not("template_id", "is", null)
-        .order("created_at", { ascending: false });
-
-      // For templates, also show system defaults
-      if (effectiveUserId) {
-        query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
-      }
-
-      // Filter by workspace if available
-      if (currentWorkspace?.id) {
-        query = query.or(`workspace_id.eq.${currentWorkspace.id},is_system_default.eq.true`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as Template[];
-    },
-    enabled: !!effectiveUserId,
-  });
+  // Templates removed - bot_id handles the script now
 
   // Fetch active call session for this workspace
   const { data: activeSession, refetch: refetchSession } = useQuery({
