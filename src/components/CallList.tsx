@@ -1866,7 +1866,7 @@ const CallList = () => {
               <>
                 <Button 
                   onClick={startCalling} 
-                  disabled={pendingCount === 0 || (userTokens ?? 0) < 1 || (settings.businessHoursOnly && !isWithinBusinessHours())}
+                  disabled={pendingCount === 0 || (settings.businessHoursOnly && !isWithinBusinessHours())}
                   className={settings.testMode ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}
                 >
                   <Play className="w-4 h-4 mr-2" />
