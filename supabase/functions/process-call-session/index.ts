@@ -280,16 +280,33 @@ async function processSession(supabase: any, sessionId: string) {
   // Check how many items are currently in "calling" status
   const { data: callingItems, error: callingError } = await supabase
     .from("call_list_items")
-    .select("id")
+    .select("id, called_at")
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
     .eq("status", "calling");
 
-  const currentlyCallingCount = callingItems?.length || 0;
-  const maxConcurrent = typedSession.settings.concurrentCalls || 5;
-  const availableSlots = Math.max(0, maxConcurrent - currentlyCallingCount);
+  // Auto-reset stale "calling" items (stuck for more than 5 minutes)
+  const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+  const now = Date.now();
+  const staleItems = (callingItems || []).filter(item => {
+    if (!item.called_at) return true; // No timestamp = definitely stale
+    return now - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
+  });
 
-  console.log(`[Session ${sessionId}] Currently calling: ${currentlyCallingCount}, max: ${maxConcurrent}, available slots: ${availableSlots}`);
+  if (staleItems.length > 0) {
+    const staleIds = staleItems.map(item => item.id);
+    console.log(`[Session ${sessionId}] Resetting ${staleIds.length} stale "calling" items to "failed"`);
+    await supabase
+      .from("call_list_items")
+      .update({ status: "failed", call_outcome: "Call timed out", picked_up: false })
+      .in("id", staleIds);
+  }
+
+  const activeCallingCount = (callingItems?.length || 0) - staleItems.length;
+  const maxConcurrent = typedSession.settings.concurrentCalls || 5;
+  const availableSlots = Math.max(0, maxConcurrent - activeCallingCount);
+
+  console.log(`[Session ${sessionId}] Currently calling: ${activeCallingCount}, max: ${maxConcurrent}, available slots: ${availableSlots}`);
 
   if (availableSlots === 0) {
     console.log(`[Session ${sessionId}] No available slots, waiting for webhook to trigger next call...`);
