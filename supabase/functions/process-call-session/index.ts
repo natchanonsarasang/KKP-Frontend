@@ -334,24 +334,6 @@ async function processSession(supabase: any, sessionId: string) {
 
   const debtorMap = new Map((debtors as Debtor[] || []).map(d => [d.id, d]));
 
-  // Get templates
-  const templateIds = [...new Set(pendingItems.map((item: { template_id: string | null }) => item.template_id).filter(Boolean))];
-  const { data: templates } = await supabase
-    .from("call_templates")
-    .select("id, template_id, org_name, message")
-    .in("id", templateIds);
-
-  const templateMap = new Map((templates as Template[] || []).map(t => [t.id, t]));
-
-  // Get default template
-  const { data: defaultTemplates } = await supabase
-    .from("call_templates")
-    .select("id, template_id, org_name, message")
-    .eq("is_system_default", true)
-    .limit(1);
-
-  const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
-
   const isTestMode = typedSession.settings.testMode === true;
   const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
   const BOT_ID = "69ccfae9b875327d960ef1bb";
@@ -370,7 +352,7 @@ async function processSession(supabase: any, sessionId: string) {
   console.log(`[Session ${sessionId}] Marked ${itemIds.length} items as 'calling'`);
 
   // Process items concurrently
-  const processItem = async (item: { id: string; debtor_id: string; template_id: string | null }) => {
+  const processItem = async (item: { id: string; debtor_id: string }) => {
     const debtor = debtorMap.get(item.debtor_id);
     if (!debtor) {
       console.log(`[Session ${sessionId}] Debtor not found for item ${item.id}`);
@@ -387,14 +369,7 @@ async function processSession(supabase: any, sessionId: string) {
       return { success: false, failed: false };
     }
 
-    const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
-    if (!template?.template_id) {
-      console.log(`[Session ${sessionId}] No template for item ${item.id}`);
-      return { success: false, failed: false };
-    }
-
-    // Build message with variables
-    let constructedMessage = template.message;
+    // Build variables from debtor data - bot has its own script
     const vars = debtor.variables || {};
 
     // Replace variables in message with proper Thai reading
