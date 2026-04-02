@@ -487,7 +487,7 @@ const DebtorsList = () => {
       if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
       if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
 
-      const { data, error } = await supabase.functions.invoke("botnoi-make-call", {
+      const { data, error } = await supabase.functions.invoke("voicebot-make-call", {
         body: {
           phone_number: debtor.phone_number,
           variables: callVariables,
