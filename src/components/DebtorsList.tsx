@@ -1028,8 +1028,6 @@ const DebtorsList = () => {
         </Card>
       </div>
 
-      {/* Inline Template Editor */}
-      <InlineTemplateEditor />
 
       {/* Filters & Auto-Dial */}
       <div className="flex flex-col gap-3">
