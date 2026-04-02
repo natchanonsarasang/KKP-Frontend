@@ -1294,12 +1294,12 @@ const CallList = () => {
       return;
     }
 
-    // Check if user has at least 1 token
-    const currentTokens = userTokens ?? 0;
-    if (currentTokens < 1) {
-      toast.error(`You have no tokens. Please add tokens to start calling.`);
-      return;
-    }
+    // Token check temporarily disabled — allow calling even with 0 tokens
+    // const currentTokens = userTokens ?? 0;
+    // if (currentTokens < 1) {
+    //   toast.error(`You have no tokens. Please add tokens to start calling.`);
+    //   return;
+    // }
 
     try {
       // Create a call session in the database
@@ -1866,7 +1866,7 @@ const CallList = () => {
               <>
                 <Button 
                   onClick={startCalling} 
-                  disabled={pendingCount === 0 || (userTokens ?? 0) < 1 || (settings.businessHoursOnly && !isWithinBusinessHours())}
+                  disabled={pendingCount === 0 || (settings.businessHoursOnly && !isWithinBusinessHours())}
                   className={settings.testMode ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}
                 >
                   <Play className="w-4 h-4 mr-2" />
