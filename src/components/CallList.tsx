@@ -170,7 +170,6 @@ const CallList = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [selectedDebtors, setSelectedDebtors] = useState<string[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [scheduledTime, setScheduledTime] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"pending" | "calling" | "completed">("pending");
   // Unused legacy state - kept for backwards compatibility but session-based now
