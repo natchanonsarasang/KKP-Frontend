@@ -663,7 +663,6 @@ const CallList = () => {
         debtor_id: debtorId,
         user_id: targetUserId,
         workspace_id: currentWorkspace.id,
-        template_id: selectedTemplateId || null,
         scheduled_at: scheduledTime ? new Date(scheduledTime).toISOString() : null,
         status: "pending",
       }));
