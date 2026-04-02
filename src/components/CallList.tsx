@@ -189,18 +189,34 @@ const CallList = () => {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [settings, setSettings] = useState<AutoDialSettings>(() => {
-    const saved = localStorage.getItem("autoDialSettings");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge with defaults to ensure all properties exist (handles migration from old settings)
-      return { ...DEFAULT_SETTINGS, ...parsed };
+    try {
+      const saved = localStorage.getItem("autoDialSettings");
+      const savedVersion = Number(localStorage.getItem("autoDialSettingsVersion") ?? "0");
+
+      if (!saved) {
+        return DEFAULT_SETTINGS;
+      }
+
+      const parsed = JSON.parse(saved) as Partial<AutoDialSettings>;
+      const mergedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+
+      if (savedVersion < 2) {
+        return {
+          ...mergedSettings,
+          concurrentCalls: DEFAULT_SETTINGS.concurrentCalls,
+        };
+      }
+
+      return mergedSettings;
+    } catch {
+      return DEFAULT_SETTINGS;
     }
-    return DEFAULT_SETTINGS;
   });
 
   // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem("autoDialSettings", JSON.stringify(settings));
+    localStorage.setItem("autoDialSettingsVersion", "2");
   }, [settings]);
 
   // Realtime subscription for call_list_items updates
