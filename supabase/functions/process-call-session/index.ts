@@ -430,7 +430,6 @@ async function processSession(supabase: any, sessionId: string) {
         // Create mock call record
         await supabase.from("call_records").insert({
           phone_number: debtor.phone_number,
-          template_id: template.id,
           botnoi_call_id: `test_${Date.now()}_${Math.random().toString(36).substring(7)}`,
           status: mockStatus,
           user_id: typedSession.user_id,
