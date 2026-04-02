@@ -567,16 +567,6 @@ const CallList = () => {
         throw new Error("No new debtors to queue");
       }
 
-      const preferredTemplate = selectedTemplateId
-        ? templates?.find((t) => t.id === selectedTemplateId)
-        : undefined;
-
-      const defaultTemplate =
-        preferredTemplate ||
-        templates?.find((t) => !t.is_system_default) ||
-        templates?.find((t) => t.is_system_default) ||
-        templates?.[0];
-
       // Insert in chunks to avoid request size limits
       const chunkSize = 500;
       let inserted = 0;
@@ -587,7 +577,6 @@ const CallList = () => {
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
-          template_id: defaultTemplate?.id || null,
           status: "pending",
         }));
 
