@@ -1092,64 +1092,6 @@ const CallList = () => {
         })
         .eq("id", debtor.id);
 
-      // Wait for call to complete
-      const maxWaitTime = 5 * 60 * 1000;
-      const pollInterval = 3000;
-      const startTime = Date.now();
-
-      // Make call via edge function - send debtor variables directly
-      const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
-      // Add standard fields
-      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
-      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
-      
-      console.log("Sending to Voicebot API - variables:", callVariables);
-      const { data: callResponse, error: callError } = await supabase.functions.invoke(
-        "botnoi-make-call",
-        {
-          body: {
-            phone_number: debtor.phone_number,
-            variables: callVariables,
-          },
-        }
-      );
-
-      if (callError) {
-        await supabase
-          .from("call_records")
-          .update({ status: "failed", result_data: { error: callError.message } })
-          .eq("id", callRecord.id);
-        await supabase
-          .from("call_list_items")
-          .update({ status: "failed" })
-          .eq("id", item.id);
-        return { success: false, shouldRetry: true };
-      }
-
-      // Update call record with Botnoi ID
-      await supabase
-        .from("call_records")
-        .update({
-          botnoi_call_id: callResponse?.outbound_id || null,
-          status: "pending",
-        })
-        .eq("id", callRecord.id);
-
-      // Update debtor contact attempts
-      await supabase
-        .from("debtors")
-        .update({
-          contact_attempts: (debtor.contact_attempts || 0) + 1,
-          last_contact_at: new Date().toISOString(),
-        })
-        .eq("id", debtor.id);
-
-      // Wait for call to complete
-      const maxWaitTime = 5 * 60 * 1000;
-      const pollInterval = 3000;
-      const startTime = Date.now();
-
       while (Date.now() - startTime < maxWaitTime) {
         if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
 
@@ -1165,7 +1107,6 @@ const CallList = () => {
           const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
           if (finalStatuses.includes(updatedRecord.status || "")) {
             const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
-            // Update call list item with final status
             await supabase
               .from("call_list_items")
               .update({ 
@@ -1193,7 +1134,7 @@ const CallList = () => {
         .eq("id", item.id);
       return { success: false, shouldRetry: true };
     }
-  }, [templates]);
+  }, []);
 
   // Start calling using backend session (persists even if page closed)
   const startCallingSession = useCallback(async () => {
