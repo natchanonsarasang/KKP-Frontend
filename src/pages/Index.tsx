@@ -1,17 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Phone, Settings, BarChart3, Users } from "lucide-react";
+import { Phone, BarChart3, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import TemplateSetup from "@/components/TemplateSetup";
 import CallDashboard from "@/components/CallDashboard";
 import DebtorsList from "@/components/DebtorsList";
 import { Toaster } from "@/components/ui/sonner";
 
-type TabType = "debtors" | "templates" | "analytics";
+type TabType = "debtors" | "analytics";
 
 const navItems = [
   { id: "debtors" as const, label: "Debtors", icon: Users },
-  { id: "templates" as const, label: "Templates", icon: Settings },
   { id: "analytics" as const, label: "Analytics", icon: BarChart3 },
 ];
 
@@ -22,10 +20,8 @@ const Index = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Toaster />
       
-      {/* Top Navbar */}
       <header className="h-14 flex items-center justify-between px-6 border-b border-border bg-card sticky top-0 z-40">
         <div className="flex items-center gap-6">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Phone className="w-4 h-4 text-primary-foreground" />
@@ -33,7 +29,6 @@ const Index = () => {
             <span className="font-semibold text-lg tracking-tight">Callecto</span>
           </Link>
 
-          {/* Navigation Tabs */}
           <nav className="flex items-center gap-1">
             {navItems.map((item) => (
               <button
@@ -58,11 +53,9 @@ const Index = () => {
         </p>
       </header>
 
-      {/* Page Content */}
       <main className="flex-1 overflow-auto p-6">
         <div className="animate-fade-in">
           {activeTab === "debtors" && <DebtorsList />}
-          {activeTab === "templates" && <TemplateSetup />}
           {activeTab === "analytics" && <CallDashboard />}
         </div>
       </main>

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList } from "lucide-react";
+import { Phone, Users, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList } from "lucide-react";
 import DebtorsList from "@/components/DebtorsList";
 import CallReportDashboard from "@/components/reports/CallReportDashboard";
 import CallDashboard from "@/components/CallDashboard";
