@@ -202,16 +202,32 @@ serve(async (req) => {
         console.log('Debtor auto-created:', debtorId);
       }
 
-      // Update call_list_items
-      if (debtorId && resolvedUserId) {
-        const { data: recentItem } = await supabase
-          .from('call_list_items')
-          .select('id')
-          .eq('debtor_id', debtorId)
-          .eq('status', 'calling')
-          .order('called_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      // Update call_list_items - prefer finding by call_record_id (most reliable)
+      if (resolvedUserId) {
+        let recentItem: { id: string } | null = null;
+
+        // Strategy 1: Find by call_record_id (set by process-call-session)
+        if (callRecordId) {
+          const { data: byRecord } = await supabase
+            .from('call_list_items')
+            .select('id')
+            .eq('call_record_id', callRecordId)
+            .maybeSingle();
+          if (byRecord) recentItem = byRecord;
+        }
+
+        // Strategy 2: Fall back to debtor_id + calling status
+        if (!recentItem && debtorId) {
+          const { data: byDebtor } = await supabase
+            .from('call_list_items')
+            .select('id')
+            .eq('debtor_id', debtorId)
+            .eq('status', 'calling')
+            .order('called_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (byDebtor) recentItem = byDebtor;
+        }
 
         const finalStatus = pickedUp ? 'success' : mappedStatus;
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
@@ -227,7 +243,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           }).eq('id', recentItem.id);
           console.log('Call list item updated:', recentItem.id);
-        } else {
+        } else if (debtorId) {
           await supabase.from('call_list_items').insert({
             debtor_id: debtorId,
             user_id: resolvedUserId,

@@ -564,8 +564,8 @@ async function processSession(supabase: any, sessionId: string) {
           // Use outbound_id from Botnoi response (this is what comes back in webhook)
           const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
           
-          // Create call record
-          await supabase.from("call_records").insert({
+          // Create call record and get its ID
+          const { data: callRecord } = await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
             template_id: template?.id || null,
             botnoi_call_id: botnoiCallId,
@@ -573,15 +573,17 @@ async function processSession(supabase: any, sessionId: string) {
             user_id: typedSession.user_id,
             workspace_id: typedSession.workspace_id,
             result_data: data,
-          });
+          }).select('id').single();
 
           // Update call list item - keep as "calling" until webhook confirms result
+          // Link call_record_id so webhook can find this item reliably
           await supabase
             .from("call_list_items")
             .update({ 
               status: "calling", 
               call_outcome: "Call initiated - awaiting response",
               called_at: new Date().toISOString(),
+              call_record_id: callRecord?.id || null,
             })
             .eq("id", item.id);
           
