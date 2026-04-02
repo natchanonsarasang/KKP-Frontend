@@ -139,7 +139,7 @@ const DEFAULT_SETTINGS: AutoDialSettings = {
   businessHoursEnd: "18:00",
   businessDays: [1, 2, 3, 4, 5], // Mon-Fri by default
   delayBetweenCalls: 5, // Default to 5 seconds for testing
-  concurrentCalls: 1,
+  concurrentCalls: 5,
   testMode: false,
   timezoneOffset: -(new Date().getTimezoneOffset()), // Auto-detect user's timezone
 };
