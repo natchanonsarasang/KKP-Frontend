@@ -1005,50 +1005,21 @@ const CallList = () => {
     }
   }, [buildCallPayload]);
 
-  // Make a single call
+  // Make a single call - now uses bot_id directly, no template needed
   const makeCall = useCallback(async (item: CallListItem, isRetry: boolean = false): Promise<{ success: boolean; shouldRetry: boolean }> => {
-    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
-    if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
+    if (!item.debtor) return { success: false, shouldRetry: false };
 
     try {
       const debtor = item.debtor;
       const debtorVars = debtor.variables || {};
-      
-      // Construct the full message by replacing placeholders with debtor variables
-      // Use the selected template's message as the base
-      let constructedMessage = selectedTemplate.message;
-      
-      // Replace all {placeholder} with actual values from debtor variables
-      // Apply Thai phonetic conversion for license plate fields
-      Object.entries(debtorVars).forEach(([key, value]) => {
-        const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
-        let processedValue = String(value);
-        
-        // Convert license plate fields to Thai phonetic reading (karaoke style)
-        if (shouldUsePhonetic(key)) {
-          processedValue = toThaiPhonetic(processedValue);
-        }
-        
-        constructedMessage = constructedMessage.replace(placeholder, processedValue);
-      });
-      
-      // Also replace standard placeholders
-      const debtAmount = debtor.total_debt 
-        ? numberToThaiText(debtor.total_debt) + "บาท"
-        : "-";
-      const formattedDueDate = debtor.due_date
-        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-        : "-";
-      
-      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
-      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
-      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
-      
-      console.log("Constructed message:", constructedMessage);
 
-      const callRecordDueDate = debtor.due_date
-        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-        : "";
+      // Build variables from debtor data
+      const callVariables: Record<string, string> = { ...(debtorVars || {}) };
+      if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
+      if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || debtor.total_debt.toString();
+      if (debtor.due_date) callVariables.due_date = callVariables.due_date || new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
+
+      console.log("Sending to Voicebot API - variables:", callVariables);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -1065,9 +1036,8 @@ const CallList = () => {
         .insert({
           phone_number: debtor.phone_number,
           amount: debtor.total_debt?.toString() || "",
-          due_date: callRecordDueDate,
+          due_date: debtor.due_date ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" }) : "",
           status: "calling",
-          template_id: selectedTemplate.id,
           user_id: user.id,
         })
         .select()
@@ -1080,6 +1050,52 @@ const CallList = () => {
         .from("call_list_items")
         .update({ call_record_id: callRecord.id })
         .eq("id", item.id);
+
+      // Make call via edge function - send debtor variables directly
+      const { data: callResponse, error: callError } = await supabase.functions.invoke(
+        "botnoi-make-call",
+        {
+          body: {
+            phone_number: debtor.phone_number,
+            variables: callVariables,
+          },
+        }
+      );
+
+      if (callError) {
+        await supabase
+          .from("call_records")
+          .update({ status: "failed", result_data: { error: callError.message } })
+          .eq("id", callRecord.id);
+        await supabase
+          .from("call_list_items")
+          .update({ status: "failed" })
+          .eq("id", item.id);
+        return { success: false, shouldRetry: true };
+      }
+
+      // Update call record with Botnoi ID
+      await supabase
+        .from("call_records")
+        .update({
+          botnoi_call_id: callResponse?.outbound_id || null,
+          status: "pending",
+        })
+        .eq("id", callRecord.id);
+
+      // Update debtor contact attempts
+      await supabase
+        .from("debtors")
+        .update({
+          contact_attempts: (debtor.contact_attempts || 0) + 1,
+          last_contact_at: new Date().toISOString(),
+        })
+        .eq("id", debtor.id);
+
+      // Wait for call to complete
+      const maxWaitTime = 5 * 60 * 1000;
+      const pollInterval = 3000;
+      const startTime = Date.now();
 
       // Make call via edge function - send debtor variables directly
       const callVariables: Record<string, string> = { ...(debtor.variables || {}) };
