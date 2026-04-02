@@ -137,7 +137,7 @@ const Dashboard = () => {
     { id: "debtors" as TabType, label: "Debtors", icon: Users },
     { id: "call-list" as TabType, label: "Call List", icon: ListChecks },
     { id: "analytics" as TabType, label: "Analytics", icon: BarChart3 },
-    { id: "reports" as TabType, label: "Reports", icon: ClipboardList },
+    // { id: "reports" as TabType, label: "Reports", icon: ClipboardList },
   ];
 
   if (loading) {
