@@ -316,7 +316,6 @@ const Dashboard = () => {
       <main className="p-6">
         {activeTab === "debtors" && <DebtorsList />}
         {activeTab === "call-list" && <CallList />}
-        {activeTab === "templates" && <TemplateSetup />}
         {activeTab === "analytics" && <CallDashboard />}
         {activeTab === "reports" && <CallReportDashboard />}
       </main>
