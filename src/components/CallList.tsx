@@ -974,52 +974,25 @@ const CallList = () => {
     return result;
   };
 
-  // BOTNOI TEMPLATE ID - registered with "{Appointment Date}" placeholder
-  const BOTNOI_TEMPLATE_ID = "2015208747";
-
-  // Build the payload for preview/call
+  // Build the payload for preview/call - now just sends debtor variables to bot
   const buildCallPayload = useCallback((item: CallListItem) => {
-    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
-    if (!selectedTemplate?.message || !item.debtor) return null;
+    if (!item.debtor) return null;
 
     const debtor = item.debtor;
     const debtorVars = debtor.variables || {};
     
-    // Construct the full message by replacing placeholders with debtor variables
-    let constructedMessage = selectedTemplate.message;
-    
-    // Replace all {placeholder} with actual values from debtor variables
-    Object.entries(debtorVars).forEach(([key, value]) => {
-      const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
-      let processedValue = String(value);
-      
-      // Convert license plate fields to Thai phonetic reading
-      if (shouldUsePhonetic(key)) {
-        processedValue = toThaiPhonetic(processedValue);
-      }
-      
-      constructedMessage = constructedMessage.replace(placeholder, processedValue);
-    });
-    
-    // Also replace standard placeholders
-    const debtAmount = debtor.total_debt 
-      ? numberToThaiText(debtor.total_debt) + "บาท"
-      : "-";
-    const formattedDueDate = debtor.due_date
-      ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-      : "-";
-    
-    constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
-    constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
-    constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
+    // Build variables summary for preview
+    const variablesSummary = Object.entries(debtorVars)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
 
     return {
       phone: debtor.phone_number,
-      templateId: BOTNOI_TEMPLATE_ID,
-      message: constructedMessage,
+      variables: debtorVars,
+      variablesSummary,
       item,
     };
-  }, [templates]);
+  }, []);
 
   // Show preview before calling
   const handlePreviewCall = useCallback((item: CallListItem) => {
