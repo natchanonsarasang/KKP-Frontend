@@ -319,7 +319,7 @@ const Dashboard = () => {
         {activeTab === "call-list" && <CallList />}
         
         {activeTab === "analytics" && <CallDashboard />}
-        {activeTab === "reports" && <CallReportDashboard />}
+        {/* {activeTab === "reports" && <CallReportDashboard />} */}
       </main>
     </div>
   );
