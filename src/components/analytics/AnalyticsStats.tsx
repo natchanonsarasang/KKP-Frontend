@@ -54,7 +54,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-3 gap-4">
       {stats.map((stat) => (
         <Card key={stat.label} className={stat.bgColor.replace("/10", "/5")}>
           <CardContent className="p-4">
