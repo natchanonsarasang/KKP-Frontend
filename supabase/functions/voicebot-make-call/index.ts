@@ -29,6 +29,7 @@ serve(async (req) => {
       tel_number: phone_number,
       variables: variables || {},
       interruptible: "true",
+      asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
     };
 
     console.log("Payload:", JSON.stringify(callPayload, null, 2));
