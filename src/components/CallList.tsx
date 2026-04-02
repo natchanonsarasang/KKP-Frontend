@@ -806,7 +806,7 @@ const CallList = () => {
     },
   });
 
-  // Queue failed calls for retry
+  // Queue failed calls for retry - create NEW items so failed records stay visible
   const retryFailedMutation = useMutation({
     mutationFn: async () => {
       const failedItems = callListItems?.filter(item => 
@@ -817,17 +817,26 @@ const CallList = () => {
         throw new Error("No failed calls to retry");
       }
 
+      // Create new pending items based on the failed ones
+      const newItems = failedItems.map(item => ({
+        debtor_id: item.debtor_id,
+        user_id: item.user_id,
+        template_id: item.template_id,
+        workspace_id: currentWorkspace?.id,
+        status: "pending" as string,
+        notes: `Retry of failed call`,
+      }));
+
       const { error } = await supabase
         .from("call_list_items")
-        .update({ status: "retry_pending" })
-        .in("id", failedItems.map(i => i.id));
+        .insert(newItems);
 
       if (error) throw error;
       return failedItems.length;
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
-      toast.success(`Queued ${count} calls for retry`);
+      toast.success(`Created ${count} new retry calls`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
