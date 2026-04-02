@@ -18,7 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList } from "lucide-react";
+import {
+  Phone,
+  Users,
+  FileText,
+  BarChart3,
+  LogOut,
+  LucideIcon,
+  Shield,
+  UserCog,
+  ListChecks,
+  ClipboardList,
+} from "lucide-react";
 import DebtorsList from "@/components/DebtorsList";
 import CallReportDashboard from "@/components/reports/CallReportDashboard";
 import TemplateSetup from "@/components/TemplateSetup";
@@ -39,14 +50,19 @@ interface DashboardNavLinkProps {
   children: React.ReactNode;
 }
 
-const DashboardNavLink = ({ active, onClick, icon: Icon, children }: DashboardNavLinkProps) => (
+const DashboardNavLink = ({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: DashboardNavLinkProps) => (
   <button
     onClick={onClick}
     className={cn(
       "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-      active 
-        ? "bg-primary/10 text-primary" 
-        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+      active
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted",
     )}
   >
     <Icon className="w-4 h-4" />
@@ -61,12 +77,24 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("debtors");
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  
+
   // Get admin context
-  const { isAdmin, selectedUserId, setSelectedUserId, allUsers, isLoadingUsers, effectiveUserId } = useAdmin();
-  
+  const {
+    isAdmin,
+    selectedUserId,
+    setSelectedUserId,
+    allUsers,
+    isLoadingUsers,
+    effectiveUserId,
+  } = useAdmin();
+
   // Get workspace context
-  const { currentWorkspace, workspaces, isLoading: workspacesLoading, createWorkspace } = useWorkspace();
+  const {
+    currentWorkspace,
+    workspaces,
+    isLoading: workspacesLoading,
+    createWorkspace,
+  } = useWorkspace();
 
   // Show/hide create workspace dialog based on whether workspaces exist
   useEffect(() => {
@@ -80,7 +108,7 @@ const Dashboard = () => {
   }, [workspaces, workspacesLoading, session]);
 
   // Get selected user info for display
-  const selectedUserInfo = allUsers.find(u => u.id === selectedUserId);
+  const selectedUserInfo = allUsers.find((u) => u.id === selectedUserId);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,16 +172,19 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <div className="animate-pulse text-muted-foreground">Loading..</div>
       </div>
     );
   }
 
-  const userInitials = user?.user_metadata?.full_name
-    ?.split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase() || user?.email?.[0].toUpperCase() || "U";
+  const userInitials =
+    user?.user_metadata?.full_name
+      ?.split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .toUpperCase() ||
+    user?.email?.[0].toUpperCase() ||
+    "U";
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,11 +200,16 @@ const Dashboard = () => {
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-8">
             {/* Logo - links to landing */}
-            <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Link
+              to="/"
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
               <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
                 <Phone className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold tracking-tight">Callecto</span>
+              <span className="text-lg font-semibold tracking-tight">
+                Callecto
+              </span>
             </Link>
 
             {/* Navigation */}
@@ -188,7 +224,7 @@ const Dashboard = () => {
                   {item.label}
                 </DashboardNavLink>
               ))}
-              
+
               {/* Admin Link */}
               {isAdmin && (
                 <Link
@@ -211,12 +247,16 @@ const Dashboard = () => {
                 <UserCog className="w-4 h-4 text-yellow-600" />
                 <Select
                   value={selectedUserId || "self"}
-                  onValueChange={(value) => setSelectedUserId(value === "self" ? null : value)}
+                  onValueChange={(value) =>
+                    setSelectedUserId(value === "self" ? null : value)
+                  }
                 >
-                  <SelectTrigger className={cn(
-                    "w-[200px] h-9",
-                    selectedUserId && "border-yellow-500 bg-yellow-500/10"
-                  )}>
+                  <SelectTrigger
+                    className={cn(
+                      "w-[200px] h-9",
+                      selectedUserId && "border-yellow-500 bg-yellow-500/10",
+                    )}
+                  >
                     <SelectValue placeholder="Select user" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
@@ -224,7 +264,7 @@ const Dashboard = () => {
                       <span className="font-medium">My Account</span>
                     </SelectItem>
                     {allUsers
-                      .filter(u => u.id !== user?.id)
+                      .filter((u) => u.id !== user?.id)
                       .map((u) => (
                         <SelectItem key={u.id} value={u.id}>
                           {u.full_name || u.email || u.id.slice(0, 8)}
@@ -238,9 +278,15 @@ const Dashboard = () => {
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                <Button
+                  variant="ghost"
+                  className="relative h-9 w-9 rounded-full"
+                >
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || ""} />
+                    <AvatarImage
+                      src={user?.user_metadata?.avatar_url}
+                      alt={user?.email || ""}
+                    />
                     <AvatarFallback className="bg-primary/10 text-primary text-sm">
                       {userInitials}
                     </AvatarFallback>
@@ -249,20 +295,28 @@ const Dashboard = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium">{user?.user_metadata?.full_name || "User"}</p>
+                  <p className="text-sm font-medium">
+                    {user?.user_metadata?.full_name || "User"}
+                  </p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 {isAdmin && (
                   <>
-                    <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin")}
+                      className="cursor-pointer"
+                    >
                       <Shield className="mr-2 h-4 w-4 text-yellow-600" />
                       Admin Panel
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive cursor-pointer"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
                 </DropdownMenuItem>
@@ -301,7 +355,10 @@ const Dashboard = () => {
           <div className="flex items-center gap-2 text-sm">
             <UserCog className="w-4 h-4 text-yellow-600" />
             <span className="text-yellow-700 dark:text-yellow-400">
-              Operating as: <strong>{selectedUserInfo.full_name || selectedUserInfo.email}</strong>
+              Operating as:{" "}
+              <strong>
+                {selectedUserInfo.full_name || selectedUserInfo.email}
+              </strong>
             </span>
           </div>
           <Button
