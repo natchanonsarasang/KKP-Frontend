@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-type TabType = "debtors" | "call-list" | "templates" | "analytics" | "reports";
+type TabType = "debtors" | "call-list" | "analytics" | "reports";
 
 interface DashboardNavLinkProps {
   active: boolean;
@@ -136,7 +136,6 @@ const Dashboard = () => {
   const navItems = [
     { id: "debtors" as TabType, label: "Debtors", icon: Users },
     { id: "call-list" as TabType, label: "Call List", icon: ListChecks },
-    { id: "templates" as TabType, label: "Templates", icon: FileText },
     { id: "analytics" as TabType, label: "Analytics", icon: BarChart3 },
     { id: "reports" as TabType, label: "Reports", icon: ClipboardList },
   ];
@@ -318,7 +317,7 @@ const Dashboard = () => {
       <main className="p-6">
         {activeTab === "debtors" && <DebtorsList />}
         {activeTab === "call-list" && <CallList />}
-        {activeTab === "templates" && <TemplateSetup />}
+        
         {activeTab === "analytics" && <CallDashboard />}
         {activeTab === "reports" && <CallReportDashboard />}
       </main>
