@@ -14,7 +14,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const botnoiApiToken = Deno.env.get("BOTNOI_API_TOKEN");
+    const BOT_ID = "69ccce0db875327d960ef0cf";
+    const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
