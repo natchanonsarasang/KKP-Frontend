@@ -350,6 +350,13 @@ async function categorizeConversation(log: string, status: string, mappedStatus:
     if (mappedStatus === 'completed') return "Customer silent";
     return "No answer – call back later";
   }
+
+  // Rule-based: noisy environment keywords
+  const noisyKeywords = ['ไม่ได้ยิน', 'พูดอะไร', 'เสียงดัง', 'ฟังไม่ชัด', 'ได้ยินไม่ชัด', "can't hear", 'cannot hear'];
+  const logLower = log.toLowerCase();
+  if (noisyKeywords.some(kw => logLower.includes(kw))) {
+    return "Customer in noisy environment";
+  }
   if (!apiKey) {
     console.warn('LOVABLE_API_KEY not found, skipping AI categorization');
     return "Customer has hardship situation";
