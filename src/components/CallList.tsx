@@ -1092,6 +1092,9 @@ const CallList = () => {
         })
         .eq("id", debtor.id);
 
+      const maxWaitTime = 5 * 60 * 1000;
+      const pollInterval = 3000;
+      const startTime = Date.now();
       while (Date.now() - startTime < maxWaitTime) {
         if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
 
