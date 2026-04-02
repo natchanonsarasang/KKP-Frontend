@@ -182,7 +182,7 @@ const CallList = () => {
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
-  const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null } | null>(null);
+  const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null; audioUrl: string | null } | null>(null);
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
