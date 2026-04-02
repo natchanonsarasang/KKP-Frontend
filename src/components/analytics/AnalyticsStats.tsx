@@ -45,21 +45,6 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       bgColor: "bg-primary/10",
     },
     {
-      label: "Confirmed",
-      value: confirmed.length,
-      subValue: `${conversionRate}% conv.`,
-      icon: CheckCircle,
-      color: "text-success",
-      bgColor: "bg-success/10",
-    },
-    {
-      label: "Declined",
-      value: declined.length,
-      icon: XCircle,
-      color: "text-destructive",
-      bgColor: "bg-destructive/10",
-    },
-    {
       label: "No Answer",
       value: noAnswer.length,
       icon: PhoneOff,
@@ -69,7 +54,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-3 gap-4">
       {stats.map((stat) => (
         <Card key={stat.label} className={stat.bgColor.replace("/10", "/5")}>
           <CardContent className="p-4">
