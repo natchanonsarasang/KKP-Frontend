@@ -25,12 +25,17 @@ interface CallRecord {
   phone_number: string;
   due_date: string | null;
   amount: string | null;
-  status: string;
+  status: string | null;
   botnoi_call_id: string | null;
   created_at: string;
   updated_at: string;
   template_id: string | null;
-  ai_category?: string | null;
+  call_duration: number | null;
+  result_data: Record<string, unknown> | null;
+  appointment_date: string | null;
+  appointment_time: string | null;
+  user_id: string | null;
+  workspace_id: string | null;
 }
 
 interface CallListItem {
