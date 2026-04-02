@@ -2100,26 +2100,6 @@ const CallList = () => {
           </DialogHeader>
           
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            {/* Template Selection */}
-            <div className="space-y-1.5">
-              <Label className="text-sm">Template</Label>
-              <Select
-                value={selectedTemplateId}
-                onValueChange={setSelectedTemplateId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select template" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {templates?.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.org_name} {t.is_system_default && "(Default)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Schedule Time (Optional) */}
             <div className="space-y-1.5">
               <Label className="text-sm">Schedule (Optional)</Label>
