@@ -1302,6 +1302,7 @@ const DebtorsList = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
+                              {/* Call button hidden
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1316,6 +1317,7 @@ const DebtorsList = () => {
                                 )}
                                 Call
                               </Button>
+                              */}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8">
