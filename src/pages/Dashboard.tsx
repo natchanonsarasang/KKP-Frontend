@@ -136,7 +136,6 @@ const Dashboard = () => {
   const navItems = [
     { id: "debtors" as TabType, label: "Debtors", icon: Users },
     { id: "call-list" as TabType, label: "Call List", icon: ListChecks },
-    { id: "templates" as TabType, label: "Templates", icon: FileText },
     { id: "analytics" as TabType, label: "Analytics", icon: BarChart3 },
     { id: "reports" as TabType, label: "Reports", icon: ClipboardList },
   ];
