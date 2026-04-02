@@ -1886,7 +1886,7 @@ const CallList = () => {
                     {callingCount} calling
                   </span>
                   <span className="text-muted-foreground">
-                    / {settings.concurrentCalls} max
+                    / {activeSessionConcurrentCalls} max
                   </span>
                 </div>
               )}
