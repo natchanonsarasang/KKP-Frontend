@@ -353,16 +353,8 @@ async function processSession(supabase: any, sessionId: string) {
   const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
 
   const isTestMode = typedSession.settings.testMode === true;
-  const botnoiToken = Deno.env.get("BOTNOI_API_TOKEN");
-  
-  if (!isTestMode && !botnoiToken) {
-    console.error(`[Session ${sessionId}] BOTNOI_API_TOKEN not configured`);
-    await supabase
-      .from("call_sessions")
-      .update({ status: "stopped", error_message: "BOTNOI_API_TOKEN not configured" })
-      .eq("id", sessionId);
-    return;
-  }
+  const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
+  const BOT_ID = "69ccfae9b875327d960ef1bb";
   
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -593,42 +585,43 @@ async function processSession(supabase: any, sessionId: string) {
         
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
-        // REAL MODE: Make actual call
-        const callPayload: Record<string, string> = {
-          "Tel. Number": debtor.phone_number,
-          template_id: template.template_id,
-        };
-
-        if (constructedMessage) {
-          callPayload["Appointment Date"] = constructedMessage;
+        // REAL MODE: Make actual call via new Voicebot API
+        // Build variables from debtor data
+        const callVariables: Record<string, string> = { ...(vars || {}) };
+        if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
+        if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || String(debtor.total_debt);
+        if (debtor.due_date) {
+          const formattedDate = new Date(debtor.due_date).toLocaleDateString("th-TH", {
+            day: "numeric", month: "long", year: "numeric",
+          });
+          callVariables.due_date = callVariables.due_date || formattedDate;
         }
+
+        const callPayload = {
+          bot_id: BOT_ID,
+          bot_type: "in_init_conversation",
+          tel_number: debtor.phone_number,
+          variables: callVariables,
+          interruptible: "true",
+        };
 
         console.log(`[Session ${sessionId}] Calling ${debtor.phone_number}...`);
 
-        const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {
+        const response = await fetch(CALL_API_URL, {
           method: "POST",
           headers: {
-            accept: "application/json",
-            "botnoi-token": botnoiToken!,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(callPayload),
         });
 
         const data = await response.json();
-        console.log(`[Session ${sessionId}] Botnoi response:`, JSON.stringify(data));
+        console.log(`[Session ${sessionId}] Voicebot response:`, JSON.stringify(data));
 
-        // Botnoi API returns success in different ways - check for success indicators
-        const isSuccess = response.ok && (
-          data.call_id || 
-          data.status === "success" || 
-          (data.message && data.message.toLowerCase().includes("success"))
-        );
+        const botnoiCallId = data.outbound_id || null;
+        const isSuccess = response.ok && botnoiCallId;
         
         if (isSuccess) {
-          // Use outbound_id from Botnoi response (this is what comes back in webhook)
-          const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
-          
           // Create call record
           await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
@@ -659,9 +652,9 @@ async function processSession(supabase: any, sessionId: string) {
             })
             .eq("id", item.debtor_id);
 
-          return { success: true, failed: false, confirmed: false, tokensUsed: 0 }; // Tokens deducted in webhook for real calls
+          return { success: true, failed: false, confirmed: false, tokensUsed: 0 };
         } else {
-          throw new Error(data.message || "Call failed");
+          throw new Error(data.message || JSON.stringify(data) || "Call failed");
         }
       }
     } catch (error) {
