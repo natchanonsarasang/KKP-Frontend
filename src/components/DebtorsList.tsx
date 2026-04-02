@@ -32,7 +32,7 @@ import {
   Send,
 } from "lucide-react";
 import DebtorExcelUpload from "./DebtorExcelUpload";
-import InlineTemplateEditor from "./InlineTemplateEditor";
+
 import {
   Dialog,
   DialogContent,
@@ -1028,8 +1028,6 @@ const DebtorsList = () => {
         </Card>
       </div>
 
-      {/* Inline Template Editor */}
-      <InlineTemplateEditor />
 
       {/* Filters & Auto-Dial */}
       <div className="flex flex-col gap-3">
