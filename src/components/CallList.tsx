@@ -1466,7 +1466,7 @@ const CallList = () => {
     ["failed", "no_answer", "no_response"].includes(item.status)
   ).length || 0;
 
-  // Filter items based on active tab
+  const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;
   const filteredItems = (callListItems || []).filter(item => {
     switch (activeTab) {
       case "pending":
