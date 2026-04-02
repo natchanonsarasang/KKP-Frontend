@@ -822,7 +822,7 @@ const CallList = () => {
         debtor_id: item.debtor_id,
         user_id: item.user_id,
         template_id: item.template_id,
-        workspace_id: item.workspace_id,
+        workspace_id: currentWorkspace?.id,
         status: "pending" as string,
         notes: `Retry of failed call`,
       }));
