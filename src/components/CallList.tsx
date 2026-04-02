@@ -2409,24 +2409,20 @@ const CallList = () => {
                   <span className="text-foreground font-semibold">{previewPayload.phone}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Template ID: </span>
-                  <span className="text-foreground font-semibold">{previewPayload.templateId}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block mb-1">Appointment Date (Message): </span>
+                  <span className="text-muted-foreground block mb-1">Variables (sent to Bot): </span>
                   <div className="bg-background border rounded p-3 whitespace-pre-wrap break-words text-foreground">
-                    {previewPayload.message}
+                    {previewPayload.variablesSummary || "No variables"}
                   </div>
                 </div>
               </div>
 
               <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Botnoi:</h4>
+                <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Voicebot:</h4>
                 <pre className="text-xs bg-background border rounded p-3 overflow-x-auto">
 {JSON.stringify({
-  "Tel. Number": previewPayload.phone,
-  "template_id": previewPayload.templateId,
-  "Appointment Date": previewPayload.message
+  bot_id: "69ccfae9b875327d960ef1bb",
+  tel_number: previewPayload.phone,
+  variables: previewPayload.variables,
 }, null, 2)}
                 </pre>
               </div>
