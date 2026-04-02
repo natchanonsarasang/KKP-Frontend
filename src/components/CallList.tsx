@@ -203,6 +203,33 @@ const CallList = () => {
     localStorage.setItem("autoDialSettings", JSON.stringify(settings));
   }, [settings]);
 
+  // Realtime subscription for call_list_items updates
+  useEffect(() => {
+    if (!currentWorkspace?.id) return;
+
+    const channel = supabase
+      .channel('call-list-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'call_list_items',
+          filter: `workspace_id=eq.${currentWorkspace.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
+          queryClient.invalidateQueries({ queryKey: ["active-call-session"] });
+          queryClient.invalidateQueries({ queryKey: ["call-tokens"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentWorkspace?.id, queryClient]);
+
 
   // Helper to parse notes field (could be JSON with audio_url/conversation_log or legacy plain URL)
   const parseNotesData = useCallback((notes: string | null): { audioUrl: string | null; conversationLog: string | null } => {
