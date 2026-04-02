@@ -510,7 +510,6 @@ async function processSession(supabase: any, sessionId: string) {
       } else {
         // REAL MODE: Make actual call via new Voicebot API
         const callPayload = {
-        const callPayload = {
           bot_id: BOT_ID,
           bot_type: "in_init_conversation",
           tel_number: debtor.phone_number,
