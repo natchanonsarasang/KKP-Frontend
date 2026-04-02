@@ -353,16 +353,9 @@ async function processSession(supabase: any, sessionId: string) {
   const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
 
   const isTestMode = typedSession.settings.testMode === true;
-  const botnoiToken = Deno.env.get("BOTNOI_API_TOKEN");
   
-  if (!isTestMode && !botnoiToken) {
-    console.error(`[Session ${sessionId}] BOTNOI_API_TOKEN not configured`);
-    await supabase
-      .from("call_sessions")
-      .update({ status: "stopped", error_message: "BOTNOI_API_TOKEN not configured" })
-      .eq("id", sessionId);
-    return;
-  }
+  const BOT_ID = "69ccce0db875327d960ef0cf";
+  const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
   
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -593,30 +586,30 @@ async function processSession(supabase: any, sessionId: string) {
         
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
-        // REAL MODE: Make actual call
-        const callPayload: Record<string, string> = {
-          "Tel. Number": debtor.phone_number,
-          template_id: template.template_id,
+        // REAL MODE: Make actual call via new Voicebot API
+        const vars = debtor.variables || {};
+        const callPayload = {
+          bot_id: BOT_ID,
+          bot_type: "in_init_conversation",
+          tel_number: debtor.phone_number,
+          variables: vars,
+          interruptible: "true",
+          asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
         };
 
-        if (constructedMessage) {
-          callPayload["Appointment Date"] = constructedMessage;
-        }
+        console.log(`[Session ${sessionId}] Calling ${debtor.phone_number} via Voicebot API...`);
+        console.log(`[Session ${sessionId}] Payload:`, JSON.stringify(callPayload));
 
-        console.log(`[Session ${sessionId}] Calling ${debtor.phone_number}...`);
-
-        const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {
+        const response = await fetch(CALL_API_URL, {
           method: "POST",
           headers: {
-            accept: "application/json",
-            "botnoi-token": botnoiToken!,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(callPayload),
         });
 
         const data = await response.json();
-        console.log(`[Session ${sessionId}] Botnoi response:`, JSON.stringify(data));
+        console.log(`[Session ${sessionId}] Voicebot response:`, JSON.stringify(data));
 
         // Botnoi API returns success in different ways - check for success indicators
         const isSuccess = response.ok && (

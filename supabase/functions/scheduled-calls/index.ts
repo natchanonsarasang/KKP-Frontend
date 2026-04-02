@@ -14,7 +14,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const botnoiApiToken = Deno.env.get("BOTNOI_API_TOKEN");
+    const BOT_ID = "69ccce0db875327d960ef0cf";
+    const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -137,58 +138,45 @@ serve(async (req) => {
           .update({ call_record_id: callRecord.id })
           .eq("id", item.id);
 
-        // Make the call via Botnoi API
-        if (botnoiApiToken) {
-          // Build message from debtor variables
-          const debtorVars = debtor.variables || {};
-          const messageTemplate = debtorVars.message_template || 
-            "สวัสดีค่ะ คุณมียอดค้างชำระจำนวน {debt} และมีกำหนดชำระในวันที่ {due_date} ไม่ทราบว่าสามารถชำระได้ก่อนวันครบกำหนดหรือไม่คะ";
-          
-          let appointmentMessage = messageTemplate;
-          if (debtor.total_debt) {
-            appointmentMessage = appointmentMessage.replace(/\{debt\}/gi, `${debtor.total_debt}บาท`);
-          }
-          if (debtor.due_date) {
-            const formattedDate = new Date(debtor.due_date).toLocaleDateString("th-TH", { 
-              day: "numeric", month: "long", year: "numeric" 
-            });
-            appointmentMessage = appointmentMessage.replace(/\{due_date\}/gi, formattedDate);
-          }
+        // Make the call via new Voicebot API
+        const debtorVars = debtor.variables || {};
+        
+        const callPayload = {
+          bot_id: BOT_ID,
+          bot_type: "in_init_conversation",
+          tel_number: debtor.phone_number,
+          variables: debtorVars,
+          interruptible: "true",
+          asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
+        };
 
-          const callPayload: Record<string, unknown> = {
-            template_id: template.template_id,
-            tel_no: debtor.phone_number,
-            "Appointment Date": appointmentMessage,
-          };
+        const callResponse = await fetch(CALL_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(callPayload),
+        });
 
-          const callResponse = await fetch("https://api.botnoi.ai/voice/outbound", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${botnoiApiToken}`,
-            },
-            body: JSON.stringify(callPayload),
-          });
+        const callData = await callResponse.json();
+        console.log(`Voicebot response for ${debtor.phone_number}:`, callData);
 
-          const callData = await callResponse.json();
-          console.log(`Botnoi response for ${debtor.phone_number}:`, callData);
+        // Update call record with call ID
+        const callId = callData.outbound_id || callData.call_id || null;
+        await supabase
+          .from("call_records")
+          .update({
+            botnoi_call_id: callId,
+            status: callResponse.ok ? "pending" : "failed",
+          })
+          .eq("id", callRecord.id);
 
-          // Update call record with Botnoi ID
+        // Update call list item status
+        if (!callResponse.ok) {
           await supabase
-            .from("call_records")
-            .update({
-              botnoi_call_id: callData.outbound_id || null,
-              status: callData.outbound_id ? "pending" : "failed",
-            })
-            .eq("id", callRecord.id);
-
-          // Update call list item status
-          if (!callData.outbound_id) {
-            await supabase
-              .from("call_list_items")
-              .update({ status: "failed", notes: "No outbound_id returned" })
-              .eq("id", item.id);
-          }
+            .from("call_list_items")
+            .update({ status: "failed", notes: "API call failed" })
+            .eq("id", item.id);
         }
 
         // Update debtor contact attempts
