@@ -497,17 +497,8 @@ async function processSession(supabase: any, sessionId: string) {
         
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
-        // REAL MODE: Make actual call via new Voicebot API
-        // Build variables from debtor data
-        const callVariables: Record<string, string> = { ...(vars || {}) };
-        if (debtor.name) callVariables.customer_name = callVariables.customer_name || debtor.name;
-        if (debtor.total_debt) callVariables.total_debt = callVariables.total_debt || String(debtor.total_debt);
-        if (debtor.due_date) {
-          const formattedDate = new Date(debtor.due_date).toLocaleDateString("th-TH", {
-            day: "numeric", month: "long", year: "numeric",
-          });
-          callVariables.due_date = callVariables.due_date || formattedDate;
-        }
+        // REAL MODE: Make actual call via Voicebot API using bot_id
+        // Use the callVariables already built above
 
         const callPayload = {
           bot_id: BOT_ID,
