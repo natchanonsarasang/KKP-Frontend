@@ -1,0 +1,1 @@
+INSERT INTO public.call_tokens (user_id, tokens) VALUES ('c0d2df9e-7deb-4b2a-894d-7315df12d7dd', 100);
