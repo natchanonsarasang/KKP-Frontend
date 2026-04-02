@@ -2413,7 +2413,7 @@ const CallList = () => {
                 <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Voicebot:</h4>
                 <pre className="text-xs bg-background border rounded p-3 overflow-x-auto">
 {JSON.stringify({
-  bot_id: "69ccfae9b875327d960ef1bb",
+  bot_id: "69ccce0db875327d960ef0cf",
   tel_number: previewPayload.phone,
   variables: previewPayload.variables,
 }, null, 2)}
