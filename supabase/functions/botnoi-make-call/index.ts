@@ -5,50 +5,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const BOT_ID = "69ccfae9b875327d960ef1bb";
+const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { phone_number, template_id, constructed_message } = await req.json();
+    const { phone_number, variables } = await req.json();
 
-    const botnoiToken = Deno.env.get("BOTNOI_API_TOKEN");
-    if (!botnoiToken) {
-      throw new Error("BOTNOI_API_TOKEN not configured");
+    if (!phone_number) {
+      throw new Error("phone_number is required");
     }
 
-    console.log("Making call via Botnoi API...");
-    console.log("Input:", { phone_number, template_id, constructed_message });
+    console.log("Making call via new Voicebot API...");
+    console.log("Input:", { phone_number, variables });
 
-    // Build the call payload - pack the full constructed message into Appointment Date
-    const callPayload: Record<string, string> = {
-      "Tel. Number": phone_number,
-      template_id: template_id,
+    const callPayload = {
+      bot_id: BOT_ID,
+      bot_type: "in_init_conversation",
+      tel_number: phone_number,
+      variables: variables || {},
+      interruptible: "true",
     };
-    
-    // Only add Appointment Date if constructed_message is provided
-    if (constructed_message) {
-      callPayload["Appointment Date"] = constructed_message;
-    }
-    
-    console.log("Final payload to Botnoi:", JSON.stringify(callPayload, null, 2));
 
-    const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {
+    console.log("Payload:", JSON.stringify(callPayload, null, 2));
+
+    const response = await fetch(CALL_API_URL, {
       method: "POST",
       headers: {
-        accept: "application/json",
-        "botnoi-token": botnoiToken,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(callPayload),
     });
 
     const data = await response.json();
-    console.log("Botnoi API response:", data);
+    console.log("Voicebot API response:", data);
 
     if (!response.ok) {
-      throw new Error(`Botnoi API error: ${JSON.stringify(data)}`);
+      throw new Error(`Voicebot API error: ${JSON.stringify(data)}`);
     }
 
     return new Response(JSON.stringify(data), {
