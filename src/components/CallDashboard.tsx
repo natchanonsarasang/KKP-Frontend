@@ -267,7 +267,7 @@ const CallDashboard = () => {
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
                             <TableCell className="text-sm">{record.due_date || "-"}</TableCell>
                             <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
-                            <TableCell>{getStatusBadge(record.status)}</TableCell>
+                            <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(record.created_at).toLocaleString("th-TH", {
                                 month: "short",
