@@ -21,7 +21,6 @@ import {
 import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList } from "lucide-react";
 import DebtorsList from "@/components/DebtorsList";
 import CallReportDashboard from "@/components/reports/CallReportDashboard";
-import TemplateSetup from "@/components/TemplateSetup";
 import CallDashboard from "@/components/CallDashboard";
 import CallList from "@/components/CallList";
 import WorkspaceSelector from "@/components/WorkspaceSelector";
