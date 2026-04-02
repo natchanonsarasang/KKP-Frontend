@@ -1001,7 +1001,7 @@ const CallList = () => {
       setPreviewPayload(payload);
       setShowPreviewDialog(true);
     } else {
-      toast.error("Cannot build call payload - missing template or debtor data");
+      toast.error("Cannot build call payload - missing debtor data");
     }
   }, [buildCallPayload]);
 
