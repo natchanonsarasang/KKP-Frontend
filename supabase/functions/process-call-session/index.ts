@@ -509,7 +509,7 @@ async function processSession(supabase: any, sessionId: string) {
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
         // REAL MODE: Make actual call via new Voicebot API
-        const vars = debtor.variables || {};
+        const callPayload = {
         const callPayload = {
           bot_id: BOT_ID,
           bot_type: "in_init_conversation",
