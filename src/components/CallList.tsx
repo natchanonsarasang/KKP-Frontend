@@ -176,7 +176,7 @@ const CallList = () => {
   const stopAutoDialRef = useRef(false);
   const [filterMatchCount, setFilterMatchCount] = useState<number | undefined>(undefined);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
-  const [previewPayload, setPreviewPayload] = useState<{ phone: string; templateId: string; message: string; item: CallListItem } | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<{ phone: string; variables: Record<string, string>; variablesSummary: string; item: CallListItem } | null>(null);
   const [nextBatchCountdown, setNextBatchCountdown] = useState<number>(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
