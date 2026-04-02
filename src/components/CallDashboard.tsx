@@ -25,12 +25,17 @@ interface CallRecord {
   phone_number: string;
   due_date: string | null;
   amount: string | null;
-  status: string;
+  status: string | null;
   botnoi_call_id: string | null;
   created_at: string;
   updated_at: string;
   template_id: string | null;
-  ai_category?: string | null;
+  call_duration: number | null;
+  result_data: Record<string, unknown> | null;
+  appointment_date: string | null;
+  appointment_time: string | null;
+  user_id: string | null;
+  workspace_id: string | null;
 }
 
 interface CallListItem {
@@ -82,7 +87,7 @@ const CallDashboard = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as CallRecord[];
+      return (data ?? []) as unknown as CallRecord[];
     },
     refetchInterval: 10000,
     enabled: !!effectiveUserId,
@@ -104,7 +109,7 @@ const CallDashboard = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as CallListItem[];
+      return (data ?? []) as unknown as CallListItem[];
     },
     refetchInterval: 10000,
     enabled: !!effectiveUserId,
@@ -262,7 +267,7 @@ const CallDashboard = () => {
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
                             <TableCell className="text-sm">{record.due_date || "-"}</TableCell>
                             <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
-                            <TableCell>{getStatusBadge(record.status)}</TableCell>
+                            <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {new Date(record.created_at).toLocaleString("th-TH", {
                                 month: "short",

@@ -19,10 +19,11 @@ import {
 interface CallRecord {
   id: string;
   phone_number: string;
-  status: string;
+  status: string | null;
   created_at: string;
   template_id: string | null;
-  ai_category?: string | null;
+  call_duration: number | null;
+  result_data: Record<string, unknown> | null;
 }
 
 interface CallListItem {
