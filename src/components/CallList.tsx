@@ -1046,7 +1046,7 @@ const CallList = () => {
 
       // Make call via edge function - send debtor variables directly
       const { data: callResponse, error: callError } = await supabase.functions.invoke(
-        "botnoi-make-call",
+        "voicebot-make-call",
         {
           body: {
             phone_number: debtor.phone_number,
