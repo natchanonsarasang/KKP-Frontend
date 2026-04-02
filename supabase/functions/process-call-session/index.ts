@@ -547,7 +547,7 @@ async function processSession(supabase: any, sessionId: string) {
           // Create call record
           await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
-            template_id: template.id,
+            template_id: template?.id || null,
             botnoi_call_id: botnoiCallId,
             status: "pending",
             user_id: typedSession.user_id,
