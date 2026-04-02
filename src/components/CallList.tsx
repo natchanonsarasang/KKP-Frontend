@@ -189,18 +189,48 @@ const CallList = () => {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [settings, setSettings] = useState<AutoDialSettings>(() => {
-    const saved = localStorage.getItem("autoDialSettings");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge with defaults to ensure all properties exist (handles migration from old settings)
-      return { ...DEFAULT_SETTINGS, ...parsed };
+    try {
+      const saved = localStorage.getItem("autoDialSettings");
+      const savedVersion = Number(localStorage.getItem("autoDialSettingsVersion") ?? "0");
+
+      if (!saved) {
+        return DEFAULT_SETTINGS;
+      }
+
+      const parsed = JSON.parse(saved) as Partial<AutoDialSettings>;
+      const mergedSettings = { ...DEFAULT_SETTINGS, ...parsed };
+
+      if (savedVersion < 2) {
+        return {
+          ...mergedSettings,
+          concurrentCalls: DEFAULT_SETTINGS.concurrentCalls,
+        };
+      }
+
+      return mergedSettings;
+    } catch {
+      return DEFAULT_SETTINGS;
     }
-    return DEFAULT_SETTINGS;
   });
+
+  useEffect(() => {
+    try {
+      const savedVersion = Number(localStorage.getItem("autoDialSettingsVersion") ?? "0");
+      if (savedVersion < 2) {
+        setSettings((prev) => ({
+          ...prev,
+          concurrentCalls: DEFAULT_SETTINGS.concurrentCalls,
+        }));
+      }
+    } catch {
+      // Ignore storage parsing issues and keep in-memory defaults
+    }
+  }, []);
 
   // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem("autoDialSettings", JSON.stringify(settings));
+    localStorage.setItem("autoDialSettingsVersion", "2");
   }, [settings]);
 
   // Realtime subscription for call_list_items updates
@@ -1450,7 +1480,7 @@ const CallList = () => {
     ["failed", "no_answer", "no_response"].includes(item.status)
   ).length || 0;
 
-  // Filter items based on active tab
+  const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;
   const filteredItems = (callListItems || []).filter(item => {
     switch (activeTab) {
       case "pending":
@@ -1856,7 +1886,7 @@ const CallList = () => {
                     {callingCount} calling
                   </span>
                   <span className="text-muted-foreground">
-                    / {settings.concurrentCalls} max
+                    / {activeSessionConcurrentCalls} max
                   </span>
                 </div>
               )}
