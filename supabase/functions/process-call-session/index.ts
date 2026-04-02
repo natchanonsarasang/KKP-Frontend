@@ -39,12 +39,7 @@ interface Debtor {
   is_blocked: boolean;
 }
 
-interface Template {
-  id: string;
-  template_id: string | null;
-  org_name: string;
-  message: string;
-}
+// Template interface removed - bot handles its own script
 
 // Thai number words for phonetic conversion (digit by digit for license plates)
 const thaiNumbers: Record<string, string> = {
