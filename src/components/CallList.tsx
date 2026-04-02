@@ -2679,6 +2679,22 @@ const CallList = () => {
                 </div>
               </div>
 
+              {transcriptData.audioUrl && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Volume2 className="w-4 h-4" />
+                    Audio Recording
+                  </Label>
+                  <audio
+                    controls
+                    className="w-full"
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(transcriptData.audioUrl)}`}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
+
               <Button
                 variant="outline"
                 className="w-full"
