@@ -34,6 +34,7 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
+  Volume2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -182,7 +183,7 @@ const CallList = () => {
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
-  const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null } | null>(null);
+  const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null; audioUrl: string | null } | null>(null);
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -226,7 +227,7 @@ const CallList = () => {
   // Handle viewing transcript
   const handleViewTranscript = useCallback((notes: string | null) => {
     const data = parseNotesData(notes);
-    setTranscriptData({ conversationLog: data.conversationLog });
+    setTranscriptData({ conversationLog: data.conversationLog, audioUrl: data.audioUrl });
     setShowTranscriptDialog(true);
   }, [parseNotesData]);
 
@@ -2678,6 +2679,22 @@ const CallList = () => {
                   )}
                 </div>
               </div>
+
+              {transcriptData.audioUrl && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Volume2 className="w-4 h-4" />
+                    Audio Recording
+                  </Label>
+                  <audio
+                    controls
+                    className="w-full"
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(transcriptData.audioUrl)}`}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
 
               <Button
                 variant="outline"

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       call_list_items: {
         Row: {
+          ai_category: string | null
           call_outcome: string | null
           call_record_id: string | null
           called_at: string | null
@@ -32,6 +33,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          ai_category?: string | null
           call_outcome?: string | null
           call_record_id?: string | null
           called_at?: string | null
@@ -48,6 +50,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          ai_category?: string | null
           call_outcome?: string | null
           call_record_id?: string | null
           called_at?: string | null
