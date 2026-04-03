@@ -838,7 +838,7 @@ const CallReportDashboard = () => {
                             <TableCell>
                               {audioUrl ? (
                                 <a
-                                  href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(audioUrl)}`}
+                                  href={audioUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >

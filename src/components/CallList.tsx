@@ -2755,7 +2755,7 @@ const CallList = () => {
                   <audio
                     controls
                     className="w-full"
-                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(transcriptData.audioUrl)}`}
+                    src={transcriptData.audioUrl}
                   >
                     Your browser does not support the audio element.
                   </audio>
