@@ -453,39 +453,14 @@ const DebtorsList = () => {
   // Make call mutation - directly call the debtor
   const makeCallMutation = useMutation({
     mutationFn: async (debtor: Debtor) => {
-      if (!workspaceTemplate?.template_id) {
-        throw new Error("No template configured. Please set up a call template first.");
-      }
-
-      // Construct the full message by replacing placeholders with debtor variables
-      let constructedMessage = workspaceTemplate.message;
-      const debtorVars = debtor.variables || {};
+      const debtorVars = (debtor.variables || {}) as Record<string, string>;
       
-      // Replace all {placeholder} with actual values from debtor variables
-      // Apply Thai phonetic conversion for license plate fields
-      Object.entries(debtorVars).forEach(([key, value]) => {
-        const placeholder = new RegExp(`\\{${key}\\}`, 'g');
-        let processedValue = String(value);
-        
-        // Convert license plate fields to Thai phonetic reading (karaoke style)
-        if (shouldUsePhonetic(key)) {
-          processedValue = toThaiPhonetic(processedValue);
-        }
-        // Spell out difficult Thai names phonetically
-        else if (isNameField(key)) {
-          processedValue = spellThaiName(processedValue);
-        }
-        
-        constructedMessage = constructedMessage.replace(placeholder, processedValue);
-      });
-      
-      console.log("Constructed message:", constructedMessage);
+      console.log("Calling via voicebot-make-call with variables:", debtorVars);
 
-      const { data, error } = await supabase.functions.invoke("botnoi-make-call", {
+      const { data, error } = await supabase.functions.invoke("voicebot-make-call", {
         body: {
           phone_number: debtor.phone_number,
-          template_id: workspaceTemplate.template_id,
-          constructed_message: constructedMessage,
+          variables: debtorVars,
         },
       });
 
@@ -811,17 +786,17 @@ const DebtorsList = () => {
               <div>
                 <Label className="text-sm">Customer data</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Use in call templates as{" "}
+                  Variables sent to bot:{" "}
                   <code className="text-xs bg-muted px-1 rounded">
-                    {"{agent_name}"}
+                    {"{policy_number}"}
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">
-                    {"{customer_name}"}
+                    {"{name}"}
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">
-                    {"{total_debt}"}
+                    {"{price}"}
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">

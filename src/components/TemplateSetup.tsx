@@ -538,11 +538,10 @@ const TemplateSetup = () => {
                     return;
                   }
                   try {
-                    const { error } = await supabase.functions.invoke("botnoi-make-call", {
+                    const { error } = await supabase.functions.invoke("voicebot-make-call", {
                       body: {
                         phone_number: testCallPhone,
-                        template_id: template.template_id,
-                        constructed_message: template.message,
+                        variables: {},
                       },
                     });
                     if (error) throw error;

@@ -100,15 +100,15 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     const sampleRow = headers.map((h) => {
       switch (h) {
         case "phone_number": return "0891234567";
-        case "agent_name": return "สมชาย";
-        case "customer_name": return "สมหญิง";
-        case "car_detail": return "Toyota Vios 2020";
-        case "overdue_installment": return "3";
-        case "total_debt": return "150000";
-        case "total_interest": return "5000";
-        case "total_fine": return "2000";
-        case "other_expense": return "500";
-        case "due_date": return "2025-12-31";
+        case "policy_number": return "J12345";
+        case "name": return "สมหญิง";
+        case "due_date": return "10";
+        case "due_month": return "เมษายน";
+        case "due_year": return "2569";
+        case "price": return "4000";
+        case "paid_date": return "30";
+        case "paid_month": return "เมษายน";
+        case "paid_year": return "2569";
         default: return "ตัวอย่าง";
       }
     });
@@ -294,11 +294,11 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             Import Debtors from Excel
           </DialogTitle>
           <DialogDescription>
-            Upload an Excel file (.xlsx). First column = phone number. Remaining columns should
-            match template variables such as{" "}
-            <code className="text-xs">agent_name</code>,{" "}
-            <code className="text-xs">customer_name</code>,{" "}
-            <code className="text-xs">total_debt</code>, etc.
+           Upload an Excel file (.xlsx). First column = phone number. Remaining columns should
+            match bot variables such as{" "}
+            <code className="text-xs">policy_number</code>,{" "}
+            <code className="text-xs">name</code>,{" "}
+            <code className="text-xs">price</code>, etc.
           </DialogDescription>
         </DialogHeader>
 

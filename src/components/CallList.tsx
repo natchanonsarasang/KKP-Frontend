@@ -1236,15 +1236,15 @@ const CallList = () => {
         .update({ call_record_id: callRecord.id })
         .eq("id", item.id);
 
-      // Make call via edge function - use hardcoded template ID and send constructed message
-      console.log("Sending to Botnoi - template_id:", BOTNOI_TEMPLATE_ID, "constructed_message:", constructedMessage);
+      // Make call via voicebot edge function - send variables directly
+      const debtorVars = (debtor.variables || {}) as Record<string, string>;
+      console.log("Sending to voicebot-make-call with variables:", debtorVars);
       const { data: callResponse, error: callError } = await supabase.functions.invoke(
-        "botnoi-make-call",
+        "voicebot-make-call",
         {
           body: {
             phone_number: debtor.phone_number,
-            template_id: BOTNOI_TEMPLATE_ID,
-            constructed_message: constructedMessage,
+            variables: debtorVars,
           },
         }
       );
