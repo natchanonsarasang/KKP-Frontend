@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BOT_ID = "69ccce0db875327d960ef0cf";
+const BOT_ID = "69d7214db875327d960ef7ac";
 const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
 serve(async (req) => {
@@ -20,7 +20,7 @@ serve(async (req) => {
       throw new Error("phone_number is required");
     }
 
-    console.log("Making call via new Voicebot API...");
+    console.log("Making call via Voicebot API...");
     console.log("Input:", { phone_number, variables });
 
     const callPayload = {
@@ -28,17 +28,20 @@ serve(async (req) => {
       bot_type: "in_init_conversation",
       tel_number: phone_number,
       variables: variables || {},
-      interruptible: "true",
+      interruptible: "True",
       asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
+      vad: {
+        false_timeout_sec: "5",
+        false_silence_sec: "0.1",
+        true_silence_sec: "0.25",
+      },
     };
 
     console.log("Payload:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch(CALL_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(callPayload),
     });
 

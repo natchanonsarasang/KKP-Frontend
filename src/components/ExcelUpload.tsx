@@ -178,12 +178,11 @@ const ExcelUpload = () => {
           console.log("Constructed message:", constructedMessage);
 
           const { data: callResponse, error: callError } = await supabase.functions.invoke(
-            "botnoi-make-call",
+            "voicebot-make-call",
             {
               body: {
                 phone_number: row.phone_number,
-                template_id: template.template_id,
-                constructed_message: constructedMessage,
+                variables: row,
               },
             }
           );
