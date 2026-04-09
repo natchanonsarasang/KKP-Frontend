@@ -1,14 +1,14 @@
-/** Template / customer fields stored in `debtors.variables` (plus DB column `total_debt` from `total_debt` text). */
+/** Template / customer fields stored in `debtors.variables`. */
 export const DEBTOR_CUSTOMER_VARIABLE_KEYS = [
-  "agent_name",
-  "customer_name",
-  "car_detail",
-  "overdue_installment",
-  "total_debt",
-  "total_interest",
-  "total_fine",
-  "other_expense",
+  "policy_number",
+  "name",
   "due_date",
+  "due_month",
+  "due_year",
+  "price",
+  "paid_date",
+  "paid_month",
+  "paid_year",
 ] as const;
 
 export type DebtorCustomerVariableKey =
@@ -18,24 +18,21 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   DebtorCustomerVariableKey,
   string
 > = {
-  agent_name: "Agent name",
-  customer_name: "Customer name",
-  car_detail: "Car detail",
-  overdue_installment: "Overdue installment",
-  total_debt: "Total debt",
-  total_interest: "Total interest",
-  total_fine: "Total fine",
-  other_expense: "Other expense",
+  policy_number: "Policy number",
+  name: "Name",
   due_date: "Due date",
+  due_month: "Due month",
+  due_year: "Due year",
+  price: "Price",
+  paid_date: "Paid date",
+  paid_month: "Paid month",
+  paid_year: "Paid year",
 };
 
-/** Text fields in `variables`; `due_date` is kept on the row + mirrored into variables at save. */
+/** Text fields in `variables`. */
 export function emptyDebtorCustomerVariables(): Record<string, string> {
   return Object.fromEntries(
-    DEBTOR_CUSTOMER_VARIABLE_KEYS.filter((k) => k !== "due_date").map((k) => [
-      k,
-      "",
-    ])
+    DEBTOR_CUSTOMER_VARIABLE_KEYS.map((k) => [k, ""])
   );
 }
 
