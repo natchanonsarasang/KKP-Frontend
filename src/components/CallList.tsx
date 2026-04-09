@@ -1167,43 +1167,7 @@ const CallList = () => {
 
     try {
       const debtor = item.debtor;
-      const debtorVars = debtor.variables || {};
-      
-      // Construct the full message by replacing placeholders with debtor variables
-      // Use the selected template's message as the base
-      let constructedMessage = selectedTemplate.message;
-      
-      // Replace all {placeholder} with actual values from debtor variables
-      // Apply Thai phonetic conversion for license plate fields
-      Object.entries(debtorVars).forEach(([key, value]) => {
-        const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
-        let processedValue = String(value);
-        
-        // Convert license plate fields to Thai phonetic reading (karaoke style)
-        if (shouldUsePhonetic(key)) {
-          processedValue = toThaiPhonetic(processedValue);
-        }
-        
-        constructedMessage = constructedMessage.replace(placeholder, processedValue);
-      });
-      
-      // Also replace standard placeholders
-      const debtAmount = debtor.total_debt 
-        ? numberToThaiText(debtor.total_debt) + "บาท"
-        : "-";
-      const formattedDueDate = debtor.due_date
-        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-        : "-";
-      
-      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
-      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
-      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
-      
-      console.log("Constructed message:", constructedMessage);
-
-      const callRecordDueDate = debtor.due_date
-        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-        : "";
+      const debtorVars = (debtor.variables || {}) as Record<string, string>;
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -1220,7 +1184,7 @@ const CallList = () => {
         .insert({
           phone_number: debtor.phone_number,
           amount: debtor.total_debt?.toString() || "",
-          due_date: callRecordDueDate,
+          due_date: debtor.due_date || "",
           status: "calling",
           template_id: selectedTemplate.id,
           user_id: user.id,
@@ -1237,7 +1201,6 @@ const CallList = () => {
         .eq("id", item.id);
 
       // Make call via voicebot edge function - send variables directly
-      const debtorVars = (debtor.variables || {}) as Record<string, string>;
       console.log("Sending to voicebot-make-call with variables:", debtorVars);
       const { data: callResponse, error: callError } = await supabase.functions.invoke(
         "voicebot-make-call",
