@@ -23,8 +23,10 @@ export type Database = {
           created_at: string
           debtor_id: string
           id: string
+          next_retry_at: string | null
           notes: string | null
           picked_up: boolean | null
+          retry_count: number
           scheduled_at: string | null
           status: string
           template_id: string | null
@@ -40,8 +42,10 @@ export type Database = {
           created_at?: string
           debtor_id: string
           id?: string
+          next_retry_at?: string | null
           notes?: string | null
           picked_up?: boolean | null
+          retry_count?: number
           scheduled_at?: string | null
           status?: string
           template_id?: string | null
@@ -57,8 +61,10 @@ export type Database = {
           created_at?: string
           debtor_id?: string
           id?: string
+          next_retry_at?: string | null
           notes?: string | null
           picked_up?: boolean | null
+          retry_count?: number
           scheduled_at?: string | null
           status?: string
           template_id?: string | null

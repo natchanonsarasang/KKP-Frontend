@@ -24,11 +24,11 @@ serve(async (req) => {
     const now = new Date().toISOString();
     
     // Get pending call list items that are scheduled for now or earlier
+    // Also pick up pending_retry items whose next_retry_at has passed
     const { data: pendingItems, error: fetchError } = await supabase
       .from("call_list_items")
       .select("*")
-      .eq("status", "pending")
-      .or(`scheduled_at.is.null,scheduled_at.lte.${now}`);
+      .or(`and(status.eq.pending,or(scheduled_at.is.null,scheduled_at.lte.${now})),and(status.eq.pending_retry,next_retry_at.lte.${now})`);
 
     if (fetchError) {
       console.error("Error fetching call list items:", fetchError);

@@ -320,7 +320,7 @@ async function processSession(supabase: any, sessionId: string) {
     .select("*")
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending"])
+    .in("status", ["pending", "retry_pending", "pending_retry"])
     .limit(availableSlots);
 
   if (itemsError) {
@@ -654,7 +654,7 @@ async function processSession(supabase: any, sessionId: string) {
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending"]);
+    .in("status", ["pending", "retry_pending", "pending_retry"]);
 
   // Check current calling count (with stale detection)
   const { data: currentCalling } = await supabase
