@@ -273,13 +273,9 @@ serve(async (req) => {
           }).eq('id', recentItem.id);
           console.log('Call list item updated:', recentItem.id, 'status:', retryStatus);
 
-          // Log this attempt
-          const attemptNumber = currentRetryCount + 1; // 1=initial, 2=first retry, 3=second retry
-          await supabase.from('call_attempts').insert({
-            call_list_item_id: recentItem.id,
-            call_record_id: callRecordId,
-            user_id: resolvedUserId,
-            attempt_number: attemptNumber,
+          // Update existing call_attempt (created at initiation time) instead of inserting new
+          const attemptNumber = currentRetryCount + 1;
+          const attemptUpdateData = {
             status: finalStatus,
             call_outcome: callOutcome,
             picked_up: pickedUp,
@@ -288,8 +284,31 @@ serve(async (req) => {
             audio_url: audioUrl || null,
             call_duration: callDuration ? Math.round(Number(callDuration)) : null,
             error_reason: (mappedStatus === 'failed' || mappedStatus === 'no_answer') ? (payload.error || status) : null,
-          });
-          console.log(`Call attempt ${attemptNumber} logged for item ${recentItem.id}`);
+            call_record_id: callRecordId,
+          };
+
+          // Try to update an existing "calling" attempt for this item
+          const { data: updatedAttempt } = await supabase
+            .from('call_attempts')
+            .update(attemptUpdateData)
+            .eq('call_list_item_id', recentItem.id)
+            .eq('status', 'calling')
+            .select('id')
+            .maybeSingle();
+
+          if (updatedAttempt) {
+            console.log(`Call attempt updated: ${updatedAttempt.id} (attempt ${attemptNumber})`);
+          } else {
+            // Fallback: insert if no "calling" attempt found (e.g. manual calls, legacy)
+            await supabase.from('call_attempts').insert({
+              call_list_item_id: recentItem.id,
+              call_record_id: callRecordId,
+              user_id: resolvedUserId,
+              attempt_number: attemptNumber,
+              ...attemptUpdateData,
+            });
+            console.log(`Call attempt inserted (fallback) for item ${recentItem.id}, attempt ${attemptNumber}`);
+          }
         } else if (debtorId) {
           const { data: newItem } = await supabase.from('call_list_items').insert({
             debtor_id: debtorId,
@@ -305,7 +324,7 @@ serve(async (req) => {
           }).select('id').single();
           console.log('Call list item auto-created');
 
-          // Log initial attempt for auto-created item
+          // Log attempt for auto-created item
           if (newItem) {
             await supabase.from('call_attempts').insert({
               call_list_item_id: newItem.id,
