@@ -233,16 +233,45 @@ serve(async (req) => {
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
+          // Fetch current retry_count for this item
+          const { data: itemData } = await supabase
+            .from('call_list_items')
+            .select('retry_count')
+            .eq('id', recentItem.id)
+            .single();
+          const currentRetryCount = itemData?.retry_count || 0;
+
+          // Determine if we should schedule a retry
+          const MAX_RETRIES = 2;
+          const RETRY_DELAY_MS = 60 * 1000; // 1 minute
+          const isRetryable = !pickedUp && ['failed', 'no_answer', 'no_response'].includes(mappedStatus);
+
+          let retryStatus = finalStatus;
+          let nextRetryAt: string | null = null;
+          let newRetryCount = currentRetryCount;
+
+          if (isRetryable && currentRetryCount < MAX_RETRIES) {
+            retryStatus = 'pending_retry';
+            newRetryCount = currentRetryCount + 1;
+            nextRetryAt = new Date(Date.now() + RETRY_DELAY_MS).toISOString();
+            console.log(`Scheduling retry ${newRetryCount}/${MAX_RETRIES} at ${nextRetryAt}`);
+          } else if (isRetryable && currentRetryCount >= MAX_RETRIES) {
+            retryStatus = 'final_failed';
+            console.log(`Max retries (${MAX_RETRIES}) reached, marking as final_failed`);
+          }
+
           await supabase.from('call_list_items').update({
-            status: finalStatus,
+            status: retryStatus,
             call_outcome: callOutcome,
             picked_up: pickedUp,
             notes: notesData,
             call_record_id: callRecordId,
             ai_category: aiCategory,
+            retry_count: newRetryCount,
+            next_retry_at: nextRetryAt,
             updated_at: new Date().toISOString(),
           }).eq('id', recentItem.id);
-          console.log('Call list item updated:', recentItem.id);
+          console.log('Call list item updated:', recentItem.id, 'status:', retryStatus);
         } else if (debtorId) {
           await supabase.from('call_list_items').insert({
             debtor_id: debtorId,
