@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_attempts: {
+        Row: {
+          ai_category: string | null
+          attempt_number: number
+          audio_url: string | null
+          call_duration: number | null
+          call_list_item_id: string
+          call_outcome: string | null
+          call_record_id: string | null
+          conversation_log: string | null
+          created_at: string
+          error_reason: string | null
+          id: string
+          picked_up: boolean | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ai_category?: string | null
+          attempt_number?: number
+          audio_url?: string | null
+          call_duration?: number | null
+          call_list_item_id: string
+          call_outcome?: string | null
+          call_record_id?: string | null
+          conversation_log?: string | null
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          picked_up?: boolean | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          ai_category?: string | null
+          attempt_number?: number
+          audio_url?: string | null
+          call_duration?: number | null
+          call_list_item_id?: string
+          call_outcome?: string | null
+          call_record_id?: string | null
+          conversation_log?: string | null
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          picked_up?: boolean | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_attempts_call_list_item_id_fkey"
+            columns: ["call_list_item_id"]
+            isOneToOne: false
+            referencedRelation: "call_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_attempts_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "call_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_list_items: {
         Row: {
           ai_category: string | null
