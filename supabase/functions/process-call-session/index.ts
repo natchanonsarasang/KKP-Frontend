@@ -300,6 +300,15 @@ async function processSession(supabase: any, sessionId: string) {
       .from("call_list_items")
       .update({ status: "failed", call_outcome: "Call timed out", picked_up: false })
       .in("id", staleIds);
+    
+    // Update corresponding call_attempts that are still in "calling" status
+    for (const staleId of staleIds) {
+      await supabase
+        .from("call_attempts")
+        .update({ status: "failed", call_outcome: "Call timed out", picked_up: false, error_reason: "Stale timeout (5 min)" })
+        .eq("call_list_item_id", staleId)
+        .eq("status", "calling");
+    }
   }
 
   const activeCallingCount = (callingItems?.length || 0) - staleItems.length;
@@ -564,6 +573,15 @@ async function processSession(supabase: any, sessionId: string) {
           // Use outbound_id from Botnoi response (this is what comes back in webhook)
           const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
           
+          // Get current retry_count to determine attempt_number
+          const { data: itemData } = await supabase
+            .from("call_list_items")
+            .select("retry_count")
+            .eq("id", item.id)
+            .single();
+          const currentRetryCount = itemData?.retry_count || 0;
+          const attemptNumber = currentRetryCount + 1;
+          
           // Create call record and get its ID
           const { data: callRecord } = await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
@@ -586,6 +604,19 @@ async function processSession(supabase: any, sessionId: string) {
               call_record_id: callRecord?.id || null,
             })
             .eq("id", item.id);
+          
+          // Log call_attempt IMMEDIATELY at initiation time
+          // This ensures the attempt is recorded even if the webhook never fires
+          await supabase.from("call_attempts").insert({
+            call_list_item_id: item.id,
+            call_record_id: callRecord?.id || null,
+            user_id: typedSession.user_id,
+            attempt_number: attemptNumber,
+            status: "calling",
+            call_outcome: "Call initiated - awaiting response",
+            picked_up: false,
+          });
+          console.log(`[Session ${sessionId}] Call attempt ${attemptNumber} logged for item ${item.id}`);
           
           // Update debtor contact attempt count
           await supabase
