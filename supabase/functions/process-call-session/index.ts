@@ -300,6 +300,15 @@ async function processSession(supabase: any, sessionId: string) {
       .from("call_list_items")
       .update({ status: "failed", call_outcome: "Call timed out", picked_up: false })
       .in("id", staleIds);
+    
+    // Update corresponding call_attempts that are still in "calling" status
+    for (const staleId of staleIds) {
+      await supabase
+        .from("call_attempts")
+        .update({ status: "failed", call_outcome: "Call timed out", picked_up: false, error_reason: "Stale timeout (5 min)" })
+        .eq("call_list_item_id", staleId)
+        .eq("status", "calling");
+    }
   }
 
   const activeCallingCount = (callingItems?.length || 0) - staleItems.length;
