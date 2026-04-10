@@ -272,8 +272,26 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           }).eq('id', recentItem.id);
           console.log('Call list item updated:', recentItem.id, 'status:', retryStatus);
+
+          // Log this attempt
+          const attemptNumber = currentRetryCount + 1; // 1=initial, 2=first retry, 3=second retry
+          await supabase.from('call_attempts').insert({
+            call_list_item_id: recentItem.id,
+            call_record_id: callRecordId,
+            user_id: resolvedUserId,
+            attempt_number: attemptNumber,
+            status: finalStatus,
+            call_outcome: callOutcome,
+            picked_up: pickedUp,
+            ai_category: aiCategory,
+            conversation_log: conversationLog || null,
+            audio_url: audioUrl || null,
+            call_duration: callDuration ? Math.round(Number(callDuration)) : null,
+            error_reason: (mappedStatus === 'failed' || mappedStatus === 'no_answer') ? (payload.error || status) : null,
+          });
+          console.log(`Call attempt ${attemptNumber} logged for item ${recentItem.id}`);
         } else if (debtorId) {
-          await supabase.from('call_list_items').insert({
+          const { data: newItem } = await supabase.from('call_list_items').insert({
             debtor_id: debtorId,
             user_id: resolvedUserId,
             workspace_id: resolvedWorkspaceId,
@@ -284,8 +302,27 @@ serve(async (req) => {
             call_record_id: callRecordId,
             ai_category: aiCategory,
             called_at: new Date().toISOString(),
-          });
+          }).select('id').single();
           console.log('Call list item auto-created');
+
+          // Log initial attempt for auto-created item
+          if (newItem) {
+            await supabase.from('call_attempts').insert({
+              call_list_item_id: newItem.id,
+              call_record_id: callRecordId,
+              user_id: resolvedUserId,
+              attempt_number: 1,
+              status: finalStatus,
+              call_outcome: callOutcome,
+              picked_up: pickedUp,
+              ai_category: aiCategory,
+              conversation_log: conversationLog || null,
+              audio_url: audioUrl || null,
+              call_duration: callDuration ? Math.round(Number(callDuration)) : null,
+              error_reason: (mappedStatus === 'failed' || mappedStatus === 'no_answer') ? (payload.error || status) : null,
+            });
+            console.log('Initial attempt logged for auto-created item');
+          }
         }
 
         // Deduct tokens: 4 if picked up, 1 if not
