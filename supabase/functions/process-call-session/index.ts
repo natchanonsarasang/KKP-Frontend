@@ -115,17 +115,17 @@ const thaiPositions = ["", "สิบ", "ร้อย", "พัน", "หมื�
 function numberToThaiWords(num: number): string {
   if (num === 0) return "ศูนย์";
   if (num < 0) return "ลบ" + numberToThaiWords(-num);
-  
+
   let result = "";
   let position = 0;
-  
+
   while (num > 0) {
     const digit = num % 10;
     num = Math.floor(num / 10);
-    
+
     if (digit !== 0) {
       let digitWord = thaiNumbers[digit.toString()];
-      
+
       // Special cases for Thai number reading
       if (position === 0 && digit === 1 && result !== "") {
         digitWord = "เอ็ด"; // 1 at ones place (except standalone)
@@ -134,18 +134,18 @@ function numberToThaiWords(num: number): string {
       } else if (position === 1 && digit === 2) {
         digitWord = "ยี่"; // 2 at tens place
       }
-      
+
       result = digitWord + thaiPositions[position] + result;
     }
-    
+
     position++;
-    
+
     // Handle millions (reset position after 6)
     if (position === 7) {
       position = 1;
     }
   }
-  
+
   return result;
 }
 
@@ -214,14 +214,14 @@ function isWithinBusinessHours(settings: CallSession["settings"]): boolean {
     console.log("Test mode enabled - skipping business hours check");
     return true;
   }
-  
+
   if (!settings.businessHoursOnly) return true;
 
   // Get current UTC time and apply user's timezone offset
   const now = new Date();
   const timezoneOffset = settings.timezoneOffset || 0; // Default to UTC if not set
   const localTime = new Date(now.getTime() + timezoneOffset * 60 * 1000);
-  
+
   const currentDay = localTime.getUTCDay();
 
   if (!settings.businessDays?.includes(currentDay)) {
@@ -239,7 +239,7 @@ function isWithinBusinessHours(settings: CallSession["settings"]): boolean {
   const endTime = endHour * 60 + endMin;
 
   console.log(`Business hours check: local time ${hours}:${minutes} (${currentTime} mins), range ${startTime}-${endTime}, offset ${timezoneOffset}`);
-  
+
   return currentTime >= startTime && currentTime <= endTime;
 }
 
@@ -300,7 +300,7 @@ async function processSession(supabase: any, sessionId: string) {
       .from("call_list_items")
       .update({ status: "failed", call_outcome: "Call timed out", picked_up: false })
       .in("id", staleIds);
-    
+
     // Update corresponding call_attempts that are still in "calling" status
     for (const staleId of staleIds) {
       await supabase
@@ -341,9 +341,9 @@ async function processSession(supabase: any, sessionId: string) {
     console.log(`[Session ${sessionId}] No pending items, completing session.`);
     await supabase
       .from("call_sessions")
-      .update({ 
-        status: "completed", 
-        completed_at: new Date().toISOString() 
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString()
       })
       .eq("id", sessionId);
     return;
@@ -379,10 +379,10 @@ async function processSession(supabase: any, sessionId: string) {
   const defaultTemplate = defaultTemplates?.[0] as Template | undefined;
 
   const isTestMode = typedSession.settings.testMode === true;
-  
+
   const BOT_ID = "69ccce0db875327d960ef0cf";
   const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
-  
+
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
   }
@@ -393,7 +393,7 @@ async function processSession(supabase: any, sessionId: string) {
     .from("call_list_items")
     .update({ status: "calling", called_at: new Date().toISOString() })
     .in("id", itemIds);
-  
+
   console.log(`[Session ${sessionId}] Marked ${itemIds.length} items as 'calling'`);
 
   // Process items concurrently
@@ -427,10 +427,10 @@ async function processSession(supabase: any, sessionId: string) {
       if (isTestMode) {
         // TEST MODE: Simulate call with random outcome
         console.log(`[Session ${sessionId}] 🧪 SIMULATING call to ${debtor.phone_number}...`);
-        
+
         // Simulate processing time (1-3 seconds)
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        
+
         // Random outcome: 40% confirmed, 20% declined, 20% no_response, 10% other, 10% failed
         const rand = Math.random();
         let mockStatus: string;
@@ -439,7 +439,7 @@ async function processSession(supabase: any, sessionId: string) {
         let acceptIncrement = 0;
         let rejectIncrement = 0;
         let otherIncrement = 0;
-        
+
         if (rand < 0.4) {
           mockStatus = "confirmed";
           mockOutcome = "ยืนยันชำระ";
@@ -464,9 +464,9 @@ async function processSession(supabase: any, sessionId: string) {
           mockOutcome = "โทรไม่สำเร็จ";
           pickedUp = false;
         }
-        
+
         console.log(`[Session ${sessionId}] 🧪 Mock result for ${debtor.phone_number}: ${mockStatus}`);
-        
+
         // Create mock call record
         await supabase.from("call_records").insert({
           phone_number: debtor.phone_number,
@@ -477,35 +477,35 @@ async function processSession(supabase: any, sessionId: string) {
           workspace_id: typedSession.workspace_id,
           result_data: { test_mode: true, simulated: true },
         });
-        
+
         // Update call list item
         await supabase
           .from("call_list_items")
-          .update({ 
-            status: mockStatus, 
+          .update({
+            status: mockStatus,
             call_outcome: mockOutcome,
             picked_up: pickedUp,
           })
           .eq("id", item.id);
-        
+
         // Update debtor stats - this is critical for filtering
         const debtorUpdate: Record<string, unknown> = {
-          contact_attempts: (debtor as unknown as { contact_attempts?: number }).contact_attempts 
-            ? (debtor as unknown as { contact_attempts: number }).contact_attempts + 1 
+          contact_attempts: (debtor as unknown as { contact_attempts?: number }).contact_attempts
+            ? (debtor as unknown as { contact_attempts: number }).contact_attempts + 1
             : 1,
           last_contact_at: new Date().toISOString(),
           last_response: mockOutcome,
           call_outcome: mockStatus,
           call_answered: pickedUp,
         };
-        
+
         if (pickedUp) {
           debtorUpdate.picked_up_count = ((debtor as unknown as { picked_up_count?: number }).picked_up_count || 0) + 1;
           debtorUpdate.successful_contacts = ((debtor as unknown as { successful_contacts?: number }).successful_contacts || 0) + 1;
         } else {
           debtorUpdate.not_picked_up_count = ((debtor as unknown as { not_picked_up_count?: number }).not_picked_up_count || 0) + 1;
         }
-        
+
         if (acceptIncrement > 0) {
           debtorUpdate.accept_count = ((debtor as unknown as { accept_count?: number }).accept_count || 0) + 1;
         }
@@ -515,33 +515,33 @@ async function processSession(supabase: any, sessionId: string) {
         if (otherIncrement > 0) {
           debtorUpdate.other_count = ((debtor as unknown as { other_count?: number }).other_count || 0) + 1;
         }
-        
+
         await supabase
           .from("debtors")
           .update(debtorUpdate)
           .eq("id", item.debtor_id);
-        
+
         console.log(`[Session ${sessionId}] Updated debtor ${item.debtor_id} stats`);
-        
+
         // Deduct tokens for test mode: 4 if picked up, 1 if not
         const tokensToDeduct = pickedUp ? 4 : 1;
         console.log(`[Session ${sessionId}] Deducting ${tokensToDeduct} tokens for test call (picked_up: ${pickedUp})`);
-        
+
         const { data: deductResult, error: deductError } = await supabase
           .rpc('deduct_tokens', { p_user_id: typedSession.user_id, p_amount: tokensToDeduct });
-        
+
         if (deductError) {
           console.error(`[Session ${sessionId}] Error deducting tokens:`, deductError);
         } else {
           console.log(`[Session ${sessionId}] Token deduction result: ${deductResult}`);
         }
-        
+
         return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
       } else {
         // REAL MODE: Make actual call via new Voicebot API
         const callPayload = {
           bot_id: BOT_ID,
-          bot_type: "in_init_conversation",
+          bot_type: "Confirm1",
           tel_number: debtor.phone_number,
           variables: vars,
           interruptible: "true",
@@ -564,15 +564,15 @@ async function processSession(supabase: any, sessionId: string) {
 
         // Botnoi API returns success in different ways - check for success indicators
         const isSuccess = response.ok && (
-          data.call_id || 
-          data.status === "success" || 
+          data.call_id ||
+          data.status === "success" ||
           (data.message && data.message.toLowerCase().includes("success"))
         );
-        
+
         if (isSuccess) {
           // Use outbound_id from Botnoi response (this is what comes back in webhook)
           const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
-          
+
           // Get current retry_count to determine attempt_number
           const { data: itemData } = await supabase
             .from("call_list_items")
@@ -581,7 +581,7 @@ async function processSession(supabase: any, sessionId: string) {
             .single();
           const currentRetryCount = itemData?.retry_count || 0;
           const attemptNumber = currentRetryCount + 1;
-          
+
           // Create call record and get its ID
           const { data: callRecord } = await supabase.from("call_records").insert({
             phone_number: debtor.phone_number,
@@ -597,14 +597,14 @@ async function processSession(supabase: any, sessionId: string) {
           // Link call_record_id so webhook can find this item reliably
           await supabase
             .from("call_list_items")
-            .update({ 
-              status: "calling", 
+            .update({
+              status: "calling",
               call_outcome: "Call initiated - awaiting response",
               called_at: new Date().toISOString(),
               call_record_id: callRecord?.id || null,
             })
             .eq("id", item.id);
-          
+
           // Log call_attempt IMMEDIATELY at initiation time
           // This ensures the attempt is recorded even if the webhook never fires
           await supabase.from("call_attempts").insert({
@@ -617,7 +617,7 @@ async function processSession(supabase: any, sessionId: string) {
             picked_up: false,
           });
           console.log(`[Session ${sessionId}] Call attempt ${attemptNumber} logged for item ${item.id}`);
-          
+
           // Update debtor contact attempt count
           await supabase
             .from("debtors")
@@ -634,12 +634,12 @@ async function processSession(supabase: any, sessionId: string) {
       }
     } catch (error) {
       console.error(`[Session ${sessionId}] Error calling ${debtor.phone_number}:`, error);
-      
+
       await supabase
         .from("call_list_items")
-        .update({ 
-          status: "failed", 
-          call_outcome: error instanceof Error ? error.message : "Unknown error" 
+        .update({
+          status: "failed",
+          call_outcome: error instanceof Error ? error.message : "Unknown error"
         })
         .eq("id", item.id);
 
@@ -662,11 +662,11 @@ async function processSession(supabase: any, sessionId: string) {
   // Process all items in parallel
   console.log(`[Session ${sessionId}] Processing ${pendingItems.length} items concurrently...`);
   const results = await Promise.all(pendingItems.map(processItem));
-  
+
   const completedCount = results.filter(r => r.success).length;
   const failedCount = results.filter(r => r.failed).length;
   const tokensUsedInBatch = results.reduce((sum, r) => sum + (r.tokensUsed || 0), 0);
-  
+
   console.log(`[Session ${sessionId}] Batch complete: ${completedCount} completed, ${failedCount} failed, ${tokensUsedInBatch} tokens used`);
 
   // Update session progress (tokens_used only updated for test mode, real mode tokens are deducted in webhook)
@@ -723,9 +723,9 @@ async function processSession(supabase: any, sessionId: string) {
     console.log(`[Session ${sessionId}] All items processed, completing.`);
     await supabase
       .from("call_sessions")
-      .update({ 
-        status: "completed", 
-        completed_at: new Date().toISOString() 
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString()
       })
       .eq("id", sessionId);
   } else {

@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const callPayload = {
       bot_id: BOT_ID,
-      bot_type: "in_init_conversation",
+      bot_type: "Confirm1",
       tel_number: phone_number,
       variables: variables || {},
       interruptible: "True",

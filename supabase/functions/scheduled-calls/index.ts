@@ -22,7 +22,7 @@ serve(async (req) => {
     console.log("Checking for scheduled call list items...");
 
     const now = new Date().toISOString();
-    
+
     // Get pending call list items that are scheduled for now or earlier
     // Also pick up pending_retry items whose next_retry_at has passed
     const { data: pendingItems, error: fetchError } = await supabase
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     // Get debtor IDs
     const debtorIds = [...new Set(pendingItems.map(item => item.debtor_id))];
-    
+
     // Fetch debtors
     const { data: debtors } = await supabase
       .from("debtors")
@@ -131,10 +131,10 @@ serve(async (req) => {
 
         // Make the call via new Voicebot API
         const debtorVars = debtor.variables || {};
-        
+
         const callPayload = {
           bot_id: BOT_ID,
-          bot_type: "in_init_conversation",
+          bot_type: "Confirm1",
           tel_number: debtor.phone_number,
           variables: debtorVars,
           interruptible: "true",
