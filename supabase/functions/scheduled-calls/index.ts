@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const BOT_ID = "69ccce0db875327d960ef0cf";
+    const BOT_ID = "69d7214db875327d960ef7ac";
     const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -28,7 +28,9 @@ serve(async (req) => {
     const { data: pendingItems, error: fetchError } = await supabase
       .from("call_list_items")
       .select("*")
-      .or(`and(status.eq.pending,or(scheduled_at.is.null,scheduled_at.lte.${now})),and(status.eq.pending_retry,next_retry_at.lte.${now})`);
+      .or(
+        `and(status.eq.pending,or(scheduled_at.is.null,scheduled_at.lte.${now})),and(status.eq.pending_retry,next_retry_at.lte.${now})`,
+      );
 
     if (fetchError) {
       console.error("Error fetching call list items:", fetchError);
@@ -38,31 +40,24 @@ serve(async (req) => {
     console.log(`Found ${pendingItems?.length || 0} pending call list items`);
 
     if (!pendingItems || pendingItems.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No scheduled calls due", processed: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ message: "No scheduled calls due", processed: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get debtor IDs
-    const debtorIds = [...new Set(pendingItems.map(item => item.debtor_id))];
+    const debtorIds = [...new Set(pendingItems.map((item) => item.debtor_id))];
 
     // Fetch debtors
-    const { data: debtors } = await supabase
-      .from("debtors")
-      .select("*")
-      .in("id", debtorIds);
+    const { data: debtors } = await supabase.from("debtors").select("*").in("id", debtorIds);
 
-    const debtorMap = new Map(debtors?.map(d => [d.id, d]) || []);
+    const debtorMap = new Map(debtors?.map((d) => [d.id, d]) || []);
 
     // Get template IDs and fetch templates
-    const templateIds = [...new Set(pendingItems.map(item => item.template_id).filter(Boolean))];
-    const { data: templates } = await supabase
-      .from("call_templates")
-      .select("*")
-      .in("id", templateIds);
+    const templateIds = [...new Set(pendingItems.map((item) => item.template_id).filter(Boolean))];
+    const { data: templates } = await supabase.from("call_templates").select("*").in("id", templateIds);
 
-    const templateMap = new Map(templates?.map(t => [t.id, t]) || []);
+    const templateMap = new Map(templates?.map((t) => [t.id, t]) || []);
 
     // Get default template if needed
     const { data: defaultTemplates } = await supabase
@@ -94,10 +89,7 @@ serve(async (req) => {
 
       try {
         // Update call list item to calling
-        await supabase
-          .from("call_list_items")
-          .update({ status: "calling", called_at: now })
-          .eq("id", item.id);
+        await supabase.from("call_list_items").update({ status: "calling", called_at: now }).eq("id", item.id);
 
         // Create call record
         const { data: callRecord, error: insertError } = await supabase
@@ -124,10 +116,7 @@ serve(async (req) => {
         }
 
         // Link call record to call list item
-        await supabase
-          .from("call_list_items")
-          .update({ call_record_id: callRecord.id })
-          .eq("id", item.id);
+        await supabase.from("call_list_items").update({ call_record_id: callRecord.id }).eq("id", item.id);
 
         // Make the call via new Voicebot API
         const debtorVars = debtor.variables || {};
@@ -181,7 +170,6 @@ serve(async (req) => {
 
         results.push({ phone: debtor.phone_number, success: true });
         console.log(`Successfully initiated call for ${debtor.phone_number}`);
-
       } catch (callError) {
         console.error(`Error processing ${debtor.phone_number}:`, callError);
         await supabase
@@ -201,14 +189,13 @@ serve(async (req) => {
         successful,
         results,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
     console.error("Scheduled calls error:", error);
-    return new Response(
-      JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
