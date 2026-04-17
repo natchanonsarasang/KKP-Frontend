@@ -333,12 +333,16 @@ async function processSession(supabase: any, sessionId: string) {
   }
 
   // Get pending call list items - only up to available slots
+  // For pending_retry/retry_pending items, only pick them up after next_retry_at has passed (10 min delay)
+  const nowIso = new Date().toISOString();
   const { data: pendingItems, error: itemsError } = await supabase
     .from("call_list_items")
     .select("*")
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending", "pending_retry"])
+    .or(
+      `status.eq.pending,and(status.in.(pending_retry,retry_pending),or(next_retry_at.is.null,next_retry_at.lte.${nowIso}))`,
+    )
     .limit(availableSlots);
 
   if (itemsError) {
