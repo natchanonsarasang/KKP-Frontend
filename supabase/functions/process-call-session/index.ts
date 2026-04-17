@@ -62,50 +62,50 @@ const thaiNumbers: Record<string, string> = {
 
 // Thai consonant phonetic names (split format: กอ|ไก่)
 const thaiConsonants: Record<string, string[]> = {
-  'ก': ['กอ', 'ไก่'],
-  'ข': ['ขอ', 'ไข่'],
-  'ฃ': ['ฃอ', 'ขวด'],
-  'ค': ['คอ', 'ควาย'],
-  'ฅ': ['ฅอ', 'คน'],
-  'ฆ': ['ฆอ', 'ระฆัง'],
-  'ง': ['งอ', 'งู'],
-  'จ': ['จอ', 'จาน'],
-  'ฉ': ['ฉอ', 'ฉิ่ง'],
-  'ช': ['ชอ', 'ช้าง'],
-  'ซ': ['ซอ', 'โซ่'],
-  'ฌ': ['ฌอ', 'เฌอ'],
-  'ญ': ['ยอ', 'หญิง'],
-  'ฎ': ['ดอ', 'ชฎา'],
-  'ฏ': ['ตอ', 'ปฏัก'],
-  'ฐ': ['ถอ', 'ฐาน'],
-  'ฑ': ['ทอ', 'มณโฑ'],
-  'ฒ': ['ทอ', 'ผู้เฒ่า'],
-  'ณ': ['นอ', 'เณร'],
-  'ด': ['ดอ', 'เด็ก'],
-  'ต': ['ตอ', 'เต่า'],
-  'ถ': ['ถอ', 'ถุง'],
-  'ท': ['ทอ', 'ทหาร'],
-  'ธ': ['ทอ', 'ธง'],
-  'น': ['นอ', 'หนู'],
-  'บ': ['บอ', 'ใบไม้'],
-  'ป': ['ปอ', 'ปลา'],
-  'ผ': ['ผอ', 'ผึ้ง'],
-  'ฝ': ['ฝอ', 'ฝา'],
-  'พ': ['พอ', 'พาน'],
-  'ฟ': ['ฟอ', 'ฟัน'],
-  'ภ': ['พอ', 'สำเภา'],
-  'ม': ['มอ', 'ม้า'],
-  'ย': ['ยอ', 'ยักษ์'],
-  'ร': ['รอ', 'เรือ'],
-  'ล': ['ลอ', 'ลิง'],
-  'ว': ['วอ', 'แหวน'],
-  'ศ': ['สอ', 'ศาลา'],
-  'ษ': ['สอ', 'ฤๅษี'],
-  'ส': ['สอ', 'เสือ'],
-  'ห': ['หอ', 'หีบ'],
-  'ฬ': ['ลอ', 'จุฬา'],
-  'อ': ['ออ', 'อ่าง'],
-  'ฮ': ['ฮอ', 'นกฮูก'],
+  ก: ["กอ", "ไก่"],
+  ข: ["ขอ", "ไข่"],
+  ฃ: ["ฃอ", "ขวด"],
+  ค: ["คอ", "ควาย"],
+  ฅ: ["ฅอ", "คน"],
+  ฆ: ["ฆอ", "ระฆัง"],
+  ง: ["งอ", "งู"],
+  จ: ["จอ", "จาน"],
+  ฉ: ["ฉอ", "ฉิ่ง"],
+  ช: ["ชอ", "ช้าง"],
+  ซ: ["ซอ", "โซ่"],
+  ฌ: ["ฌอ", "เฌอ"],
+  ญ: ["ยอ", "หญิง"],
+  ฎ: ["ดอ", "ชฎา"],
+  ฏ: ["ตอ", "ปฏัก"],
+  ฐ: ["ถอ", "ฐาน"],
+  ฑ: ["ทอ", "มณโฑ"],
+  ฒ: ["ทอ", "ผู้เฒ่า"],
+  ณ: ["นอ", "เณร"],
+  ด: ["ดอ", "เด็ก"],
+  ต: ["ตอ", "เต่า"],
+  ถ: ["ถอ", "ถุง"],
+  ท: ["ทอ", "ทหาร"],
+  ธ: ["ทอ", "ธง"],
+  น: ["นอ", "หนู"],
+  บ: ["บอ", "ใบไม้"],
+  ป: ["ปอ", "ปลา"],
+  ผ: ["ผอ", "ผึ้ง"],
+  ฝ: ["ฝอ", "ฝา"],
+  พ: ["พอ", "พาน"],
+  ฟ: ["ฟอ", "ฟัน"],
+  ภ: ["พอ", "สำเภา"],
+  ม: ["มอ", "ม้า"],
+  ย: ["ยอ", "ยักษ์"],
+  ร: ["รอ", "เรือ"],
+  ล: ["ลอ", "ลิง"],
+  ว: ["วอ", "แหวน"],
+  ศ: ["สอ", "ศาลา"],
+  ษ: ["สอ", "ฤๅษี"],
+  ส: ["สอ", "เสือ"],
+  ห: ["หอ", "หีบ"],
+  ฬ: ["ลอ", "จุฬา"],
+  อ: ["ออ", "อ่าง"],
+  ฮ: ["ฮอ", "นกฮูก"],
 };
 
 // Thai position words for currency reading
@@ -168,16 +168,16 @@ function toThaiPhonetic(text: string): string {
     }
   }
   // Join with | separators: |หก|กอ|ไก่|ขอ|ไข่|สอง|สี่|สาม|สี่
-  return parts.length > 0 ? `|${parts.join('|')}` : '';
+  return parts.length > 0 ? `|${parts.join("|")}` : "";
 }
 
 // Spell out Thai name phonetically for difficult names
-const uncommonChars = new Set(['ฆ', 'ฌ', 'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ', 'ธ', 'ภ', 'ศ', 'ษ', 'ฬ', 'ญ']);
+const uncommonChars = new Set(["ฆ", "ฌ", "ฎ", "ฏ", "ฐ", "ฑ", "ฒ", "ณ", "ธ", "ภ", "ศ", "ษ", "ฬ", "ญ"]);
 const thaiModifiers = /[\u0E30-\u0E3A\u0E40-\u0E4E\u0E47-\u0E4F]/;
 
 function spellThaiName(name: string): string {
   if (!name || name.trim().length === 0) return name;
-  const needsSpelling = [...name].some(c => uncommonChars.has(c));
+  const needsSpelling = [...name].some((c) => uncommonChars.has(c));
   if (!needsSpelling) return name;
 
   const parts: string[] = [];
@@ -196,10 +196,10 @@ function spellThaiName(name: string): string {
       }
     }
   }
-  return `${name} สะกดว่า ${parts.join(' ')}`;
+  return `${name} สะกดว่า ${parts.join(" ")}`;
 }
 
-const nameFields = ['name', 'ชื่อ', 'first_name', 'last_name', 'นามสกุล', 'ชื่อจริง'];
+const nameFields = ["name", "ชื่อ", "first_name", "last_name", "นามสกุล", "ชื่อจริง"];
 
 // Convert amount string to Thai words (WITHOUT "บาท" - template already has it)
 function amountToThaiWords(amountStr: string): string {
@@ -238,7 +238,9 @@ function isWithinBusinessHours(settings: CallSession["settings"]): boolean {
   const startTime = startHour * 60 + startMin;
   const endTime = endHour * 60 + endMin;
 
-  console.log(`Business hours check: local time ${hours}:${minutes} (${currentTime} mins), range ${startTime}-${endTime}, offset ${timezoneOffset}`);
+  console.log(
+    `Business hours check: local time ${hours}:${minutes} (${currentTime} mins), range ${startTime}-${endTime}, offset ${timezoneOffset}`,
+  );
 
   return currentTime >= startTime && currentTime <= endTime;
 }
@@ -288,13 +290,13 @@ async function processSession(supabase: any, sessionId: string) {
   // Auto-reset stale "calling" items (stuck for more than 5 minutes)
   const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   const now = Date.now();
-  const staleItems = (callingItems || []).filter(item => {
+  const staleItems = (callingItems || []).filter((item) => {
     if (!item.called_at) return true; // No timestamp = definitely stale
     return now - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (staleItems.length > 0) {
-    const staleIds = staleItems.map(item => item.id);
+    const staleIds = staleItems.map((item) => item.id);
     console.log(`[Session ${sessionId}] Resetting ${staleIds.length} stale "calling" items to "failed"`);
     await supabase
       .from("call_list_items")
@@ -305,7 +307,12 @@ async function processSession(supabase: any, sessionId: string) {
     for (const staleId of staleIds) {
       await supabase
         .from("call_attempts")
-        .update({ status: "failed", call_outcome: "Call timed out", picked_up: false, error_reason: "Stale timeout (5 min)" })
+        .update({
+          status: "failed",
+          call_outcome: "Call timed out",
+          picked_up: false,
+          error_reason: "Stale timeout (5 min)",
+        })
         .eq("call_list_item_id", staleId)
         .eq("status", "calling");
     }
@@ -315,7 +322,9 @@ async function processSession(supabase: any, sessionId: string) {
   const maxConcurrent = typedSession.settings.concurrentCalls || 5;
   const availableSlots = Math.max(0, maxConcurrent - activeCallingCount);
 
-  console.log(`[Session ${sessionId}] Currently calling: ${activeCallingCount}, max: ${maxConcurrent}, available slots: ${availableSlots}`);
+  console.log(
+    `[Session ${sessionId}] Currently calling: ${activeCallingCount}, max: ${maxConcurrent}, available slots: ${availableSlots}`,
+  );
 
   if (availableSlots === 0) {
     console.log(`[Session ${sessionId}] No available slots, waiting for webhook to trigger next call...`);
@@ -343,7 +352,7 @@ async function processSession(supabase: any, sessionId: string) {
       .from("call_sessions")
       .update({
         status: "completed",
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
       })
       .eq("id", sessionId);
     return;
@@ -358,16 +367,18 @@ async function processSession(supabase: any, sessionId: string) {
     .select("id, phone_number, name, due_date, total_debt, variables, is_blocked")
     .in("id", debtorIds);
 
-  const debtorMap = new Map((debtors as Debtor[] || []).map(d => [d.id, d]));
+  const debtorMap = new Map(((debtors as Debtor[]) || []).map((d) => [d.id, d]));
 
   // Get templates
-  const templateIds = [...new Set(pendingItems.map((item: { template_id: string | null }) => item.template_id).filter(Boolean))];
+  const templateIds = [
+    ...new Set(pendingItems.map((item: { template_id: string | null }) => item.template_id).filter(Boolean)),
+  ];
   const { data: templates } = await supabase
     .from("call_templates")
     .select("id, template_id, org_name, message")
     .in("id", templateIds);
 
-  const templateMap = new Map((templates as Template[] || []).map(t => [t.id, t]));
+  const templateMap = new Map(((templates as Template[]) || []).map((t) => [t.id, t]));
 
   // Get default template
   const { data: defaultTemplates } = await supabase
@@ -380,7 +391,7 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
 
-  const BOT_ID = "69ccce0db875327d960ef0cf";
+  const BOT_ID = "69d7214db875327d960ef7ac";
   const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
 
   if (isTestMode) {
@@ -421,7 +432,9 @@ async function processSession(supabase: any, sessionId: string) {
     const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
     const vars = debtor.variables || {};
 
-    console.log(`[Session ${sessionId}] Processing call for ${debtor.phone_number} with ${Object.keys(vars).length} variables`);
+    console.log(
+      `[Session ${sessionId}] Processing call for ${debtor.phone_number} with ${Object.keys(vars).length} variables`,
+    );
 
     try {
       if (isTestMode) {
@@ -429,7 +442,7 @@ async function processSession(supabase: any, sessionId: string) {
         console.log(`[Session ${sessionId}] 🧪 SIMULATING call to ${debtor.phone_number}...`);
 
         // Simulate processing time (1-3 seconds)
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000));
 
         // Random outcome: 40% confirmed, 20% declined, 20% no_response, 10% other, 10% failed
         const rand = Math.random();
@@ -501,9 +514,11 @@ async function processSession(supabase: any, sessionId: string) {
 
         if (pickedUp) {
           debtorUpdate.picked_up_count = ((debtor as unknown as { picked_up_count?: number }).picked_up_count || 0) + 1;
-          debtorUpdate.successful_contacts = ((debtor as unknown as { successful_contacts?: number }).successful_contacts || 0) + 1;
+          debtorUpdate.successful_contacts =
+            ((debtor as unknown as { successful_contacts?: number }).successful_contacts || 0) + 1;
         } else {
-          debtorUpdate.not_picked_up_count = ((debtor as unknown as { not_picked_up_count?: number }).not_picked_up_count || 0) + 1;
+          debtorUpdate.not_picked_up_count =
+            ((debtor as unknown as { not_picked_up_count?: number }).not_picked_up_count || 0) + 1;
         }
 
         if (acceptIncrement > 0) {
@@ -516,10 +531,7 @@ async function processSession(supabase: any, sessionId: string) {
           debtorUpdate.other_count = ((debtor as unknown as { other_count?: number }).other_count || 0) + 1;
         }
 
-        await supabase
-          .from("debtors")
-          .update(debtorUpdate)
-          .eq("id", item.debtor_id);
+        await supabase.from("debtors").update(debtorUpdate).eq("id", item.debtor_id);
 
         console.log(`[Session ${sessionId}] Updated debtor ${item.debtor_id} stats`);
 
@@ -527,8 +539,10 @@ async function processSession(supabase: any, sessionId: string) {
         const tokensToDeduct = pickedUp ? 4 : 1;
         console.log(`[Session ${sessionId}] Deducting ${tokensToDeduct} tokens for test call (picked_up: ${pickedUp})`);
 
-        const { data: deductResult, error: deductError } = await supabase
-          .rpc('deduct_tokens', { p_user_id: typedSession.user_id, p_amount: tokensToDeduct });
+        const { data: deductResult, error: deductError } = await supabase.rpc("deduct_tokens", {
+          p_user_id: typedSession.user_id,
+          p_amount: tokensToDeduct,
+        });
 
         if (deductError) {
           console.error(`[Session ${sessionId}] Error deducting tokens:`, deductError);
@@ -536,7 +550,12 @@ async function processSession(supabase: any, sessionId: string) {
           console.log(`[Session ${sessionId}] Token deduction result: ${deductResult}`);
         }
 
-        return { success: mockStatus !== "failed", failed: mockStatus === "failed", confirmed: mockStatus === "confirmed", tokensUsed: tokensToDeduct };
+        return {
+          success: mockStatus !== "failed",
+          failed: mockStatus === "failed",
+          confirmed: mockStatus === "confirmed",
+          tokensUsed: tokensToDeduct,
+        };
       } else {
         // REAL MODE: Make actual call via new Voicebot API
         const callPayload = {
@@ -563,11 +582,11 @@ async function processSession(supabase: any, sessionId: string) {
         console.log(`[Session ${sessionId}] Voicebot response:`, JSON.stringify(data));
 
         // Botnoi API returns success in different ways - check for success indicators
-        const isSuccess = response.ok && (
-          data.call_id ||
-          data.status === "success" ||
-          (data.message && data.message.toLowerCase().includes("success"))
-        );
+        const isSuccess =
+          response.ok &&
+          (data.call_id ||
+            data.status === "success" ||
+            (data.message && data.message.toLowerCase().includes("success")));
 
         if (isSuccess) {
           // Use outbound_id from Botnoi response (this is what comes back in webhook)
@@ -583,15 +602,19 @@ async function processSession(supabase: any, sessionId: string) {
           const attemptNumber = currentRetryCount + 1;
 
           // Create call record and get its ID
-          const { data: callRecord } = await supabase.from("call_records").insert({
-            phone_number: debtor.phone_number,
-            template_id: template?.id || null,
-            botnoi_call_id: botnoiCallId,
-            status: "pending",
-            user_id: typedSession.user_id,
-            workspace_id: typedSession.workspace_id,
-            result_data: data,
-          }).select('id').single();
+          const { data: callRecord } = await supabase
+            .from("call_records")
+            .insert({
+              phone_number: debtor.phone_number,
+              template_id: template?.id || null,
+              botnoi_call_id: botnoiCallId,
+              status: "pending",
+              user_id: typedSession.user_id,
+              workspace_id: typedSession.workspace_id,
+              result_data: data,
+            })
+            .select("id")
+            .single();
 
           // Update call list item - keep as "calling" until webhook confirms result
           // Link call_record_id so webhook can find this item reliably
@@ -639,7 +662,7 @@ async function processSession(supabase: any, sessionId: string) {
         .from("call_list_items")
         .update({
           status: "failed",
-          call_outcome: error instanceof Error ? error.message : "Unknown error"
+          call_outcome: error instanceof Error ? error.message : "Unknown error",
         })
         .eq("id", item.id);
 
@@ -648,11 +671,7 @@ async function processSession(supabase: any, sessionId: string) {
   };
 
   // Check if session should stop before processing
-  const { data: currentSession } = await supabase
-    .from("call_sessions")
-    .select("status")
-    .eq("id", sessionId)
-    .single();
+  const { data: currentSession } = await supabase.from("call_sessions").select("status").eq("id", sessionId).single();
 
   if (currentSession?.status === "paused") {
     console.log(`[Session ${sessionId}] Paused by user, stopping processing.`);
@@ -663,11 +682,13 @@ async function processSession(supabase: any, sessionId: string) {
   console.log(`[Session ${sessionId}] Processing ${pendingItems.length} items concurrently...`);
   const results = await Promise.all(pendingItems.map(processItem));
 
-  const completedCount = results.filter(r => r.success).length;
-  const failedCount = results.filter(r => r.failed).length;
+  const completedCount = results.filter((r) => r.success).length;
+  const failedCount = results.filter((r) => r.failed).length;
   const tokensUsedInBatch = results.reduce((sum, r) => sum + (r.tokensUsed || 0), 0);
 
-  console.log(`[Session ${sessionId}] Batch complete: ${completedCount} completed, ${failedCount} failed, ${tokensUsedInBatch} tokens used`);
+  console.log(
+    `[Session ${sessionId}] Batch complete: ${completedCount} completed, ${failedCount} failed, ${tokensUsedInBatch} tokens used`,
+  );
 
   // Update session progress (tokens_used only updated for test mode, real mode tokens are deducted in webhook)
   await supabase
@@ -697,13 +718,13 @@ async function processSession(supabase: any, sessionId: string) {
 
   // Reset any stale calls at the end too
   const endNow = Date.now();
-  const endStaleItems = (currentCalling || []).filter(item => {
+  const endStaleItems = (currentCalling || []).filter((item) => {
     if (!item.called_at) return true;
     return endNow - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (endStaleItems.length > 0) {
-    const endStaleIds = endStaleItems.map(item => item.id);
+    const endStaleIds = endStaleItems.map((item) => item.id);
     console.log(`[Session ${sessionId}] End-of-batch: resetting ${endStaleIds.length} stale items`);
     await supabase
       .from("call_list_items")
@@ -725,7 +746,7 @@ async function processSession(supabase: any, sessionId: string) {
       .from("call_sessions")
       .update({
         status: "completed",
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
       })
       .eq("id", sessionId);
   } else {
