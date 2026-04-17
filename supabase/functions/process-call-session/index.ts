@@ -705,12 +705,16 @@ async function processSession(supabase: any, sessionId: string) {
     .eq("id", sessionId);
 
   // Check if more items to process and if we have available slots
+  // Exclude pending_retry items whose next_retry_at hasn't passed yet (10 min delay)
+  const checkNowIso = new Date().toISOString();
   const { count } = await supabase
     .from("call_list_items")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending", "pending_retry"]);
+    .or(
+      `status.eq.pending,and(status.in.(pending_retry,retry_pending),or(next_retry_at.is.null,next_retry_at.lte.${checkNowIso}))`,
+    );
 
   // Check current calling count (with stale detection)
   const { data: currentCalling } = await supabase
