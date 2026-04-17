@@ -333,12 +333,16 @@ async function processSession(supabase: any, sessionId: string) {
   }
 
   // Get pending call list items - only up to available slots
+  // For pending_retry/retry_pending items, only pick them up after next_retry_at has passed (10 min delay)
+  const nowIso = new Date().toISOString();
   const { data: pendingItems, error: itemsError } = await supabase
     .from("call_list_items")
     .select("*")
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending", "pending_retry"])
+    .or(
+      `status.eq.pending,and(status.in.(pending_retry,retry_pending),or(next_retry_at.is.null,next_retry_at.lte.${nowIso}))`,
+    )
     .limit(availableSlots);
 
   if (itemsError) {
@@ -347,6 +351,22 @@ async function processSession(supabase: any, sessionId: string) {
   }
 
   if (!pendingItems || pendingItems.length === 0) {
+    // Before completing, check if there are pending_retry items waiting for their delay window
+    const { count: waitingRetries } = await supabase
+      .from("call_list_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", typedSession.workspace_id)
+      .eq("user_id", typedSession.user_id)
+      .in("status", ["pending_retry", "retry_pending"])
+      .gt("next_retry_at", nowIso);
+
+    if (waitingRetries && waitingRetries > 0) {
+      console.log(
+        `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 10-min delay. Keeping session running.`,
+      );
+      return;
+    }
+
     console.log(`[Session ${sessionId}] No pending items, completing session.`);
     await supabase
       .from("call_sessions")
@@ -701,12 +721,16 @@ async function processSession(supabase: any, sessionId: string) {
     .eq("id", sessionId);
 
   // Check if more items to process and if we have available slots
+  // Exclude pending_retry items whose next_retry_at hasn't passed yet (10 min delay)
+  const checkNowIso = new Date().toISOString();
   const { count } = await supabase
     .from("call_list_items")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", typedSession.workspace_id)
     .eq("user_id", typedSession.user_id)
-    .in("status", ["pending", "retry_pending", "pending_retry"]);
+    .or(
+      `status.eq.pending,and(status.in.(pending_retry,retry_pending),or(next_retry_at.is.null,next_retry_at.lte.${checkNowIso}))`,
+    );
 
   // Check current calling count (with stale detection)
   const { data: currentCalling } = await supabase
