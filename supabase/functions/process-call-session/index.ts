@@ -351,6 +351,22 @@ async function processSession(supabase: any, sessionId: string) {
   }
 
   if (!pendingItems || pendingItems.length === 0) {
+    // Before completing, check if there are pending_retry items waiting for their delay window
+    const { count: waitingRetries } = await supabase
+      .from("call_list_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", typedSession.workspace_id)
+      .eq("user_id", typedSession.user_id)
+      .in("status", ["pending_retry", "retry_pending"])
+      .gt("next_retry_at", nowIso);
+
+    if (waitingRetries && waitingRetries > 0) {
+      console.log(
+        `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 10-min delay. Keeping session running.`,
+      );
+      return;
+    }
+
     console.log(`[Session ${sessionId}] No pending items, completing session.`);
     await supabase
       .from("call_sessions")
