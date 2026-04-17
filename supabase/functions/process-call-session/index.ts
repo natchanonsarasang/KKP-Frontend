@@ -333,7 +333,7 @@ async function processSession(supabase: any, sessionId: string) {
   }
 
   // Get pending call list items - only up to available slots
-  // For pending_retry/retry_pending items, only pick them up after next_retry_at has passed (10 min delay)
+  // For pending_retry/retry_pending items, only pick them up after next_retry_at has passed (1 min delay)
   const nowIso = new Date().toISOString();
   const { data: pendingItems, error: itemsError } = await supabase
     .from("call_list_items")
@@ -362,7 +362,7 @@ async function processSession(supabase: any, sessionId: string) {
 
     if (waitingRetries && waitingRetries > 0) {
       console.log(
-        `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 10-min delay. Keeping session running.`,
+          `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 1-min delay. Keeping session running.`,
       );
       return;
     }
