@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const BOT_ID = "69d7214db875327d960ef7ac";
-const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
+const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

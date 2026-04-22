@@ -362,7 +362,7 @@ async function processSession(supabase: any, sessionId: string) {
 
     if (waitingRetries && waitingRetries > 0) {
       console.log(
-          `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 1-min delay. Keeping session running.`,
+        `[Session ${sessionId}] No items ready now, but ${waitingRetries} retry(ies) waiting for 1-min delay. Keeping session running.`,
       );
       return;
     }
@@ -412,7 +412,7 @@ async function processSession(supabase: any, sessionId: string) {
   const isTestMode = typedSession.settings.testMode === true;
 
   const BOT_ID = "69d7214db875327d960ef7ac";
-  const CALL_API_URL = "https://bn-voicebot-system.onrender.com/api/voicebot/custom/call_message_public";
+  const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
