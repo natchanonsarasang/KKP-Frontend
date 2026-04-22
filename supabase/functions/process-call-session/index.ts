@@ -585,7 +585,7 @@ async function processSession(supabase: any, sessionId: string) {
           variables: vars,
           asr: {
             asr_provider: "botnoi-aws-th-noise-classifier-v17c",
-            asr_timeout: 5
+            asr_timeout: 30
           },
           interruptible: "True",
           vad: {
