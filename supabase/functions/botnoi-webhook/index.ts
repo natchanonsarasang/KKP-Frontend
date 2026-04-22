@@ -22,29 +22,30 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // Function to categorize conversation using AI
-    const categorizeConversation = async (log: string, status: string): Promise<string> => {
+    const categorizeConversation = async (log: string, status: string): Promise<{category: string, callback_time?: string}> => {
       // 1. Check system-level statuses first
       if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
-        return "ไม่รับสาย → โทรรอบ 2";
+        return { category: "ไม่รับสาย \u2192 โทรรอบ 2" };
       }
       
       if (status === 'failed' || status === 'error') {
-        return "โทรแล้วปิดเครื่อง";
+        return { category: "โทรแล้วปิดเครื่อง" };
       }
 
       // 2. If no log, and status is completed, it might be "ลูกค้าไม่พูด" or "เงียบ"
       if (!log || log.trim().length < 5) {
-        if (status === 'completed') return "ลูกค้าไม่พูด";
-        return "ไม่รับสาย → โทรรอบ 2";
+        if (status === 'completed') return { category: "ลูกค้าไม่พูด" };
+        return { category: "ไม่รับสาย → โทรรอบ 2" };
       }
 
       // 3. For behavioral categories, use OpenAI
       if (!OPENAI_API_KEY) {
         console.warn('OPENAI_API_KEY not found, skipping AI categorization');
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return { category: "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)" };
       }
 
       try {
+        const currentTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -53,10 +54,11 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
+            response_format: { type: "json_object" },
             messages: [
               {
                 role: 'system',
-                content: `You are an AI that categorizes debt collection call transcripts into one of these 13 categories in Thai:
+                content: `You are an AI that categorizes debt collection call transcripts into one of these 14 categories in Thai:
 1. ลูกค้าอยู่ที่เสียงดัง (Noisy environment)
 2. ลูกค้าอยู่ข้างทาง / ไม่สะดวก (Inconvenient/Roadside)
 3. ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก) (Refuses to pay/Silent/Interrupts)
@@ -70,8 +72,13 @@ serve(async (req) => {
 11. ลูกค้าพูดภาษาถิ่น (Local dialect)
 12. ลูกค้าไม่พูด (Silent customer)
 13. โทรแล้วปิดเครื่อง (System result: Failed/Phone off)
+14. ลูกค้านัดโทรใหม่ภายหลัง (Customer wants to be called back later / postpone)
 
-Return ONLY the category name as a string, nothing else.`
+For category 14 (ลูกค้านัดโทรใหม่ภายหลัง), extract the requested callback time.
+Current system time (Bangkok) is: ${currentTime}.
+If the customer says "tomorrow", calculate based on this time.
+
+Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD HH:mm" or null }`
               },
               {
                 role: 'user',
@@ -83,9 +90,8 @@ Return ONLY the category name as a string, nothing else.`
         });
 
         const result = await response.json();
-        const category = result.choices?.[0]?.message?.content?.trim();
+        const aiData = JSON.parse(result.choices?.[0]?.message?.content || '{}');
         
-        // Ensure the returned category is one of the allowed ones
         const AICATEGORIES = [
           "ลูกค้าอยู่ที่เสียงดัง",
           "ลูกค้าอยู่ข้างทาง / ไม่สะดวก",
@@ -99,22 +105,29 @@ Return ONLY the category name as a string, nothing else.`
           "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)",
           "ลูกค้าพูดภาษาถิ่น",
           "ลูกค้าไม่พูด",
-          "โทรแล้วปิดเครื่อง"
+          "โทรแล้วปิดเครื่อง",
+          "ลูกค้านัดโทรใหม่ภายหลัง"
         ];
 
-        if (category && AICATEGORIES.includes(category)) {
-          return category;
+        let finalCategory = aiData.category || "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        
+        // Validation/Fuzzy match
+        if (!AICATEGORIES.includes(finalCategory)) {
+          for (const allowedCat of AICATEGORIES) {
+            if (finalCategory.includes(allowedCat)) {
+              finalCategory = allowedCat;
+              break;
+            }
+          }
         }
 
-        // Fallback or fuzzy match
-        for (const allowedCat of AICATEGORIES) {
-          if (category?.includes(allowedCat)) return allowedCat;
-        }
-
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return {
+          category: finalCategory,
+          callback_time: aiData.callback_time || null
+        };
       } catch (err) {
         console.error('Error calling OpenAI:', err);
-        return "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
+        return { category: "ลูกค้าพูดเรื่องอื่น (\u0e19\u0e49\u0e33\u0e17\u0e40\u0e27\u0e47\u0e19 / \u0e40\u0e2a\u0e35\u0e22\u0e0a\u0e35\u0e27\u0e34\u0e15)" };
       }
     };
 
@@ -178,8 +191,9 @@ Return ONLY the category name as a string, nothing else.`
       console.log('Picked up:', pickedUp);
 
       // Perform AI categorization
-      const aiCategory = await categorizeConversation(conversationLog || '', status);
-      console.log('AI Category:', aiCategory);
+      const aiResult = await categorizeConversation(conversationLog || '', status);
+      const aiCategory = aiResult.category;
+      console.log('AI Result:', JSON.stringify(aiResult));
 
       // Determine token deduction: 4 tokens if picked up, 1 token if not picked up
       const tokensToDeduct = pickedUp ? 4 : 1;
@@ -253,7 +267,16 @@ Return ONLY the category name as a string, nothing else.`
           } else if (recentItem) {
             // Now update by ID - store status as Success if picked up
             // Store audio URL and conversation log as JSON in notes field
-            const finalStatus = pickedUp ? 'success' : mappedStatus;
+            let finalStatus = pickedUp ? 'success' : mappedStatus;
+            let nextScheduledAt = null;
+
+            // If AI detected a postponement request, move back to pending with a schedule
+            if (aiResult.category === "ลูกค้านัดโทรใหม่ภายหลัง" && aiResult.callback_time) {
+              console.log(`Detected callback request for ${aiResult.callback_time}. Rescheduling...`);
+              finalStatus = 'pending';
+              nextScheduledAt = new Date(aiResult.callback_time).toISOString();
+            }
+
             const notesData = JSON.stringify({ 
               audio_url: audioUrl, 
               conversation_log: conversationLog 
@@ -263,10 +286,11 @@ Return ONLY the category name as a string, nothing else.`
               .from('call_list_items')
               .update({
                 status: finalStatus,
-                call_outcome: callOutcome,
+                scheduled_at: nextScheduledAt,
+                call_outcome: aiResult.category,
                 picked_up: pickedUp,
                 notes: notesData, // Store audio URL and transcription as JSON
-                ai_category: aiCategory,
+                ai_category: aiResult.category,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', recentItem.id);
