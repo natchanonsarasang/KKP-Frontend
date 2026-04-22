@@ -30,7 +30,7 @@ serve(async (req) => {
       variables: variables || {},
       asr: {
         asr_provider: "botnoi-aws-th-noise-classifier-v17c",
-        asr_timeout: 30
+        asr_timeout: 5
       },
       interruptible: "True",
       vad: {
