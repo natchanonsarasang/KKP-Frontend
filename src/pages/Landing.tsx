@@ -90,7 +90,7 @@ const Landing = () => {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
               <Phone className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-semibold tracking-tight">Callectooo</span>
+            <span className="text-xl font-semibold tracking-tight">Callecto</span>
           </Link>
 
           {user ? (
