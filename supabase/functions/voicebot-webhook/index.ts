@@ -329,7 +329,6 @@ serve(async (req) => {
             // Fallback: insert if no "calling" attempt found (e.g. manual calls, legacy)
             await supabase.from("call_attempts").insert({
               call_list_item_id: recentItem.id,
-              call_record_id: callRecordId,
               user_id: resolvedUserId,
               attempt_number: attemptNumber,
               ...attemptUpdateData,
