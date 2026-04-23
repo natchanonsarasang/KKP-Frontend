@@ -719,14 +719,20 @@ async function processSession(supabase: any, sessionId: string) {
   );
 
   // Update session progress (tokens_used only updated for test mode, real mode tokens are deducted in webhook)
-  await supabase
-    .from("call_sessions")
-    .update({
-      completed_calls: typedSession.completed_calls + completedCount,
-      failed_calls: typedSession.failed_calls + failedCount,
-      tokens_used: typedSession.tokens_used + tokensUsedInBatch,
-    })
-    .eq("id", sessionId);
+  if (isTestMode) {
+    await supabase
+      .from("call_sessions")
+      .update({
+        completed_calls: typedSession.completed_calls + completedCount,
+        failed_calls: typedSession.failed_calls + failedCount,
+        tokens_used: typedSession.tokens_used + tokensUsedInBatch,
+      })
+      .eq("id", sessionId);
+  } else {
+    // For real mode, we don't update completed/failed here anymore. 
+    // It will be updated in the webhook when the call actually finishes.
+    console.log(`[Session ${sessionId}] Call initiated. Waiting for webhook to update stats.`);
+  }
 
   // Check if more items to process and if we have available slots
   // Exclude pending_retry items whose next_retry_at hasn't passed yet (10 min delay)

@@ -410,12 +410,32 @@ serve(async (req) => {
     // Trigger next call for active sessions
     const { data: activeSessions } = await supabase
       .from("call_sessions")
-      .select("id")
+      .select("*")
       .eq("status", "running")
+      .eq("workspace_id", resolvedWorkspaceId)
       .limit(10);
 
     if (activeSessions?.length) {
       for (const session of activeSessions) {
+        // Update session stats if this call reached a final state
+        const updates: Record<string, any> = {};
+        if (finalStatus === "success") {
+          updates.completed_calls = (session.completed_calls || 0) + 1;
+          if (mappedStatus === "confirmed") {
+            updates.confirmed_calls = (session.confirmed_calls || 0) + 1;
+          }
+        } else if (retryStatus === "final_failed") {
+          updates.failed_calls = (session.failed_calls || 0) + 1;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          console.log(`Updating session ${session.id} stats:`, updates);
+          await supabase
+            .from("call_sessions")
+            .update(updates)
+            .eq("id", session.id);
+        }
+
         console.log(`Triggering next call for session ${session.id}`);
         fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
           method: "POST",
@@ -424,7 +444,7 @@ serve(async (req) => {
             Authorization: `Bearer ${supabaseKey}`,
           },
           body: JSON.stringify({ action: "continue", session_id: session.id }),
-        }).catch((err) => console.error("Error triggering next call:", err));
+        }).catch((err: any) => console.error("Error triggering next call:", err));
       }
     }
 
