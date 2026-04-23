@@ -215,7 +215,7 @@ serve(async (req) => {
 
           if (recentItem) {
             const currentRetryCount = recentItem.retry_count || 0;
-            const MAX_RETRIES = 2;
+            const MAX_RETRIES = 0;
             const RETRY_DELAY_MS = 5 * 1000;
             
             // Logic to determine retry: if not picked up and status looks like a failure
