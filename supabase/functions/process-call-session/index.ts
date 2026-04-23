@@ -290,13 +290,13 @@ async function processSession(supabase: any, sessionId: string) {
   // Auto-reset stale "calling" items (stuck for more than 5 minutes)
   const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   const now = Date.now();
-  const staleItems = (callingItems || []).filter((item) => {
+  const staleItems = (callingItems || []).filter((item: any) => {
     if (!item.called_at) return true; // No timestamp = definitely stale
     return now - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (staleItems.length > 0) {
-    const staleIds = staleItems.map((item) => item.id);
+    const staleIds = staleItems.map((item: any) => item.id);
     console.log(`[Session ${sessionId}] Resetting ${staleIds.length} stale "calling" items to "failed"`);
     await supabase
       .from("call_list_items")
@@ -756,13 +756,13 @@ async function processSession(supabase: any, sessionId: string) {
 
   // Reset any stale calls at the end too
   const endNow = Date.now();
-  const endStaleItems = (currentCalling || []).filter((item) => {
+  const endStaleItems = (currentCalling || []).filter((item: any) => {
     if (!item.called_at) return true;
     return endNow - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (endStaleItems.length > 0) {
-    const endStaleIds = endStaleItems.map((item) => item.id);
+    const endStaleIds = endStaleItems.map((item: any) => item.id);
     console.log(`[Session ${sessionId}] End-of-batch: resetting ${endStaleIds.length} stale items`);
     await supabase
       .from("call_list_items")

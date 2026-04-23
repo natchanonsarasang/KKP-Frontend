@@ -52,6 +52,7 @@ serve(async (req) => {
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
+    let mappedStatus = "failed";
 
     if (["Confirm", "confirm", "yes", "Yes"].includes(action)) {
       mappedStatus = "confirmed";
