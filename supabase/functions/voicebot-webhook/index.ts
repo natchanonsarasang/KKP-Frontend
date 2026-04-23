@@ -45,8 +45,10 @@ serve(async (req) => {
       });
     }
 
-    // Determine if customer picked up based on conversation_log content
-    const hasConversation = conversationLog && conversationLog.trim().length > 20 && conversationLog.includes("User:");
+    // Check if user actually spoke in the conversation
+    // A valid pickup should have at least one "User:" entry with some text after it
+    const userParts = conversationLog ? conversationLog.split("User:") : [];
+    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
 
     // Map action/status to our internal status
     let mappedStatus = "pending";
@@ -61,11 +63,11 @@ serve(async (req) => {
     } else if (status === "no_answer" || status === "busy" || status === "unreachable") {
       mappedStatus = "no_answer";
     } else if (status === "completed") {
-      // If completed with conversation, treat as completed-with-pickup
-      mappedStatus = hasConversation ? "completed" : "no_answer";
+      // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
+      mappedStatus = hasUserSpoken ? "completed" : "no_answer";
     }
 
-    const pickedUp = hasConversation || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
