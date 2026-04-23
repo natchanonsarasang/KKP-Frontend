@@ -91,6 +91,7 @@ export type Database = {
           id: string
           next_retry_at: string | null
           notes: string | null
+          phone_number: string | null
           picked_up: boolean | null
           retry_count: number
           scheduled_at: string | null
@@ -110,6 +111,7 @@ export type Database = {
           id?: string
           next_retry_at?: string | null
           notes?: string | null
+          phone_number?: string | null
           picked_up?: boolean | null
           retry_count?: number
           scheduled_at?: string | null
@@ -129,6 +131,7 @@ export type Database = {
           id?: string
           next_retry_at?: string | null
           notes?: string | null
+          phone_number?: string | null
           picked_up?: boolean | null
           retry_count?: number
           scheduled_at?: string | null
