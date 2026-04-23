@@ -271,7 +271,7 @@ serve(async (req) => {
           const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
           const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
 
-          let retryStatus = finalStatus;
+          retryStatus = finalStatus;
           let nextRetryAt: string | null = null;
           let newRetryCount = currentRetryCount;
 
