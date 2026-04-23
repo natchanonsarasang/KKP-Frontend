@@ -265,16 +265,51 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
           if (fetchError) {
             console.error('Error fetching call_list_item:', fetchError);
           } else if (recentItem) {
-            // Now update by ID - store status as Success if picked up
-            // Store audio URL and conversation log as JSON in notes field
-            let finalStatus = pickedUp ? 'success' : mappedStatus;
-            let nextScheduledAt = null;
+            // Determine if customer picked up based on conversation_log content
+            const userParts = conversationLog ? conversationLog.split("User:") : [];
+            const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
+            
+            // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
+            if (status === 'completed' && !hasUserSpoken) {
+              mappedStatus = 'no_answer';
+            }
 
-            // If AI detected a postponement request, move back to pending with a schedule
+            // Update pickedUp based on user speaking
+            const finalPickedUp = hasUserSpoken || ['confirmed', 'declined', 'no_response'].includes(mappedStatus);
+            let finalStatus = finalPickedUp ? 'success' : mappedStatus;
+            
+            // Fetch current retry_count for this item
+            const { data: itemData } = await supabase
+              .from('call_list_items')
+              .select('retry_count')
+              .eq('id', recentItem.id)
+              .single();
+            const currentRetryCount = itemData?.retry_count || 0;
+
+            // Determine if we should schedule a retry
+            const MAX_RETRIES = 2;
+            const RETRY_DELAY_MS = 10 * 1000; // 10 seconds for faster retries
+            const isRetryable = !finalPickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
+
+            let retryStatus = finalStatus;
+            let nextRetryAt = null;
+            let newRetryCount = currentRetryCount;
+
+            if (isRetryable && currentRetryCount < MAX_RETRIES) {
+              retryStatus = 'pending_retry';
+              newRetryCount = currentRetryCount + 1;
+              nextRetryAt = new Date(Date.now() + RETRY_DELAY_MS).toISOString();
+              console.log(`Scheduling retry ${newRetryCount}/${MAX_RETRIES} at ${nextRetryAt}`);
+            } else if (isRetryable && currentRetryCount >= MAX_RETRIES) {
+              retryStatus = 'final_failed';
+              console.log(`Max retries (${MAX_RETRIES}) reached, marking as final_failed`);
+            }
+
+            // If AI detected a postponement request, move back to pending with a schedule (priority over auto-retry)
             if (aiResult.category === "ลูกค้านัดโทรใหม่ภายหลัง" && aiResult.callback_time) {
               console.log(`Detected callback request for ${aiResult.callback_time}. Rescheduling...`);
-              finalStatus = 'pending';
-              nextScheduledAt = new Date(aiResult.callback_time).toISOString();
+              retryStatus = 'pending';
+              nextRetryAt = new Date(aiResult.callback_time).toISOString();
             }
 
             const notesData = JSON.stringify({ 
@@ -285,11 +320,13 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
             const { error: cliError } = await supabase
               .from('call_list_items')
               .update({
-                status: finalStatus,
-                scheduled_at: nextScheduledAt,
+                status: retryStatus,
+                scheduled_at: retryStatus === 'pending' ? nextRetryAt : null,
+                next_retry_at: retryStatus === 'pending_retry' ? nextRetryAt : null,
+                retry_count: newRetryCount,
                 call_outcome: aiResult.category,
-                picked_up: pickedUp,
-                notes: notesData, // Store audio URL and transcription as JSON
+                picked_up: finalPickedUp,
+                notes: notesData,
                 ai_category: aiResult.category,
                 updated_at: new Date().toISOString(),
               })

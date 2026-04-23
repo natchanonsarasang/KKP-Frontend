@@ -256,7 +256,7 @@ serve(async (req) => {
 
           // Determine if we should schedule a retry
           const MAX_RETRIES = 2;
-          const RETRY_DELAY_MS = 60 * 1000; // 1 minute
+          const RETRY_DELAY_MS = 10 * 1000; // 10 seconds for faster retries
           const isRetryable = !pickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
 
           let retryStatus = finalStatus;

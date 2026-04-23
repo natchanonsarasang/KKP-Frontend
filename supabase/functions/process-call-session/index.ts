@@ -779,6 +779,20 @@ async function processSession(supabase: any, sessionId: string) {
   } else if (count && count > 0) {
     console.log(`[Session ${sessionId}] ${count} more items but no slots available, waiting for webhook...`);
   } else if (callingNow === 0) {
+    // Before completing, double check if there are ANY items waiting for retry delay
+    const { count: waitingForRetry } = await supabase
+      .from("call_list_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", typedSession.workspace_id)
+      .eq("user_id", typedSession.user_id)
+      .in("status", ["pending_retry", "retry_pending"])
+      .gt("next_retry_at", checkNowIso);
+
+    if (waitingForRetry && waitingForRetry > 0) {
+      console.log(`[Session ${sessionId}] No items ready now, but ${waitingForRetry} retries waiting for delay. Keeping session running.`);
+      return;
+    }
+
     console.log(`[Session ${sessionId}] All items processed, completing.`);
     await supabase
       .from("call_sessions")
