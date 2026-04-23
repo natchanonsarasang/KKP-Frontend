@@ -52,6 +52,7 @@ serve(async (req) => {
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
+    let mappedStatus = "failed";
 
     if (["Confirm", "confirm", "yes", "Yes"].includes(action)) {
       mappedStatus = "confirmed";
@@ -252,7 +253,8 @@ serve(async (req) => {
           if (byDebtor) recentItem = byDebtor;
         }
 
-        const finalStatus = pickedUp ? "success" : mappedStatus;
+        let finalStatus = pickedUp ? "success" : mappedStatus;
+        let retryStatus = finalStatus;
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
@@ -269,7 +271,7 @@ serve(async (req) => {
           const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
           const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
 
-          let retryStatus = finalStatus;
+          retryStatus = finalStatus;
           let nextRetryAt: string | null = null;
           let newRetryCount = currentRetryCount;
 
@@ -328,7 +330,6 @@ serve(async (req) => {
             // Fallback: insert if no "calling" attempt found (e.g. manual calls, legacy)
             await supabase.from("call_attempts").insert({
               call_list_item_id: recentItem.id,
-              call_record_id: callRecordId,
               user_id: resolvedUserId,
               attempt_number: attemptNumber,
               ...attemptUpdateData,
