@@ -37,7 +37,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      const newUserId = session?.user?.id ?? null;
+      let newUserId = session?.user?.id ?? null;
       const previousUserId = currentUserIdRef.current;
 
       currentUserIdRef.current = newUserId;

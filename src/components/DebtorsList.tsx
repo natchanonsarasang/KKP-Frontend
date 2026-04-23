@@ -69,21 +69,41 @@ import {
   DEBTOR_CUSTOMER_VARIABLE_LABELS,
   emptyDebtorCustomerVariables,
   parseDebtAmountForColumn,
+  splitThaiDate,
 } from "@/lib/debtorVariables";
 
 function buildVariablesToSave(
   tv: Record<string, string>,
   preserveTemplateFrom?: Record<string, unknown> | null,
-  dueDateIso?: string
+  dueDateIso?: string,
+  paidDateIso?: string
 ): Record<string, string> {
   const out: Record<string, string> = {};
+  
+  const dueParts = splitThaiDate(dueDateIso);
+  const paidParts = splitThaiDate(paidDateIso);
+
   for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
     if (k === "due_date") {
-      out[k] = dueDateIso?.trim() ?? "";
+      out[k] = dueParts.day;
+    } else if (k === "due_month") {
+      out[k] = dueParts.month;
+    } else if (k === "due_year") {
+      out[k] = dueParts.year;
+    } else if (k === "paid_date") {
+      out[k] = paidParts.day;
+    } else if (k === "paid_month") {
+      out[k] = paidParts.month;
+    } else if (k === "paid_year") {
+      out[k] = paidParts.year;
     } else {
       out[k] = tv[k] ?? "";
     }
   }
+  // Store ISO versions to restore date pickers when editing
+  if (dueDateIso) out.due_date_iso = dueDateIso;
+  if (paidDateIso) out.paid_date_iso = paidDateIso;
+
   const mt = preserveTemplateFrom?.message_template;
   if (typeof mt === "string" && mt.length > 0) {
     out.message_template = mt;
@@ -122,7 +142,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 
-const DebtorsList = () => {
+interface DebtorsListProps {
+  onNextStep?: () => void;
+}
+
+const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const queryClient = useQueryClient();
   const { effectiveUserId, isAdmin, selectedUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
@@ -136,6 +160,7 @@ const DebtorsList = () => {
     status: "active",
     notes: "",
     due_date: "",
+    paid_date: "",
   });
   const [templateVariables, setTemplateVariables] = useState<
     Record<string, string>
@@ -145,10 +170,10 @@ const DebtorsList = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
-  
+
   // Selection for send to call list
   const [selectedDebtors, setSelectedDebtors] = useState<Set<string>>(new Set());
-  
+
   const pageSize = 50;
 
   // Server-side paginated query with sorting and filtering
@@ -265,28 +290,28 @@ const DebtorsList = () => {
       if (error) throw error;
 
       // Calculate stats per phone number from raw data
-      const stats: Record<string, { 
-        total: number; 
-        confirmed: number; 
-        declined: number; 
+      const stats: Record<string, {
+        total: number;
+        confirmed: number;
+        declined: number;
         no_response: number;
         picked_up: number;
         not_picked_up: number;
       }> = {};
-      
+
       data.forEach((record) => {
         if (!stats[record.phone_number]) {
-          stats[record.phone_number] = { 
-            total: 0, 
-            confirmed: 0, 
-            declined: 0, 
+          stats[record.phone_number] = {
+            total: 0,
+            confirmed: 0,
+            declined: 0,
             no_response: 0,
             picked_up: 0,
             not_picked_up: 0,
           };
         }
         stats[record.phone_number].total++;
-        
+
         // Count by status from call_records
         if (record.status === "confirmed") {
           stats[record.phone_number].confirmed++;
@@ -314,11 +339,12 @@ const DebtorsList = () => {
       const targetUserId = effectiveUserId;
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-      
+
       const variablesData = buildVariablesToSave(
         data.variables,
         null,
-        data.formData.due_date
+        data.formData.due_date,
+        data.formData.paid_date
       );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
@@ -362,7 +388,8 @@ const DebtorsList = () => {
       const variablesData = buildVariablesToSave(
         data.variables,
         existingVariables,
-        data.formData.due_date
+        data.formData.due_date,
+        data.formData.paid_date
       );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
@@ -454,7 +481,7 @@ const DebtorsList = () => {
   const makeCallMutation = useMutation({
     mutationFn: async (debtor: Debtor) => {
       const debtorVars = (debtor.variables || {}) as Record<string, string>;
-      
+
       console.log("Calling via voicebot-make-call with variables:", debtorVars);
 
       const { data, error } = await supabase.functions.invoke("voicebot-make-call", {
@@ -465,7 +492,7 @@ const DebtorsList = () => {
       });
 
       if (error) throw error;
-      
+
       // Create call record
       await supabase.from("call_records").insert({
         phone_number: debtor.phone_number,
@@ -525,6 +552,9 @@ const DebtorsList = () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       toast.success(`Added ${count} debtors to Call List`);
       setSelectedDebtors(new Set());
+      if (onNextStep) {
+        onNextStep();
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to add to call list");
@@ -534,10 +564,10 @@ const DebtorsList = () => {
   // Select/deselect all visible debtors
   const toggleSelectAll = () => {
     if (!debtors) return;
-    
+
     const selectableDebtors = debtors.filter(d => d.status !== "paid");
     const allSelected = selectableDebtors.every(d => selectedDebtors.has(d.id));
-    
+
     if (allSelected) {
       // Deselect all
       const newSelected = new Set(selectedDebtors);
@@ -569,6 +599,7 @@ const DebtorsList = () => {
       status: "active",
       notes: "",
       due_date: "",
+      paid_date: "",
     });
     setTemplateVariables(emptyDebtorCustomerVariables());
   };
@@ -581,10 +612,11 @@ const DebtorsList = () => {
       status: debtor.status,
       notes: debtor.notes || "",
       due_date: debtor.due_date ? debtor.due_date.slice(0, 10) : "",
+      paid_date: debtor.variables?.paid_date_iso || "", 
     });
     const next = emptyDebtorCustomerVariables();
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-      if (k === "due_date") continue;
+      if (["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(k)) continue;
       const v = debtorVars[k];
       next[k] = v != null && v !== undefined ? String(v) : "";
     }
@@ -625,8 +657,8 @@ const DebtorsList = () => {
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
-    return sortDirection === "asc" 
-      ? <ArrowUp className="w-3 h-3 ml-1" /> 
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1" />
       : <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
@@ -704,7 +736,7 @@ const DebtorsList = () => {
         }
         const { data: debtData, error: debtError } = await debtQuery
           .range(page * pageSize, (page + 1) * pageSize - 1);
-        
+
         if (debtError) {
           console.error("Error fetching debt sum:", debtError);
           break;
@@ -806,59 +838,57 @@ const DebtorsList = () => {
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => (
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Due Date *</Label>
+                  <Input
+                    type="date"
+                    required
+                    value={formData.due_date || ""}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        due_date: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Paid Date</Label>
+                  <Input
+                    type="date"
+                    value={formData.paid_date || ""}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        paid_date: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {DEBTOR_CUSTOMER_VARIABLE_KEYS.filter(key => 
+                  !["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(key)
+                ).map((key) => (
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm">
                       {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
-                      {key === "due_date" ? " *" : ""}
                     </Label>
-                    {key === "due_date" ? (
-                      <Input
-                        type="date"
-                        required
-                        value={formData.due_date || ""}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            due_date: e.target.value,
-                          }))
-                        }
-                      />
-                    ) : (
-                      <Input
-                        value={templateVariables[key] ?? ""}
-                        onChange={(e) =>
-                          setTemplateVariables((prev) => ({
-                            ...prev,
-                            [key]: e.target.value,
-                          }))
-                        }
-                        placeholder={key}
-                      />
-                    )}
+                    <Input
+                      value={templateVariables[key] ?? ""}
+                      onChange={(e) =>
+                        setTemplateVariables((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      placeholder={key}
+                    />
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => setFormData((p) => ({ ...p, status: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="negotiating">Negotiating</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="defaulted">Defaulted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
             <div className="space-y-1.5">
               <Label className="text-sm">Notes</Label>
@@ -910,8 +940,8 @@ const DebtorsList = () => {
         </div>
         <div className="flex gap-2">
           {totalCount > 0 && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 if (window.confirm(`Are you sure you want to delete all ${totalCount} debtors? This action cannot be undone.`)) {
                   clearAllDebtorsMutation.mutate();
@@ -939,64 +969,6 @@ const DebtorsList = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-primary/10">
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.total}</div>
-                <div className="text-xs text-muted-foreground">Total Debtors</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-destructive/10">
-                <TrendingUp className="w-4 h-4 text-destructive" />
-              </div>
-              <div>
-                <div className="text-xl font-semibold">{formatCurrency(stats.totalDebt)}</div>
-                <div className="text-xs text-muted-foreground">Total Outstanding</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-warning/10">
-                <AlertCircle className="w-4 h-4 text-warning" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.active}</div>
-                <div className="text-xs text-muted-foreground">Active Cases</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-success/10">
-                <CheckCircle className="w-4 h-4 text-success" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{stats.paid}</div>
-                <div className="text-xs text-muted-foreground">Paid</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
 
       {/* Filters & Auto-Dial */}
@@ -1032,7 +1004,7 @@ const DebtorsList = () => {
           </div>
         </div>
 
-        {/* Send to Call List Controls */}
+        {/* Send to Call List Controls - Selection Count Only */}
         <div className="flex gap-3 items-center flex-wrap p-3 bg-muted/30 rounded-lg border">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Bulk Actions:</span>
@@ -1040,38 +1012,41 @@ const DebtorsList = () => {
               {selectedDebtors.size} selected
             </Badge>
           </div>
-          
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => sendToCallListMutation.mutate()}
-            disabled={selectedDebtors.size === 0 || sendToCallListMutation.isPending}
-            className="gap-1.5"
-          >
-            {sendToCallListMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            Send to Call List
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSelectAll}
-            disabled={!debtors || debtors.length === 0}
-          >
-            {debtors && debtors.filter(d => d.status !== "paid").every(d => selectedDebtors.has(d.id))
-              ? "Deselect All"
-              : "Select All on Page"}
-          </Button>
         </div>
       </div>
 
       {/* Table */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Debtor List</CardTitle>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base font-medium">Debtor List</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => sendToCallListMutation.mutate()}
+              disabled={selectedDebtors.size === 0 || sendToCallListMutation.isPending}
+              className="h-8 gap-1.5 bg-primary/90 hover:bg-primary shadow-sm"
+            >
+              {sendToCallListMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              Send to Call List
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSelectAll}
+              disabled={!debtors || debtors.length === 0}
+              className="h-8 text-xs"
+            >
+              {debtors && debtors.filter(d => d.status !== "paid").every(d => selectedDebtors.has(d.id))
+                ? "Deselect"
+                : "Select All"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -1086,7 +1061,7 @@ const DebtorsList = () => {
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
-                          checked={debtors && debtors.filter(d => d.status !== "paid").length > 0 && 
+                          checked={debtors && debtors.filter(d => d.status !== "paid").length > 0 &&
                             debtors.filter(d => d.status !== "paid").every(d => selectedDebtors.has(d.id))}
                           onCheckedChange={toggleSelectAll}
                           disabled={sendToCallListMutation.isPending}
@@ -1095,8 +1070,8 @@ const DebtorsList = () => {
                       <TableHead className="text-xs w-20">ID</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
                       {variableColumns.map((varKey) => (
-                        <TableHead 
-                          key={varKey} 
+                        <TableHead
+                          key={varKey}
                           className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                           onClick={() => handleSort(`var:${varKey}`)}
                         >
@@ -1107,7 +1082,7 @@ const DebtorsList = () => {
                         </TableHead>
                       ))}
                       <TableHead className="text-xs">Status</TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("picked_up_count")}
                       >
@@ -1116,7 +1091,7 @@ const DebtorsList = () => {
                           {getSortIcon("picked_up_count")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("not_picked_up_count")}
                       >
@@ -1125,7 +1100,7 @@ const DebtorsList = () => {
                           {getSortIcon("not_picked_up_count")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("accept_count")}
                       >
@@ -1134,7 +1109,7 @@ const DebtorsList = () => {
                           {getSortIcon("accept_count")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("reject_count")}
                       >
@@ -1143,7 +1118,7 @@ const DebtorsList = () => {
                           {getSortIcon("reject_count")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("other_count")}
                       >
@@ -1152,7 +1127,7 @@ const DebtorsList = () => {
                           {getSortIcon("other_count")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("contact_attempts")}
                       >
@@ -1161,7 +1136,7 @@ const DebtorsList = () => {
                           {getSortIcon("contact_attempts")}
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("last_contact_at")}
                       >
@@ -1178,10 +1153,10 @@ const DebtorsList = () => {
                       const phoneStats = callStats?.[debtor.phone_number];
                       const isAdding = addingToCallList === debtor.id;
                       const isSelected = selectedDebtors.has(debtor.id);
-                      
+
                       return (
-                        <TableRow 
-                          key={debtor.id} 
+                        <TableRow
+                          key={debtor.id}
                           className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`}
                         >
                           <TableCell>
@@ -1201,17 +1176,17 @@ const DebtorsList = () => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
                             const isNumeric = value && !isNaN(Number(String(value).replace(/,/g, '')));
-                            let displayValue = value 
-                              ? (isNumeric 
-                                  ? Number(String(value).replace(/,/g, '')).toLocaleString('th-TH')
-                                  : String(value))
+                            let displayValue = value
+                              ? (isNumeric
+                                ? Number(String(value).replace(/,/g, '')).toLocaleString('th-TH')
+                                : String(value))
                               : "-";
-                            
+
                             // Mask license plate fields
                             if (value && isLicensePlateField(varKey)) {
                               displayValue = maskLicensePlate(String(value));
                             }
-                            
+
                             return (
                               <TableCell key={varKey} className="text-sm">
                                 {displayValue}
@@ -1267,11 +1242,11 @@ const DebtorsList = () => {
                               <Clock className="w-3 h-3" />
                               {debtor.last_contact_at
                                 ? new Date(debtor.last_contact_at).toLocaleDateString("th-TH", {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
+                                  day: "numeric",
+                                  month: "short",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
                                 : "-"}
                             </div>
                           </TableCell>

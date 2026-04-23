@@ -39,7 +39,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         const { data, error } = await supabase.auth.getSession();
         if (error) console.warn("getSession error", error);
         if (!cancelled) {
-          setUserId(data.session?.user?.id ?? null);
+          const id = data.session?.user?.id ?? null;
+          setUserId(id);
           setAuthReady(true);
         }
       } catch (e) {
@@ -62,8 +63,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (cancelled) return;
-      setUserId(session?.user?.id ?? null);
+      const newUserId = session?.user?.id ?? null;
+      setUserId(newUserId);
       setAuthReady(true);
     });
 

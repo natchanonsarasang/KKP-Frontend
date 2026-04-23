@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList } from "lucide-react";
+import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList, Coins } from "lucide-react";
 import DebtorsList from "@/components/DebtorsList";
 import CallReportDashboard from "@/components/reports/CallReportDashboard";
 import TemplateSetup from "@/components/TemplateSetup";
@@ -44,8 +44,8 @@ const DashboardNavLink = ({ active, onClick, icon: Icon, children }: DashboardNa
     onClick={onClick}
     className={cn(
       "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-      active 
-        ? "bg-primary/10 text-primary" 
+      active
+        ? "bg-primary/10 text-primary"
         : "text-muted-foreground hover:text-foreground hover:bg-muted"
     )}
   >
@@ -54,6 +54,63 @@ const DashboardNavLink = ({ active, onClick, icon: Icon, children }: DashboardNa
   </button>
 );
 
+const StepIndicator = ({ activeTab, onTabClick }: { activeTab: TabType, onTabClick: (tab: TabType) => void }) => {
+  const steps: { id: TabType, label: string, icon: LucideIcon }[] = [
+    { id: "debtors", label: "Select Debtors", icon: Users },
+    { id: "call-list", label: "Start Calling", icon: Phone },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+  ];
+
+  return (
+    <div className="flex items-center justify-center w-full max-w-4xl mx-auto mb-8">
+      {steps.map((step, index) => {
+        const isActive = activeTab === step.id;
+        const isCompleted = steps.findIndex(s => s.id === activeTab) > index;
+
+        return (
+          <div key={step.id} className="flex items-center flex-1 last:flex-none">
+            <button
+              onClick={() => onTabClick(step.id)}
+              className="flex flex-col items-center gap-2 group relative transition-all"
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all",
+                isActive
+                  ? "bg-primary/10 border-primary text-primary shadow-sm"
+                  : isCompleted
+                    ? "bg-primary border-primary text-white"
+                    : "bg-background border-muted text-muted-foreground group-hover:border-muted-foreground"
+              )}>
+                <step.icon className="w-5 h-5" />
+                {isCompleted && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                  </div>
+                )}
+              </div>
+              <span className={cn(
+                "text-xs font-medium whitespace-nowrap",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}>
+                {step.label}
+              </span>
+            </button>
+
+            {index < steps.length - 1 && (
+              <div className="flex-1 h-[2px] mx-4 mb-6 bg-muted">
+                <div className={cn(
+                  "h-full transition-all duration-500",
+                  isCompleted ? "w-full bg-primary" : "w-0"
+                )} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -61,10 +118,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("debtors");
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  
+
   // Get admin context
   const { isAdmin, selectedUserId, setSelectedUserId, allUsers, isLoadingUsers, effectiveUserId } = useAdmin();
-  
+
   // Get workspace context
   const { currentWorkspace, workspaces, isLoading: workspacesLoading, createWorkspace } = useWorkspace();
 
@@ -87,6 +144,7 @@ const Dashboard = () => {
 
     const finish = (nextSession: Session | null) => {
       if (cancelled) return;
+
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
@@ -133,12 +191,6 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const navItems = [
-    { id: "debtors" as TabType, label: "Debtors", icon: Users },
-    { id: "call-list" as TabType, label: "Call List", icon: ListChecks },
-    { id: "analytics" as TabType, label: "Analytics", icon: BarChart3 },
-    // { id: "reports" as TabType, label: "Reports", icon: ClipboardList },
-  ];
 
   if (loading) {
     return (
@@ -175,33 +227,20 @@ const Dashboard = () => {
               <span className="text-lg font-semibold tracking-tight">Callecto</span>
             </Link>
 
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => (
-                <DashboardNavLink
-                  key={item.id}
-                  active={activeTab === item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  icon={item.icon}
-                >
-                  {item.label}
-                </DashboardNavLink>
-              ))}
-              
-              {/* Admin Link */}
-              {isAdmin && (
-                <Link
-                  to="/admin"
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-yellow-600 hover:bg-yellow-500/10 transition-colors"
-                >
-                  <Shield className="w-4 h-4" />
-                  Admin
-                </Link>
-              )}
-            </nav>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Token Balance Mockup */}
+            <div className="hidden sm:flex items-center gap-2 px-3 h-10 rounded-lg border border-orange-200 bg-orange-50/50 text-orange-700">
+              <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center">
+                <Coins className="w-3 h-3 text-orange-600" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold leading-none">100</span>
+                <span className="text-[10px] font-medium uppercase tracking-tight text-orange-600/80 leading-none">Call Tokens</span>
+              </div>
+            </div>
+
             {/* Workspace Selector */}
             <WorkspaceSelector />
             {/* Admin User Selector */}
@@ -270,28 +309,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        <nav className="flex md:hidden items-center gap-1 px-4 pb-3 overflow-x-auto">
-          {navItems.map((item) => (
-            <DashboardNavLink
-              key={item.id}
-              active={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
-              icon={item.icon}
-            >
-              {item.label}
-            </DashboardNavLink>
-          ))}
-          {isAdmin && (
-            <Link
-              to="/admin"
-              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-yellow-600 hover:bg-yellow-500/10 transition-colors whitespace-nowrap"
-            >
-              <Shield className="w-4 h-4" />
-              Admin
-            </Link>
-          )}
-        </nav>
       </header>
 
       {/* Admin Impersonation Banner */}
@@ -315,11 +332,13 @@ const Dashboard = () => {
       )}
 
       <main className="p-6">
-        {activeTab === "debtors" && <DebtorsList />}
+        <StepIndicator activeTab={activeTab} onTabClick={(tab) => setActiveTab(tab)} />
+
+        {activeTab === "debtors" && (
+          <DebtorsList onNextStep={() => setActiveTab("call-list")} />
+        )}
         {activeTab === "call-list" && <CallList />}
-        
         {activeTab === "analytics" && <CallDashboard />}
-        {/* {activeTab === "reports" && <CallReportDashboard />} */}
       </main>
     </div>
   );

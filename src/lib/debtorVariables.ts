@@ -55,3 +55,25 @@ export function parseDueDateForColumn(
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().slice(0, 10);
 }
+
+/** Split ISO date (YYYY-MM-DD) into Thai day, month name, and Buddhist year. */
+export function splitThaiDate(isoDate: string | null | undefined): {
+  day: string;
+  month: string;
+  year: string;
+} {
+  if (!isoDate) return { day: "", month: "", year: "" };
+  
+  const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return { day: "", month: "", year: "" };
+
+  const day = d.getDate().toString();
+  const monthNames = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  const month = monthNames[d.getMonth()];
+  const year = (d.getFullYear() + 543).toString();
+
+  return { day, month, year };
+}

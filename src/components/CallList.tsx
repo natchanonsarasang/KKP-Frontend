@@ -184,7 +184,7 @@ const CallList = () => {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null; audioUrl: string | null } | null>(null);
-  
+
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -264,7 +264,7 @@ const CallList = () => {
   // Helper to parse notes field (could be JSON with audio_url/conversation_log or legacy plain URL)
   const parseNotesData = useCallback((notes: string | null): { audioUrl: string | null; conversationLog: string | null } => {
     if (!notes) return { audioUrl: null, conversationLog: null };
-    
+
     // Try to parse as JSON first (new format)
     try {
       const parsed = JSON.parse(notes);
@@ -291,22 +291,22 @@ const CallList = () => {
   // Check if currently within business hours and days
   const isWithinBusinessHours = useCallback(() => {
     if (!settings.businessHoursOnly) return true;
-    
+
     const now = new Date();
     const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
-    
+
     // Check if today is a business day
     if (!settings.businessDays.includes(currentDay)) return false;
-    
+
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const currentTime = hours * 60 + minutes;
-    
+
     const [startHour, startMin] = settings.businessHoursStart.split(":").map(Number);
     const [endHour, endMin] = settings.businessHoursEnd.split(":").map(Number);
     const startTime = startHour * 60 + startMin;
     const endTime = endHour * 60 + endMin;
-    
+
     return currentTime >= startTime && currentTime <= endTime;
   }, [settings]);
 
@@ -380,12 +380,12 @@ const CallList = () => {
         ...item,
         debtor: debtorMap.get(item.debtor_id),
       })) as CallListItem[];
-      
+
       // Log a sample to debug
       if (result.length > 0) {
         console.log("Sample call list item with debtor:", JSON.stringify(result[0], null, 2));
       }
-      
+
       return result;
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
@@ -445,23 +445,23 @@ const CallList = () => {
 
       if (error) throw error;
 
-      const stats: Record<string, { 
+      const stats: Record<string, {
         picked_up: number;
         not_picked_up: number;
         confirmed: number;
         declined: number;
       }> = {};
-      
+
       data.forEach((record) => {
         if (!stats[record.phone_number]) {
-          stats[record.phone_number] = { 
+          stats[record.phone_number] = {
             picked_up: 0,
             not_picked_up: 0,
             confirmed: 0,
             declined: 0,
           };
         }
-        
+
         if (record.status === "confirmed") {
           stats[record.phone_number].confirmed++;
           stats[record.phone_number].picked_up++;
@@ -847,7 +847,7 @@ const CallList = () => {
   const clearAllMutation = useMutation({
     mutationFn: async () => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-      
+
       const { error } = await supabase
         .from("call_list_items")
         .delete()
@@ -866,7 +866,7 @@ const CallList = () => {
   // Queue failed calls for retry - create NEW items so failed records stay visible
   const retryFailedMutation = useMutation({
     mutationFn: async () => {
-      const failedItems = callListItems?.filter(item => 
+      const failedItems = callListItems?.filter(item =>
         ["failed", "no_answer", "no_response"].includes(item.status)
       ) || [];
 
@@ -917,22 +917,22 @@ const CallList = () => {
       // Filter debtors based on conditions
       let filteredDebtors = (allActiveDebtors || []).filter(d => {
         if (queuedDebtorIds.has(d.id)) return false;
-        
+
         // Get debt from variables.Debt (with capital D) or fall back to total_debt
         const vars = d.variables || {};
         const debtValue = parseFloat(vars.Debt || vars.debt || "0") || (d.total_debt ?? 0);
-        
+
         // Apply debt filters
         if (conditions.minDebt !== undefined && debtValue < conditions.minDebt) return false;
         if (conditions.maxDebt !== undefined && debtValue > conditions.maxDebt) return false;
-        
+
         // Get counts from call_records stats (same as DebtorsList UI displays)
         const debtorStats = phoneStats?.[d.phone_number];
         const pickedUp = debtorStats?.picked_up ?? 0;
         const notPickedUp = debtorStats?.not_picked_up ?? 0;
         const accepted = debtorStats?.confirmed ?? 0;
         const rejected = debtorStats?.declined ?? 0;
-        
+
         if (conditions.minPickedUp !== undefined && pickedUp < conditions.minPickedUp) return false;
         if (conditions.maxPickedUp !== undefined && pickedUp > conditions.maxPickedUp) return false;
         if (conditions.minNotPickedUp !== undefined && notPickedUp < conditions.minNotPickedUp) return false;
@@ -942,7 +942,7 @@ const CallList = () => {
         if (conditions.minRejected !== undefined && rejected < conditions.minRejected) return false;
         if (conditions.maxRejected !== undefined && rejected > conditions.maxRejected) return false;
         if (conditions.status && d.status !== conditions.status) return false;
-        
+
         return true;
       });
 
@@ -1010,7 +1010,7 @@ const CallList = () => {
   const handleCalculateFilterCount = async (conditions: FilterConditions) => {
     setIsFilterLoading(true);
     setPendingFilterConditions(conditions);
-    
+
     try {
       // Get debtors not already in pending queue
       const queuedDebtorIds = new Set(
@@ -1022,21 +1022,21 @@ const CallList = () => {
       // Filter debtors based on conditions
       const filteredDebtors = (allActiveDebtors || []).filter(d => {
         if (queuedDebtorIds.has(d.id)) return false;
-        
+
         // Get debt from variables.Debt (with capital D) or fall back to total_debt
         const vars = d.variables || {};
         const debtValue = parseFloat(vars.Debt || vars.debt || "0") || (d.total_debt ?? 0);
-        
+
         if (conditions.minDebt !== undefined && debtValue < conditions.minDebt) return false;
         if (conditions.maxDebt !== undefined && debtValue > conditions.maxDebt) return false;
-        
+
         // Get counts from call_records stats (same as DebtorsList UI displays)
         const debtorStats = phoneStats?.[d.phone_number];
         const pickedUp = debtorStats?.picked_up ?? 0;
         const notPickedUp = debtorStats?.not_picked_up ?? 0;
         const accepted = debtorStats?.confirmed ?? 0;
         const rejected = debtorStats?.declined ?? 0;
-        
+
         if (conditions.minPickedUp !== undefined && pickedUp < conditions.minPickedUp) return false;
         if (conditions.maxPickedUp !== undefined && pickedUp > conditions.maxPickedUp) return false;
         if (conditions.minNotPickedUp !== undefined && notPickedUp < conditions.minNotPickedUp) return false;
@@ -1046,7 +1046,7 @@ const CallList = () => {
         if (conditions.minRejected !== undefined && rejected < conditions.minRejected) return false;
         if (conditions.maxRejected !== undefined && rejected > conditions.maxRejected) return false;
         if (conditions.status && d.status !== conditions.status) return false;
-        
+
         return true;
       });
 
@@ -1070,20 +1070,20 @@ const CallList = () => {
   // Convert number to Thai text
   const numberToThaiText = (num: number): string => {
     if (num === 0) return "ศูนย์";
-    
+
     const ones = ["", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
     const positions = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
-    
+
     let result = "";
     let position = 0;
     let tempNum = Math.floor(num);
-    
+
     while (tempNum > 0) {
       const digit = tempNum % 10;
-      
+
       if (digit !== 0) {
         let digitText = ones[digit];
-        
+
         if (position === 1 && digit === 2) {
           digitText = "ยี่";
         } else if (position === 1 && digit === 1) {
@@ -1091,14 +1091,14 @@ const CallList = () => {
         } else if (position === 0 && digit === 1 && tempNum > 10) {
           digitText = "เอ็ด";
         }
-        
+
         result = digitText + positions[position] + result;
       }
-      
+
       tempNum = Math.floor(tempNum / 10);
       position++;
     }
-    
+
     return result;
   };
 
@@ -1112,31 +1112,31 @@ const CallList = () => {
 
     const debtor = item.debtor;
     const debtorVars = debtor.variables || {};
-    
+
     // Construct the full message by replacing placeholders with debtor variables
     let constructedMessage = selectedTemplate.message;
-    
+
     // Replace all {placeholder} with actual values from debtor variables
     Object.entries(debtorVars).forEach(([key, value]) => {
       const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
       let processedValue = String(value);
-      
+
       // Convert license plate fields to Thai phonetic reading
       if (shouldUsePhonetic(key)) {
         processedValue = toThaiPhonetic(processedValue);
       }
-      
+
       constructedMessage = constructedMessage.replace(placeholder, processedValue);
     });
-    
+
     // Also replace standard placeholders
-    const debtAmount = debtor.total_debt 
+    const debtAmount = debtor.total_debt
       ? numberToThaiText(debtor.total_debt) + "บาท"
       : "-";
     const formattedDueDate = debtor.due_date
       ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
       : "-";
-    
+
     constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
     constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
     constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
@@ -1265,7 +1265,7 @@ const CallList = () => {
             // Update call list item with final status
             await supabase
               .from("call_list_items")
-              .update({ 
+              .update({
                 status: updatedRecord.status,
                 call_outcome: updatedRecord.status,
                 picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
@@ -1305,10 +1305,10 @@ const CallList = () => {
       return;
     }
 
-    const pendingItems = callListItems?.filter(item => 
+    const pendingItems = callListItems?.filter(item =>
       (item.status === "pending" || item.status === "retry_pending") && item.debtor
     ) || [];
-    
+
     if (pendingItems.length === 0) {
       toast.error("No pending calls in the list");
       return;
@@ -1425,7 +1425,7 @@ const CallList = () => {
   const getStatusBadge = (status: string) => {
     const config = statusConfig[status] || statusConfig.pending;
     const Icon = config.icon;
-    
+
     return (
       <Badge variant="secondary" className={`${config.color} gap-1 font-normal`}>
         <Icon className="w-3 h-3" />
@@ -1436,10 +1436,10 @@ const CallList = () => {
 
   const pendingCount = callListItems?.filter(item => item.status === "pending" || item.status === "retry_pending").length || 0;
   const callingCount = callListItems?.filter(item => item.status === "calling").length || 0;
-  const processedCount = callListItems?.filter(item => 
+  const processedCount = callListItems?.filter(item =>
     ["completed", "success", "confirmed", "declined", "no_answer", "failed", "no_response"].includes(item.status)
   ).length || 0;
-  const failedCount = callListItems?.filter(item => 
+  const failedCount = callListItems?.filter(item =>
     ["failed", "no_answer", "no_response"].includes(item.status)
   ).length || 0;
 
@@ -1472,8 +1472,8 @@ const CallList = () => {
     if (sortField !== field) {
       return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc" 
-      ? <ArrowUp className="w-3 h-3 ml-1" /> 
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1" />
       : <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
@@ -1510,23 +1510,23 @@ const CallList = () => {
     }
 
     if (aVal === null || bVal === null) return 0;
-    
+
     if (typeof aVal === "string" && typeof bVal === "string") {
-      return sortDirection === "asc" 
-        ? aVal.localeCompare(bVal) 
+      return sortDirection === "asc"
+        ? aVal.localeCompare(bVal)
         : bVal.localeCompare(aVal);
     }
-    
+
     if (typeof aVal === "number" && typeof bVal === "number") {
       return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
     }
-    
+
     return 0;
   });
 
   // Export completed calls to Excel
   const handleExportCompletedCalls = useCallback(() => {
-    const completedItems = (callListItems || []).filter(item => 
+    const completedItems = (callListItems || []).filter(item =>
       ["confirmed", "declined", "completed", "failed", "no_answer", "busy", "cancelled", "invalid_number", "timeout"].includes(item.status)
     );
 
@@ -1564,7 +1564,7 @@ const CallList = () => {
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Completed Calls");
-    
+
     // Auto-size columns
     const colWidths = Object.keys(exportData[0] || {}).map(key => ({
       wch: Math.max(key.length, 15)
@@ -1584,7 +1584,7 @@ const CallList = () => {
       .map(item => item.debtor_id)
   );
   const queueAllCount = (allActiveDebtors || []).filter(d => !queuedDebtorIds.has(d.id)).length;
-  
+
   // Count uncalled debtors (those with 0 calls)
   const uncalledCount = (allActiveDebtors || []).filter(d => {
     if (queuedDebtorIds.has(d.id)) return false;
@@ -1594,7 +1594,7 @@ const CallList = () => {
   }).length;
 
   const toggleDebtorSelection = (id: string) => {
-    setSelectedDebtors(prev => 
+    setSelectedDebtors(prev =>
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
     );
   };
@@ -1723,9 +1723,9 @@ const CallList = () => {
           <Card className="border-warning/20">
             <CardContent className="p-3">
               <div className="text-xl font-semibold text-warning">
-                {callListItems?.filter(item => 
-                  item.picked_up === true && 
-                  item.status !== "confirmed" && 
+                {callListItems?.filter(item =>
+                  item.picked_up === true &&
+                  item.status !== "confirmed" &&
                   item.status !== "declined" &&
                   item.call_outcome !== "Confirmed" &&
                   item.call_outcome !== "Declined"
@@ -1778,9 +1778,9 @@ const CallList = () => {
                 )}
                 <div>
                   <p className="font-medium flex items-center gap-2">
-                    {activeSession.status === "running" ? "Calls in Progress" : 
-                     activeSession.status === "stopping" ? "Stopping..." : 
-                     "Paused"}
+                    {activeSession.status === "running" ? "Calls in Progress" :
+                      activeSession.status === "stopping" ? "Stopping..." :
+                        "Paused"}
                     {settings.testMode && (
                       <Badge variant="outline" className="bg-warning/20 text-warning border-warning text-xs">
                         🧪 TEST MODE
@@ -1819,7 +1819,7 @@ const CallList = () => {
                 )}
               </div>
             </div>
-            
+
             {/* Progress Bar */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -1829,17 +1829,17 @@ const CallList = () => {
                 </span>
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary transition-all duration-500"
-                  style={{ 
-                    width: `${activeSession.total_calls > 0 
-                      ? ((activeSession.completed_calls + activeSession.failed_calls) / activeSession.total_calls) * 100 
-                      : 0}%` 
+                  style={{
+                    width: `${activeSession.total_calls > 0
+                      ? ((activeSession.completed_calls + activeSession.failed_calls) / activeSession.total_calls) * 100
+                      : 0}%`
                   }}
                 />
               </div>
             </div>
-            
+
             {/* Stats */}
             <div className="flex flex-wrap gap-4 text-sm">
               {activeSession.status === "running" && callingCount > 0 && (
@@ -1884,8 +1884,8 @@ const CallList = () => {
           <div className="flex flex-wrap items-center gap-3">
             {!activeSession ? (
               <>
-                <Button 
-                  onClick={startCalling} 
+                <Button
+                  onClick={startCalling}
                   disabled={pendingCount === 0 || (settings.businessHoursOnly && !isWithinBusinessHours())}
                   className={settings.testMode ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}
                 >
@@ -1950,8 +1950,8 @@ const CallList = () => {
             ) : null}
 
             {pendingCount > 0 && !activeSession && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => clearPendingMutation.mutate()}
                 disabled={clearPendingMutation.isPending}
               >
@@ -1961,8 +1961,8 @@ const CallList = () => {
             )}
 
             {processedCount > 0 && !activeSession && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => clearCompletedMutation.mutate()}
                 disabled={clearCompletedMutation.isPending}
               >
@@ -1972,8 +1972,8 @@ const CallList = () => {
             )}
 
             {callListItems && callListItems.length > 0 && !activeSession && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={() => clearAllMutation.mutate()}
                 disabled={clearAllMutation.isPending}
               >
@@ -2009,21 +2009,19 @@ const CallList = () => {
               <div className="flex gap-1 bg-muted p-1 rounded-lg">
                 <button
                   onClick={() => setActiveTab("pending")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === "pending" 
-                      ? "bg-background text-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "pending"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   Pending ({pendingCount})
                 </button>
                 <button
                   onClick={() => setActiveTab("calling")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === "calling" 
-                      ? "bg-primary text-primary-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "calling"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5">
                     {callingCount > 0 && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -2032,11 +2030,10 @@ const CallList = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab("completed")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === "completed" 
-                      ? "bg-background text-foreground shadow-sm" 
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "completed"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   Completed ({processedCount})
                 </button>
@@ -2055,7 +2052,7 @@ const CallList = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs w-12">#</TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("phone")}
                     >
@@ -2064,7 +2061,7 @@ const CallList = () => {
                         {getSortIcon("phone")}
                       </span>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("status")}
                     >
@@ -2073,7 +2070,7 @@ const CallList = () => {
                         {getSortIcon("status")}
                       </span>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("picked_up")}
                     >
@@ -2082,7 +2079,7 @@ const CallList = () => {
                         {getSortIcon("picked_up")}
                       </span>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("call_outcome")}
                     >
@@ -2091,7 +2088,7 @@ const CallList = () => {
                         {getSortIcon("call_outcome")}
                       </span>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("called_at")}
                     >
@@ -2100,7 +2097,7 @@ const CallList = () => {
                         {getSortIcon("called_at")}
                       </span>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("created_at")}
                     >
@@ -2116,14 +2113,14 @@ const CallList = () => {
                   {filteredCallListItems.map((item, index) => {
                     const debtor = item.debtor;
                     const isCurrentlyCalling = item.status === "calling";
-                    
+
                     // Determine picked up display
                     const getPickedUpDisplay = () => {
                       if (item.picked_up === true) return <Badge variant="outline" className="bg-success/10 text-success border-success/20">Yes</Badge>;
                       if (item.picked_up === false) return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">No</Badge>;
                       return <span className="text-muted-foreground">-</span>;
                     };
-                    
+
                     // Determine outcome display
                     const getOutcomeDisplay = () => {
                       if (!item.call_outcome) return <span className="text-muted-foreground">-</span>;
@@ -2136,7 +2133,7 @@ const CallList = () => {
                       }
                       return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">{item.call_outcome}</Badge>;
                     };
-                    
+
                     return (
                       <TableRow key={item.id} className={isCurrentlyCalling ? "bg-primary/5 animate-pulse" : ""}>
                         <TableCell className="text-sm text-muted-foreground font-mono">
@@ -2154,11 +2151,11 @@ const CallList = () => {
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                             : "-"
                           }
                         </TableCell>
@@ -2251,7 +2248,7 @@ const CallList = () => {
               Select debtors to add to the call queue
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
             {/* Template Selection */}
             <div className="space-y-1.5">
@@ -2291,7 +2288,7 @@ const CallList = () => {
                   {selectedDebtors.length === availableDebtors?.length ? "Deselect All" : "Select All"}
                 </Button>
               </div>
-              
+
               {availableDebtors && availableDebtors.length > 0 ? (
                 <div className="flex-1 overflow-auto border rounded-md">
                   <Table>
@@ -2306,13 +2303,13 @@ const CallList = () => {
                     </TableHeader>
                     <TableBody>
                       {availableDebtors.map((debtor) => (
-                        <TableRow 
+                        <TableRow
                           key={debtor.id}
                           className="cursor-pointer"
                           onClick={() => toggleDebtorSelection(debtor.id)}
                         >
                           <TableCell>
-                            <Checkbox 
+                            <Checkbox
                               checked={selectedDebtors.includes(debtor.id)}
                               onCheckedChange={() => toggleDebtorSelection(debtor.id)}
                             />
@@ -2320,7 +2317,7 @@ const CallList = () => {
                           <TableCell className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</TableCell>
                           <TableCell className="text-sm">{debtor.name || "-"}</TableCell>
                           <TableCell className="text-sm">
-                            {debtor.total_debt 
+                            {debtor.total_debt
                               ? new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", minimumFractionDigits: 0 }).format(debtor.total_debt)
                               : "-"
                             }
@@ -2378,7 +2375,7 @@ const CallList = () => {
               Configure retry logic, limits, and business hours
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4">
             {/* Test Mode Toggle */}
             <div className="rounded-lg border-2 border-dashed border-warning/50 bg-warning/5 p-4 space-y-2">
@@ -2511,18 +2508,17 @@ const CallList = () => {
                                 : [...s.businessDays, index].sort()
                             }));
                           }}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                            settings.businessDays.includes(index)
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-                          }`}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${settings.businessDays.includes(index)
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                            }`}
                         >
                           {day}
                         </button>
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Time Selection */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -2596,11 +2592,11 @@ const CallList = () => {
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Botnoi:</h4>
                 <pre className="text-xs bg-background border rounded p-3 overflow-x-auto">
-{JSON.stringify({
-  "Tel. Number": previewPayload.phone,
-  "template_id": previewPayload.templateId,
-  "Appointment Date": previewPayload.message
-}, null, 2)}
+                  {JSON.stringify({
+                    "Tel. Number": previewPayload.phone,
+                    "template_id": previewPayload.templateId,
+                    "Appointment Date": previewPayload.message
+                  }, null, 2)}
                 </pre>
               </div>
 
@@ -2677,22 +2673,21 @@ const CallList = () => {
                       return lines.map((line, idx) => {
                         const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(Bot|User):\s*(.*)$/i);
                         if (!match) return null;
-                        
+
                         const [, timestamp, role, message] = match;
                         const isBot = role.toLowerCase() === 'bot';
                         const time = timestamp.split(' ')[1]; // Just HH:MM:SS
-                        
+
                         return (
-                          <div 
-                            key={idx} 
+                          <div
+                            key={idx}
                             className={`flex ${isBot ? 'justify-start' : 'justify-end'}`}
                           >
-                            <div 
-                              className={`max-w-[85%] rounded-2xl px-4 py-2 ${
-                                isBot 
-                                  ? 'bg-muted text-foreground rounded-bl-sm' 
-                                  : 'bg-primary text-primary-foreground rounded-br-sm'
-                              }`}
+                            <div
+                              className={`max-w-[85%] rounded-2xl px-4 py-2 ${isBot
+                                ? 'bg-muted text-foreground rounded-bl-sm'
+                                : 'bg-primary text-primary-foreground rounded-br-sm'
+                                }`}
                             >
                               <p className="text-sm">{message}</p>
                               <p className={`text-[10px] mt-1 ${isBot ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
