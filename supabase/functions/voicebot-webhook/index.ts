@@ -253,7 +253,8 @@ serve(async (req) => {
           if (byDebtor) recentItem = byDebtor;
         }
 
-        const finalStatus = pickedUp ? "success" : mappedStatus;
+        let finalStatus = pickedUp ? "success" : mappedStatus;
+        let retryStatus = finalStatus;
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
