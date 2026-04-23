@@ -50,21 +50,28 @@ serve(async (req) => {
     const userParts = conversationLog ? conversationLog.split("User:") : [];
     const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
 
-    // Map action/status to our internal status
-    let mappedStatus = "pending";
+    // Map Botnoi status to our internal status
+    const rawStatus = (status || "").toLowerCase();
+
     if (["Confirm", "confirm", "yes", "Yes"].includes(action)) {
       mappedStatus = "confirmed";
     } else if (["Decline", "decline", "no", "No"].includes(action)) {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    } else if (status === "failed" || status === "error") {
-      mappedStatus = "failed";
-    } else if (status === "no_answer" || status === "busy" || status === "unreachable") {
-      mappedStatus = "no_answer";
-    } else if (status === "completed") {
+    } else if (rawStatus === "completed") {
       // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
+    } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
+      mappedStatus = "no_answer";
+    } else if (rawStatus === "busy") {
+      mappedStatus = "busy";
+    } else if (rawStatus === "failed" || rawStatus === "error") {
+      mappedStatus = "failed";
+    } else if (rawStatus === "rejected") {
+      mappedStatus = "rejected";
+    } else if (rawStatus === "voicemail") {
+      mappedStatus = "voicemail";
     }
 
     const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
@@ -77,6 +84,9 @@ serve(async (req) => {
       no_answer: "No Answer",
       completed: "Completed",
       failed: "Failed",
+      busy: "Busy",
+      rejected: "Rejected",
+      voicemail: "Voicemail",
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
@@ -256,8 +266,8 @@ serve(async (req) => {
 
           // Determine if we should schedule a retry
           const MAX_RETRIES = 3;
-          const RETRY_DELAY_MS = 20 * 1000; // 20 seconds
-          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
+          const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
+          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
 
           let retryStatus = finalStatus;
           let nextRetryAt: string | null = null;

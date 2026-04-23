@@ -514,6 +514,7 @@ const DebtorsList = () => {
         workspace_id: currentWorkspace.id,
         template_id: defaultTemplate?.id || null,
         status: "pending",
+        phone_number: debtor.phone_number,
       }));
 
       const { error } = await supabase.from("call_list_items").insert(items);

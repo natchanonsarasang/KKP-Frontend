@@ -23,13 +23,23 @@ serve(async (req) => {
 
     // Function to categorize conversation using AI
     const categorizeConversation = async (log: string, status: string): Promise<{ category: string, callback_time?: string }> => {
-      // 1. Check system-level statuses first
-      if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
+      const rawStatus = (status || "").toLowerCase();
+      
+      // 1. Check system-level statuses first to save tokens
+      if (rawStatus === 'no_answer' || rawStatus === 'busy' || rawStatus === 'unreachable' || rawStatus === 'no answer') {
         return { category: "ไม่รับสาย \u2192 โทรรอบ 2" };
       }
-
-      if (status === 'failed' || status === 'error') {
+      
+      if (rawStatus === 'failed' || rawStatus === 'error') {
         return { category: "โทรแล้วปิดเครื่อง" };
+      }
+
+      if (rawStatus === 'rejected') {
+        return { category: "ลูกค้ากดตัดสาย" };
+      }
+
+      if (rawStatus === 'voicemail') {
+        return { category: "ระบบฝากข้อความเสียง" };
       }
 
       // 2. If no log, and status is completed, it might be "ลูกค้าไม่พูด" or "เงียบ"
@@ -151,18 +161,27 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
       // Map Botnoi action to our status (action is the user's response)
       let mappedStatus = 'pending';
 
+      // Map Botnoi status to our system status
+      const rawStatus = (status || "").toLowerCase();
+      
       if (action === 'Confirm' || action === 'confirm' || action === 'yes' || action === 'Yes') {
         mappedStatus = 'confirmed';
       } else if (action === 'Decline' || action === 'decline' || action === 'no' || action === 'No') {
         mappedStatus = 'declined';
       } else if (action === 'Unknown' || action === 'unknown') {
         mappedStatus = 'no_response';
-      } else if (status === 'failed' || status === 'error') {
-        mappedStatus = 'failed';
-      } else if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
-        mappedStatus = 'no_answer';
-      } else if (status === 'completed') {
+      } else if (rawStatus === 'completed') {
         mappedStatus = 'completed';
+      } else if (rawStatus === 'no answer' || rawStatus === 'no_answer') {
+        mappedStatus = 'no_answer';
+      } else if (rawStatus === 'busy') {
+        mappedStatus = 'busy';
+      } else if (rawStatus === 'failed' || rawStatus === 'error') {
+        mappedStatus = 'failed';
+      } else if (rawStatus === 'rejected') {
+        mappedStatus = 'rejected'; // New status
+      } else if (rawStatus === 'voicemail') {
+        mappedStatus = 'voicemail'; // New status
       }
 
       console.log('Mapped status:', mappedStatus);
@@ -288,8 +307,8 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
 
             // Determine if we should schedule a retry
             const MAX_RETRIES = 2;
-            const RETRY_DELAY_MS = 20 * 1000; // 20 seconds
-            const isRetryable = !finalPickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
+            const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
+            const isRetryable = !finalPickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
 
             let retryStatus = finalStatus;
             let nextRetryAt = null;
@@ -465,11 +484,27 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
 
       // After processing, trigger next call if there's an active session
       // Find active session for this workspace
-      const { data: activeSessions } = await supabase
+      // We need to resolve the workspace_id first
+      let resolvedWorkspaceId = null;
+      if (recentItem) {
+        const { data: itemWithWorkspace } = await supabase
+          .from('call_list_items')
+          .select('workspace_id')
+          .eq('id', recentItem.id)
+          .maybeSingle();
+        resolvedWorkspaceId = itemWithWorkspace?.workspace_id;
+      }
+
+      const sessionQuery = supabase
         .from('call_sessions')
         .select('id, workspace_id, user_id, completed_calls, failed_calls, confirmed_calls')
-        .eq('status', 'running')
-        .limit(10);
+        .eq('status', 'running');
+      
+      if (resolvedWorkspaceId) {
+        sessionQuery.eq('workspace_id', resolvedWorkspaceId);
+      }
+
+      const { data: activeSessions } = await sessionQuery.limit(10);
 
       if (activeSessions && activeSessions.length > 0) {
         // Trigger process-call-session for each active session
