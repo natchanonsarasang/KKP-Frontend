@@ -467,13 +467,32 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
       // Find active session for this workspace
       const { data: activeSessions } = await supabase
         .from('call_sessions')
-        .select('id, workspace_id, user_id')
+        .select('id, workspace_id, user_id, completed_calls, failed_calls, confirmed_calls')
         .eq('status', 'running')
         .limit(10);
 
       if (activeSessions && activeSessions.length > 0) {
         // Trigger process-call-session for each active session
         for (const session of activeSessions) {
+          // Update session stats if this call reached a final state
+          const updates: Record<string, any> = {};
+          if (finalStatus === "success") {
+            updates.completed_calls = (session.completed_calls || 0) + 1;
+            if (mappedStatus === "confirmed") {
+              updates.confirmed_calls = (session.confirmed_calls || 0) + 1;
+            }
+          } else if (retryStatus === "final_failed") {
+            updates.failed_calls = (session.failed_calls || 0) + 1;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            console.log(`Updating session ${session.id} stats:`, updates);
+            await supabase
+              .from("call_sessions")
+              .update(updates)
+              .eq("id", session.id);
+          }
+
           console.log(`Triggering next call for session ${session.id}`);
 
           // Use EdgeRuntime.waitUntil if available for background processing
