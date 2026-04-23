@@ -1,0 +1,1 @@
+ALTER TABLE public.call_list_items ADD COLUMN phone_number text;
