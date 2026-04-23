@@ -22,12 +22,12 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // Function to categorize conversation using AI
-    const categorizeConversation = async (log: string, status: string): Promise<{category: string, callback_time?: string}> => {
+    const categorizeConversation = async (log: string, status: string): Promise<{ category: string, callback_time?: string }> => {
       // 1. Check system-level statuses first
       if (status === 'no_answer' || status === 'busy' || status === 'unreachable') {
         return { category: "ไม่รับสาย \u2192 โทรรอบ 2" };
       }
-      
+
       if (status === 'failed' || status === 'error') {
         return { category: "โทรแล้วปิดเครื่อง" };
       }
@@ -91,7 +91,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
 
         const result = await response.json();
         const aiData = JSON.parse(result.choices?.[0]?.message?.content || '{}');
-        
+
         const AICATEGORIES = [
           "ลูกค้าอยู่ที่เสียงดัง",
           "ลูกค้าอยู่ข้างทาง / ไม่สะดวก",
@@ -110,7 +110,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
         ];
 
         let finalCategory = aiData.category || "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)";
-        
+
         // Validation/Fuzzy match
         if (!AICATEGORIES.includes(finalCategory)) {
           for (const allowedCat of AICATEGORIES) {
@@ -150,7 +150,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
     if (callId || phoneNumber) {
       // Map Botnoi action to our status (action is the user's response)
       let mappedStatus = 'pending';
-      
+
       if (action === 'Confirm' || action === 'confirm' || action === 'yes' || action === 'Yes') {
         mappedStatus = 'confirmed';
       } else if (action === 'Decline' || action === 'decline' || action === 'no' || action === 'No') {
@@ -268,7 +268,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
             // Determine if customer picked up based on conversation_log content
             const userParts = conversationLog ? conversationLog.split("User:") : [];
             const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
-            
+
             // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
             if (status === 'completed' && !hasUserSpoken) {
               mappedStatus = 'no_answer';
@@ -277,7 +277,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
             // Update pickedUp based on user speaking
             const finalPickedUp = hasUserSpoken || ['confirmed', 'declined', 'no_response'].includes(mappedStatus);
             let finalStatus = finalPickedUp ? 'success' : mappedStatus;
-            
+
             // Fetch current retry_count for this item
             const { data: itemData } = await supabase
               .from('call_list_items')
@@ -288,7 +288,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
 
             // Determine if we should schedule a retry
             const MAX_RETRIES = 2;
-            const RETRY_DELAY_MS = 10 * 1000; // 10 seconds for faster retries
+            const RETRY_DELAY_MS = 20 * 1000; // 20 seconds
             const isRetryable = !finalPickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
 
             let retryStatus = finalStatus;
@@ -312,11 +312,11 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
               nextRetryAt = new Date(aiResult.callback_time).toISOString();
             }
 
-            const notesData = JSON.stringify({ 
-              audio_url: audioUrl, 
-              conversation_log: conversationLog 
+            const notesData = JSON.stringify({
+              audio_url: audioUrl,
+              conversation_log: conversationLog
             });
-            
+
             const { error: cliError } = await supabase
               .from('call_list_items')
               .update({
@@ -336,7 +336,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
               console.error('Error updating call_list_item:', cliError);
             } else {
               console.log('Call list item updated successfully:', recentItem.id);
-              
+
               // Deduct tokens based on call outcome
               // Get the user_id from the call_list_item to deduct tokens
               const { data: callItem } = await supabase
@@ -344,18 +344,18 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
                 .select('user_id')
                 .eq('id', recentItem.id)
                 .single();
-              
+
               if (callItem?.user_id) {
                 console.log(`Deducting ${tokensToDeduct} tokens for user ${callItem.user_id} (picked_up: ${pickedUp})`);
-                
+
                 const { data: deductResult, error: deductError } = await supabase
                   .rpc('deduct_tokens', { p_user_id: callItem.user_id, p_amount: tokensToDeduct });
-                
+
                 if (deductError) {
                   console.error('Error deducting tokens:', deductError);
                 } else {
                   console.log(`Token deduction result: ${deductResult}`);
-                  
+
                   // Update tokens_used in the active call session
                   const { data: activeSession } = await supabase
                     .from('call_sessions')
@@ -365,7 +365,7 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
                     .order('started_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
-                  
+
                   if (activeSession) {
                     const newTokensUsed = (activeSession.tokens_used || 0) + tokensToDeduct;
                     await supabase
@@ -475,22 +475,22 @@ Return JSON format: { "category": "category name", "callback_time": "YYYY-MM-DD 
         // Trigger process-call-session for each active session
         for (const session of activeSessions) {
           console.log(`Triggering next call for session ${session.id}`);
-          
+
           // Use EdgeRuntime.waitUntil if available for background processing
           const triggerNextCall = async () => {
             try {
               const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
               const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-              
+
               await fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${supabaseKey}`,
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   action: 'continue',
-                  session_id: session.id 
+                  session_id: session.id
                 }),
               });
             } catch (err) {
