@@ -81,10 +81,6 @@ serve(async (req) => {
           11. สายหลุดระหว่างสนทนา (Dropped Call) 
           12. ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request) 
 
-          For category 14, extract the requested callback time.
-          Current system time (Bangkok) is: ${currentTime}.
-          If the customer says "tomorrow", calculate based on this time.
-
           Return JSON format: {"category": "Category Name", "callback_time": "ISO_TIMESTAMP or null"}
         `;
 
@@ -285,7 +281,7 @@ serve(async (req) => {
                 }
 
                 // Trigger next call background
-                supabase.functions.invoke("process-call-session").catch(() => {});
+                supabase.functions.invoke("process-call-session").catch(() => { });
               }
             }
           }

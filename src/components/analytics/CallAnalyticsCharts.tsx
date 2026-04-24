@@ -433,50 +433,63 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
 };
 
 export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
-  const chartColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+  const chartColors = [
+    "#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4",
+    "#ec4899", "#f97316", "#14b8a6", "#3b82f6", "#a855f7", "#71717a"
+  ];
   const categoryData = useMemo(() => {
     // Thai categories as primary display labels
     const categories: Record<string, number> = {
-      "ลูกค้าอยู่ที่เสียงดัง": 0,
-      "ลูกค้าอยู่ข้างทาง / ไม่สะดวก": 0,
-      "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)": 0,
-      "ลูกค้าสนใจปรับโครงสร้างหนี้": 0,
-      "ลูกค้าขอคุยกับเจ้าหน้าที่": 0,
-      "ลูกค่ายอมจ่าย + บอกวันที่": 0,
-      "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่": 0,
-      "ไม่รับสาย → โทรรอบ 2": 0,
-      "ไม่อยากคุยกับ Bot": 0,
-      "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)": 0,
-      "ลูกค้าพูดภาษาถิ่น": 0,
-      "ลูกค้าไม่พูด": 0,
-      "โทรแล้วปิดเครื่อง": 0,
+      "ลูกค้าไม่สะดวกคุย (Not Convenient)": 0,
+      "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)": 0,
+      "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)": 0,
+      "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)": 0,
+      "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)": 0,
+      "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)": 0,
+      "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)": 0,
+      "เสียงแทรก/เสียงรบกวน (Background Noise)": 0,
+      "ลูกค้าพูดเรื่องอื่น (Out of Topic)": 0,
+      "ลูกค้าเงียบ (Silence)": 0,
+      "สายหลุดระหว่างสนทนา (Dropped Call)": 0,
+      "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)": 0,
     };
 
-    // Map English webhook categories to Thai
     const englishToThai: Record<string, string> = {
-      "Customer in noisy environment": "ลูกค้าอยู่ที่เสียงดัง",
-      "Customer not convenient to talk": "ลูกค้าอยู่ข้างทาง / ไม่สะดวก",
-      "Customer refused to pay": "ลูกค้าไม่ยอมจ่าย (เงียบ / พูดแทรก)",
-      "Customer interested in debt restructuring": "ลูกค้าสนใจปรับโครงสร้างหนี้",
-      "Customer requested human agent": "ลูกค้าขอคุยกับเจ้าหน้าที่",
-      "Customer promised to pay with date": "ลูกค่ายอมจ่าย + บอกวันที่",
-      "Customer promised to pay (no date)": "ลูกค่ายอมจ่าย แต่ไม่บอกวันที่",
-      "No answer – call back later": "ไม่รับสาย → โทรรอบ 2",
-      "Customer refused to talk to bot": "ไม่อยากคุยกับ Bot",
-      "Customer has hardship situation": "ลูกค้าพูดเรื่องอื่น (น้ำท่วม / เสียชีวิต)",
-      "Language barrier": "ลูกค้าพูดภาษาถิ่น",
-      "Customer silent": "ลูกค้าไม่พูด",
-      "Phone is turned off": "โทรแล้วปิดเครื่อง",
+      "Not Convenient": "ลูกค้าไม่สะดวกคุย (Not Convenient)",
+      "Already Paid": "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)",
+      "Normal Flow": "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)",
+      "Wrong Person": "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)",
+      "Transfer": "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
+      "Call Later": "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)",
+      "Barge-in": "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)",
+      "Background Noise": "เสียงแทรก/เสียงรบกวน (Background Noise)",
+      "Out of Topic": "ลูกค้าพูดเรื่องอื่น (Out of Topic)",
+      "Silence": "ลูกค้าเงียบ (Silence)",
+      "Dropped Call": "สายหลุดระหว่างสนทนา (Dropped Call)",
+      "Repeat Request": "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)",
     };
 
     callListItems.forEach((item) => {
       if (!item.ai_category) return;
-      // Map English to Thai if needed, keep Thai as-is
-      const mapped = englishToThai[item.ai_category] || item.ai_category;
-      if (categories[mapped] !== undefined) {
-        categories[mapped]++;
+      
+      const rawCategory = item.ai_category;
+      
+      // 1. Try direct mapping from English if AI returned only English
+      let mappedCategory = englishToThai[rawCategory] || null;
+
+      // 2. If not found, try to find match among our Thai(English) keys
+      if (!mappedCategory) {
+        mappedCategory = Object.keys(categories).find(cat => 
+          rawCategory === cat || 
+          rawCategory.includes(cat.split(" (")[0]) ||
+          (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0]))
+        ) || null;
+      }
+
+      if (mappedCategory) {
+        categories[mappedCategory]++;
       } else {
-        categories[mapped] = (categories[mapped] || 0) + 1;
+        categories["ลูกค้าพูดเรื่องอื่น (Out of Topic)"]++;
       }
     });
 
@@ -491,12 +504,12 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
         <CardTitle className="text-base font-semibold">AI Customer Insights (Categories)</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px]">
+        <div className="h-[500px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={categoryData}
               layout="vertical"
-              margin={{ top: 10, right: 30, left: 160, bottom: 0 }}
+              margin={{ top: 10, right: 30, left: 220, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} hide />
@@ -504,7 +517,7 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
                 type="category"
                 dataKey="name"
                 tick={{ fontSize: 11 }}
-                width={150}
+                width={210}
                 className="text-muted-foreground"
               />
               <Tooltip
