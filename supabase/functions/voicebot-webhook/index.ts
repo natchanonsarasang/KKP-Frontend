@@ -165,7 +165,7 @@ serve(async (req) => {
 
       if (record) {
         callRecordId = record.id;
-        await supabase
+        const { error: updateError } = await supabase
           .from("call_records")
           .update({
             status: mappedStatus,
@@ -178,7 +178,29 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", record.id);
-        console.log("Call record updated:", record.id);
+        
+        if (updateError) {
+          console.error(`Error updating call record ${record.id}:`, updateError);
+        } else {
+          console.log("Call record updated successfully:", record.id);
+        }
+
+        // --- ALSO update the call_list_items table to reflect in UI ---
+        const { error: cliError } = await supabase
+          .from("call_list_items")
+          .update({
+            status: finalStatus,
+            call_outcome: callOutcome,
+            picked_up: pickedUp,
+            notes: JSON.stringify({
+              audio_url: audioUrl,
+              conversation_log: conversationLog
+            })
+          })
+          .eq("call_record_id", record.id);
+        
+        if (cliError) console.error("Error updating call_list_items:", cliError);
+        else console.log("Call list item updated via record_id");
       }
     }
 
