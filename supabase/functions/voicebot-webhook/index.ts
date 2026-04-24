@@ -76,6 +76,7 @@ serve(async (req) => {
     }
 
     const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -253,12 +254,13 @@ serve(async (req) => {
           if (byDebtor) recentItem = byDebtor;
         }
 
-        let finalStatus = pickedUp ? "success" : mappedStatus;
-        let retryStatus = finalStatus;
+        // Retry logic disabled: failed/no_response calls are marked failed immediately.
+        // No pending_retry, no automatic re-call. Manual retry only via the UI.
+        finalStatus = pickedUp ? "success" : "failed";
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
-          // Fetch current retry_count for this item
+          // Fetch current retry_count for this item (used only for attempt numbering)
           const { data: itemData } = await supabase
             .from("call_list_items")
             .select("retry_count")
@@ -266,40 +268,20 @@ serve(async (req) => {
             .single();
           const currentRetryCount = itemData?.retry_count || 0;
 
-          // Determine if we should schedule a retry
-          const MAX_RETRIES = 0;
-          const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
-          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
-
-          retryStatus = finalStatus;
-          let nextRetryAt: string | null = null;
-          let newRetryCount = currentRetryCount;
-
-          if (isRetryable && currentRetryCount < MAX_RETRIES) {
-            retryStatus = "pending_retry";
-            newRetryCount = currentRetryCount + 1;
-            nextRetryAt = new Date(Date.now() + RETRY_DELAY_MS).toISOString();
-            console.log(`Scheduling retry ${newRetryCount}/${MAX_RETRIES} at ${nextRetryAt}`);
-          } else if (isRetryable && currentRetryCount >= MAX_RETRIES) {
-            retryStatus = "final_failed";
-            console.log(`Max retries (${MAX_RETRIES}) reached, marking as final_failed`);
-          }
-
           await supabase
             .from("call_list_items")
             .update({
-              status: retryStatus,
+              status: finalStatus,
               call_outcome: callOutcome,
               picked_up: pickedUp,
               notes: notesData,
               call_record_id: callRecordId,
               ai_category: aiCategory,
-              retry_count: newRetryCount,
-              next_retry_at: nextRetryAt,
+              next_retry_at: null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", recentItem.id);
-          console.log("Call list item updated:", recentItem.id, "status:", retryStatus);
+          console.log("Call list item updated:", recentItem.id, "status:", finalStatus);
 
           // Update existing call_attempt (created at initiation time) instead of inserting new
           const attemptNumber = currentRetryCount + 1;
@@ -420,7 +402,8 @@ serve(async (req) => {
       }
     }
 
-    // Trigger next call for active sessions
+    // Update active session stats only. Automatic next-call trigger is disabled.
+    // Calls must only be triggered manually from the UI.
     const { data: activeSessions } = await supabase
       .from("call_sessions")
       .select("*")
@@ -430,14 +413,13 @@ serve(async (req) => {
 
     if (activeSessions?.length) {
       for (const session of activeSessions) {
-        // Update session stats if this call reached a final state
         const updates: Record<string, any> = {};
         if (finalStatus === "success") {
           updates.completed_calls = (session.completed_calls || 0) + 1;
           if (mappedStatus === "confirmed") {
             updates.confirmed_calls = (session.confirmed_calls || 0) + 1;
           }
-        } else if (retryStatus === "final_failed") {
+        } else if (finalStatus === "failed") {
           updates.failed_calls = (session.failed_calls || 0) + 1;
         }
 
@@ -448,16 +430,6 @@ serve(async (req) => {
             .update(updates)
             .eq("id", session.id);
         }
-
-        console.log(`Triggering next call for session ${session.id}`);
-        fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({ action: "continue", session_id: session.id }),
-        }).catch((err: any) => console.error("Error triggering next call:", err));
       }
     }
 
