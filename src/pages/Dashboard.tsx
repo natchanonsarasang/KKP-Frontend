@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,23 @@ const Dashboard = () => {
   // Get workspace context
   const { currentWorkspace, workspaces, isLoading: workspacesLoading, createWorkspace } = useWorkspace();
 
+  // Fetch user tokens for the header
+  const { data: userTokens } = useQuery({
+    queryKey: ["call-tokens", effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) return null;
+      const { data, error } = await supabase
+        .from("call_tokens")
+        .select("tokens")
+        .eq("user_id", effectiveUserId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data?.tokens ?? 0;
+    },
+    enabled: !!effectiveUserId,
+  });
+
   // Show/hide create workspace dialog based on whether workspaces exist
   useEffect(() => {
     if (!workspacesLoading && session) {
@@ -230,13 +248,13 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Token Balance Mockup */}
+            {/* Token Balance */}
             <div className="hidden sm:flex items-center gap-2 px-3 h-10 rounded-lg border border-orange-200 bg-orange-50/50 text-orange-700">
               <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center">
                 <Coins className="w-3 h-3 text-orange-600" />
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold leading-none">100</span>
+                <span className="text-sm font-bold leading-none">{userTokens ?? 0}</span>
                 <span className="text-[10px] font-medium uppercase tracking-tight text-orange-600/80 leading-none">Call Tokens</span>
               </div>
             </div>
