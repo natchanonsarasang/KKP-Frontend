@@ -248,7 +248,8 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Token Balance */}
+            {/* Token Balance Hidden for Testing */}
+            {/* 
             <div className="hidden sm:flex items-center gap-2 px-3 h-10 rounded-lg border border-orange-200 bg-orange-50/50 text-orange-700">
               <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center">
                 <Coins className="w-3 h-3 text-orange-600" />
@@ -258,6 +259,7 @@ const Dashboard = () => {
                 <span className="text-[10px] font-medium uppercase tracking-tight text-orange-600/80 leading-none">Call Tokens</span>
               </div>
             </div>
+            */}
 
             {/* Workspace Selector */}
             <WorkspaceSelector />

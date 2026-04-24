@@ -555,8 +555,9 @@ async function processSession(supabase: any, sessionId: string) {
 
         console.log(`[Session ${sessionId}] Updated debtor ${item.debtor_id} stats`);
 
-        // Deduct 1 token for test mode call (Direct update)
-        const tokensToDeduct = 1;
+        // Token deduction disabled for testing
+        const tokensToDeduct = 0;
+        /*
         const { data: currentTokensData } = await supabase
           .from("call_tokens")
           .select("tokens")
@@ -573,6 +574,7 @@ async function processSession(supabase: any, sessionId: string) {
             .eq("user_id", typedSession.user_id);
           console.log(`[Session ${sessionId}] Tokens deducted: ${tokensToDeduct}`);
         }
+        */
 
         return {
           success: mockStatus !== "failed",
@@ -682,7 +684,8 @@ async function processSession(supabase: any, sessionId: string) {
             })
             .eq("id", item.debtor_id);
 
-          // Deduct 1 token for real call (Direct update)
+          // Token deduction disabled for testing
+          /*
           const { data: currentTokensData } = await supabase
             .from("call_tokens")
             .select("tokens")
@@ -699,8 +702,9 @@ async function processSession(supabase: any, sessionId: string) {
               .eq("user_id", typedSession.user_id);
             console.log(`[Session ${sessionId}] Deducted 1 token for real call initiation`);
           }
+          */
 
-          return { success: true, failed: false, confirmed: false, tokensUsed: 1 };
+          return { success: true, failed: false, confirmed: false, tokensUsed: 0 };
         } else {
           throw new Error(data.message || "Call failed");
         }

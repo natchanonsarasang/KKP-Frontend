@@ -1236,7 +1236,8 @@ const CallList = () => {
         })
         .eq("id", callRecord.id);
 
-      // Deduct 1 token for single call (Direct update)
+      // Token deduction disabled for testing
+      /*
       const { data: tokenData } = await supabase
         .from("call_tokens")
         .select("tokens")
@@ -1250,6 +1251,7 @@ const CallList = () => {
           .eq("user_id", user.id);
         refetchTokens();
       }
+      */
 
       // Update debtor contact attempts
       await supabase
@@ -1332,12 +1334,14 @@ const CallList = () => {
       return;
     }
 
-    // Token check
+    // Token check disabled for testing
+    /*
     const currentTokens = userTokens ?? 0;
     if (currentTokens < 1) {
       toast.error(`You have no tokens. Please add tokens to start calling.`);
       return;
     }
+    */
 
     try {
       // Create a call session in the database
