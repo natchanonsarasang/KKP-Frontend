@@ -103,9 +103,10 @@ serve(async (req) => {
 
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
-    // --- AI Categorization ---
-    const aiCategory = await categorizeConversation(conversationLog || "", status, mappedStatus, LOVABLE_API_KEY);
-    console.log("AI Category:", aiCategory);
+    // --- AI Categorization (strict status classifier) ---
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    const aiCategory = aiResult.category;
+    console.log("AI Classification:", aiResult);
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -466,85 +467,131 @@ serve(async (req) => {
   }
 });
 
-// AI categorization using Lovable AI
-async function categorizeConversation(
+// Strict call classifier
+// STEP 1: Check json_log status first → No Answer / Rejected / Busy / Voicemail
+// STEP 2: If none, classify conversation_log into one of 12 conversation categories
+type ClassifyResult = {
+  status_id: number;
+  status_name: string;
+  category: string;
+  reason: string;
+};
+
+const SYSTEM_STATUS_MAP: Record<string, { id: number; name: string; category: string; thai: string }> = {
+  no_answer: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
+  "no answer": { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
+  unreachable: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
+  rejected: { id: 2, name: "Rejected", category: "Rejected", thai: "ลูกค้าตัดสาย" },
+  busy: { id: 3, name: "Busy", category: "Busy", thai: "ลูกค้าสายไม่ว่าง" },
+  voicemail: { id: 4, name: "Voicemail", category: "Voicemail", thai: "เข้าสู่ระบบฝากข้อความ" },
+};
+
+const CONVERSATION_CATEGORIES = [
+  { id: 5, name: "Not Convenient", thai: "ลูกค้าไม่สะดวกคุย" },
+  { id: 6, name: "Already Paid", thai: "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว" },
+  { id: 7, name: "Normal Flow", thai: "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ" },
+  { id: 8, name: "Wrong Person", thai: "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน" },
+  { id: 9, name: "Transfer", thai: "ลูกค้าขอคุยกับเจ้าหน้าที่" },
+  { id: 10, name: "Call Later", thai: "ลูกค้านัดหมายให้ติดต่อใหม่" },
+  { id: 11, name: "Barge-in", thai: "ลูกค้าสอบถามข้อมูลระหว่างสนทนา" },
+  { id: 12, name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน" },
+  { id: 13, name: "Out of Topic", thai: "ลูกค้าพูดเรื่องอื่น" },
+  { id: 14, name: "Silence", thai: "ลูกค้าเงียบ" },
+  { id: 15, name: "Dropped Call", thai: "สายหลุดระหว่างสนทนา" },
+  { id: 16, name: "Repeat Request", thai: "ลูกค้าแจ้งให้ทวนประโยคเดิม" },
+];
+
+async function classifyCall(
+  payload: Record<string, unknown>,
   log: string,
-  status: string,
-  mappedStatus: string,
   apiKey: string | undefined,
-): Promise<string> {
-  if (status === "no_answer" || status === "busy" || status === "unreachable") {
-    return "No answer – call back later";
+): Promise<ClassifyResult> {
+  // STEP 1: System-level status check (json_log)
+  const rawStatus = String(payload.status || "").toLowerCase().trim();
+  const sys = SYSTEM_STATUS_MAP[rawStatus];
+  if (sys) {
+    return {
+      status_id: sys.id,
+      status_name: sys.name,
+      category: sys.category,
+      reason: `System status: ${rawStatus} → ${sys.thai}`,
+    };
   }
-  if (status === "failed" || status === "error") {
-    return "Phone is turned off";
-  }
+
+  // STEP 2: Conversation analysis required
   if (!log || log.trim().length < 5) {
-    if (mappedStatus === "completed") return "Customer silent";
-    return "No answer – call back later";
+    const silence = CONVERSATION_CATEGORIES.find((c) => c.name === "Silence")!;
+    return {
+      status_id: silence.id,
+      status_name: silence.name,
+      category: silence.name,
+      reason: "No conversation log present",
+    };
   }
 
-  // Rule-based: noisy environment keywords
-  const noisyKeywords = ["ไม่ได้ยิน", "พูดอะไร", "เสียงดัง", "ฟังไม่ชัด", "ได้ยินไม่ชัด", "can't hear", "cannot hear"];
-  const logLower = log.toLowerCase();
-  if (noisyKeywords.some((kw) => logLower.includes(kw))) {
-    return "Customer in noisy environment";
-  }
   if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, skipping AI categorization");
-    return "Customer has hardship situation";
+    console.warn("LOVABLE_API_KEY not found, defaulting to Normal Flow");
+    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI key missing" };
   }
 
-  const CATEGORIES = [
-    "Customer in noisy environment",
-    "Customer not convenient to talk",
-    "Customer refused to pay",
-    "Customer interested in debt restructuring",
-    "Customer requested human agent",
-    "Customer promised to pay with date",
-    "Customer promised to pay (no date)",
-    "No answer – call back later",
-    "Customer refused to talk to bot",
-    "Customer has hardship situation",
-    "Language barrier",
-    "Customer silent",
-    "Phone is turned off",
-  ];
+  const categoryList = CONVERSATION_CATEGORIES.map(
+    (c) => `${c.id}. ${c.name} (${c.thai})`,
+  ).join("\n");
+
+  const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
+Choose exactly ONE conversation category from this list:
+${categoryList}
+
+Output format (STRICT JSON, no markdown):
+{
+  "status_id": <number 5-16>,
+  "status_name": "<exact English label>",
+  "reason": "<short explanation>",
+  "chart_update": { "category": "<exact English label>", "increment": 1 }
+}`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         messages: [
-          {
-            role: "system",
-            content: `You categorize debt collection call transcripts into exactly one of these 13 categories. Return ONLY the category string, nothing else.\n\n${CATEGORIES.map((c, i) => `${i + 1}. ${c}`).join("\n")}`,
-          },
-          { role: "user", content: `Analyze this transcript: "${log}"` },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `conversation_log:\n"""${log}"""` },
         ],
+        response_format: { type: "json_object" },
         temperature: 0,
       }),
     });
 
     if (!response.ok) {
-      console.error("AI error:", response.status);
-      return "Customer has hardship situation";
+      console.error("AI error:", response.status, await response.text());
+      return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI request failed" };
     }
 
     const result = await response.json();
-    const category = result.choices?.[0]?.message?.content?.trim();
-    if (category && CATEGORIES.includes(category)) return category;
-    for (const c of CATEGORIES) {
-      if (category?.includes(c)) return c;
+    const content = result.choices?.[0]?.message?.content || "{}";
+    const parsed = JSON.parse(content);
+
+    const chartCategory: string = parsed?.chart_update?.category || parsed?.status_name;
+    const match = CONVERSATION_CATEGORIES.find(
+      (c) => c.name.toLowerCase() === String(chartCategory || "").toLowerCase(),
+    );
+
+    if (match) {
+      return {
+        status_id: match.id,
+        status_name: match.name,
+        category: match.name,
+        reason: parsed?.reason || "AI classification",
+      };
     }
-    return "Customer has hardship situation";
+
+    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Unmatched AI category" };
   } catch (err) {
-    console.error("AI categorization error:", err);
-    return "Customer has hardship situation";
+    console.error("AI classification error:", err);
+    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Classifier exception" };
   }
 }
+
