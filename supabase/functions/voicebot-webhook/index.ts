@@ -402,7 +402,8 @@ serve(async (req) => {
       }
     }
 
-    // Trigger next call for active sessions
+    // Update active session stats only. Automatic next-call trigger is disabled.
+    // Calls must only be triggered manually from the UI.
     const { data: activeSessions } = await supabase
       .from("call_sessions")
       .select("*")
@@ -412,14 +413,13 @@ serve(async (req) => {
 
     if (activeSessions?.length) {
       for (const session of activeSessions) {
-        // Update session stats if this call reached a final state
         const updates: Record<string, any> = {};
         if (finalStatus === "success") {
           updates.completed_calls = (session.completed_calls || 0) + 1;
           if (mappedStatus === "confirmed") {
             updates.confirmed_calls = (session.confirmed_calls || 0) + 1;
           }
-        } else if (retryStatus === "final_failed") {
+        } else if (finalStatus === "failed") {
           updates.failed_calls = (session.failed_calls || 0) + 1;
         }
 
@@ -430,16 +430,6 @@ serve(async (req) => {
             .update(updates)
             .eq("id", session.id);
         }
-
-        console.log(`Triggering next call for session ${session.id}`);
-        fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({ action: "continue", session_id: session.id }),
-        }).catch((err: any) => console.error("Error triggering next call:", err));
       }
     }
 
