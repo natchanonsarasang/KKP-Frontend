@@ -29,7 +29,7 @@ serve(async (req) => {
       .from("call_list_items")
       .select("*")
       .or(
-        `and(status.eq.pending,or(scheduled_at.is.null,scheduled_at.lte.${now})),and(status.eq.pending_retry,next_retry_at.lte.${now})`,
+        `and(status.eq.pending,scheduled_at.not.is.null,scheduled_at.lte.${now}),and(status.eq.pending_retry,next_retry_at.lte.${now})`,
       );
 
     if (fetchError) {
