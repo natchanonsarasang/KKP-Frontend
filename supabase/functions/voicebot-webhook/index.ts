@@ -103,9 +103,10 @@ serve(async (req) => {
 
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
-    // --- AI Categorization ---
-    const aiCategory = await categorizeConversation(conversationLog || "", status, mappedStatus, LOVABLE_API_KEY);
-    console.log("AI Category:", aiCategory);
+    // --- AI Categorization (strict status classifier) ---
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    const aiCategory = aiResult.category;
+    console.log("AI Classification:", aiResult);
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
