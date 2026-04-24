@@ -253,12 +253,14 @@ serve(async (req) => {
           if (byDebtor) recentItem = byDebtor;
         }
 
-        let finalStatus = pickedUp ? "success" : mappedStatus;
-        let retryStatus = finalStatus;
+        // Retry logic disabled: failed/no_response calls are marked failed immediately.
+        // No pending_retry, no automatic re-call. Manual retry only via the UI.
+        const finalStatus = pickedUp ? "success" : "failed";
+        const retryStatus = finalStatus;
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
-          // Fetch current retry_count for this item
+          // Fetch current retry_count for this item (used only for attempt numbering)
           const { data: itemData } = await supabase
             .from("call_list_items")
             .select("retry_count")
@@ -266,40 +268,20 @@ serve(async (req) => {
             .single();
           const currentRetryCount = itemData?.retry_count || 0;
 
-          // Determine if we should schedule a retry
-          const MAX_RETRIES = 0;
-          const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
-          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
-
-          retryStatus = finalStatus;
-          let nextRetryAt: string | null = null;
-          let newRetryCount = currentRetryCount;
-
-          if (isRetryable && currentRetryCount < MAX_RETRIES) {
-            retryStatus = "pending_retry";
-            newRetryCount = currentRetryCount + 1;
-            nextRetryAt = new Date(Date.now() + RETRY_DELAY_MS).toISOString();
-            console.log(`Scheduling retry ${newRetryCount}/${MAX_RETRIES} at ${nextRetryAt}`);
-          } else if (isRetryable && currentRetryCount >= MAX_RETRIES) {
-            retryStatus = "final_failed";
-            console.log(`Max retries (${MAX_RETRIES}) reached, marking as final_failed`);
-          }
-
           await supabase
             .from("call_list_items")
             .update({
-              status: retryStatus,
+              status: finalStatus,
               call_outcome: callOutcome,
               picked_up: pickedUp,
               notes: notesData,
               call_record_id: callRecordId,
               ai_category: aiCategory,
-              retry_count: newRetryCount,
-              next_retry_at: nextRetryAt,
+              next_retry_at: null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", recentItem.id);
-          console.log("Call list item updated:", recentItem.id, "status:", retryStatus);
+          console.log("Call list item updated:", recentItem.id, "status:", finalStatus);
 
           // Update existing call_attempt (created at initiation time) instead of inserting new
           const attemptNumber = currentRetryCount + 1;
