@@ -20,6 +20,15 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Webhook received:", JSON.stringify(payload, null, 2));
 
+    // CRITICAL FIX: Ignore the initiation "Success" message if it's sent to the webhook
+    // This message only means the call was requested, not that it's finished.
+    if (payload.message && payload.message.includes("Success Create Outbound call")) {
+      console.log("Ignoring initiation acknowledgement message in webhook. Waiting for final call result...");
+      return new Response(JSON.stringify({ success: true, message: "Initiation acknowledgement ignored" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Extract fields from payload
     const callId = payload.outbound_id || payload.call_id;
     const status = payload.status; // e.g. "completed"
