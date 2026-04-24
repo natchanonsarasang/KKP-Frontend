@@ -554,6 +554,13 @@ CRITICAL CLASSIFICATION RULES:
 - If the customer eventually said it's not convenient → "Not Convenient".
 - Prefer the resolved outcome over any earlier interruption, repeat request, off-topic remark, or background noise.
 
+BARGE-IN vs DROPPED CALL (IMPORTANT DISTINCTION):
+- "Barge-in" = the customer INTERRUPTED the bot to ASK A QUESTION or interact mid-call. Use this even if the call ended abruptly afterward, as long as there was a customer question/interaction before the end.
+- "Dropped Call" = the call was cut off / disconnected with NO question or interaction from the customer (pure disconnection, silence, or technical drop with no engagement).
+- Examples:
+  * Customer asked a question mid-call → call ended → "Barge-in"
+  * Call suddenly disconnected, no customer interaction at all → "Dropped Call"
+
 Output format (STRICT JSON, no markdown):
 {
   "status_id": <number 5-16>,
