@@ -19,13 +19,28 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("Checking for scheduled call list items...");
+    // 1. Get all active running sessions
+    const { data: activeSessions, error: sessionError } = await supabase
+      .from("call_sessions")
+      .select("user_id, workspace_id")
+      .eq("status", "running");
 
-    const now = new Date().toISOString();
+    if (sessionError) {
+      console.error("Error fetching active sessions:", sessionError);
+      throw sessionError;
+    }
 
-    // Get pending call list items that are scheduled for now or earlier
+    console.log(`Found ${activeSessions?.length || 0} active running sessions`);
+
+    if (!activeSessions || activeSessions.length === 0) {
+      return new Response(JSON.stringify({ message: "No active sessions running", processed: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Get pending call list items that are scheduled for now or earlier
     // Also pick up pending_retry items whose next_retry_at has passed
-    const { data: pendingItems, error: fetchError } = await supabase
+    const { data: allPendingItems, error: fetchError } = await supabase
       .from("call_list_items")
       .select("*")
       .or(
@@ -37,10 +52,16 @@ serve(async (req) => {
       throw fetchError;
     }
 
-    console.log(`Found ${pendingItems?.length || 0} pending call list items`);
+    // 3. Filter pending items to only those belonging to active sessions
+    const activeSessionKeys = new Set(activeSessions.map(s => `${s.user_id}:${s.workspace_id}`));
+    const pendingItems = (allPendingItems || []).filter(item => 
+      activeSessionKeys.has(`${item.user_id}:${item.workspace_id}`)
+    );
 
-    if (!pendingItems || pendingItems.length === 0) {
-      return new Response(JSON.stringify({ message: "No scheduled calls due", processed: 0 }), {
+    console.log(`Found ${pendingItems.length} eligible pending items after filtering by active sessions`);
+
+    if (pendingItems.length === 0) {
+      return new Response(JSON.stringify({ message: "No scheduled calls for active sessions", processed: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
