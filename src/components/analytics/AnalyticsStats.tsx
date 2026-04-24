@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { PhoneCall, CheckCircle, XCircle, PhoneOff, TrendingUp } from "lucide-react";
+import { PhoneCall, CheckCircle, XCircle, PhoneOff, FileText } from "lucide-react";
 
 interface CallListItem {
   id: string;
@@ -16,65 +16,75 @@ interface AnalyticsStatsProps {
 export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   const completedCalls = callListItems.filter((item) => item.called_at);
   const pickedUp = completedCalls.filter((item) => item.picked_up);
-  const confirmed = completedCalls.filter((item) => item.call_outcome === "confirmed");
-  const declined = completedCalls.filter((item) => item.call_outcome === "declined");
-  const noAnswer = completedCalls.filter((item) => item.picked_up === false);
+  
+  // Specific Incomplete Statuses
+  const noAnswer = completedCalls.filter((item) => 
+    item.call_outcome?.toLowerCase() === "no_answer" || (item.picked_up === false && !item.call_outcome)
+  );
+  const busy = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy");
+  const failed = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed");
+  const rejected = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "rejected" || item.call_outcome?.toLowerCase() === "declined");
+  const voicemail = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail");
 
+  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
+  
   const pickupRate = completedCalls.length > 0 
     ? Math.round((pickedUp.length / completedCalls.length) * 100) 
     : 0;
-  
-  const conversionRate = pickedUp.length > 0 
-    ? Math.round((confirmed.length / pickedUp.length) * 100) 
-    : 0;
-
-  const stats = [
-    {
-      label: "Total Calls Made",
-      value: completedCalls.length,
-      icon: PhoneCall,
-      color: "text-foreground",
-      bgColor: "bg-muted",
-    },
-    {
-      label: "Picked Up",
-      value: pickedUp.length,
-      subValue: `${pickupRate}%`,
-      icon: PhoneCall,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
-      label: "No Answer",
-      value: noAnswer.length,
-      icon: PhoneOff,
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
-    },
-  ];
 
   return (
-    <div className="grid grid-cols-3 gap-4">
-      {stats.map((stat) => (
-        <Card key={stat.label} className={stat.bgColor.replace("/10", "/5")}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-              </div>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-semibold ${stat.color}`}>{stat.value}</span>
-                  {stat.subValue && (
-                    <span className="text-xs text-muted-foreground">{stat.subValue}</span>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground">{stat.label}</div>
-              </div>
+    <div className="space-y-6 w-full max-w-5xl mx-auto pb-6">
+      {/* 1. Total Calls - Top Large Card */}
+      <Card className="bg-muted/30 border-muted">
+        <CardContent className="p-6 text-center">
+          <div className="text-4xl font-bold text-foreground mb-1">{completedCalls.length}</div>
+          <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Calls Made</div>
+        </CardContent>
+      </Card>
+
+      {/* 2. Main Status - Two Middle Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-6 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <CheckCircle className="w-5 h-5 text-primary" />
+              <span className="text-3xl font-bold text-primary">{pickedUp.length}</span>
             </div>
+            <div className="text-sm font-medium text-primary/80 uppercase tracking-wider">Complete</div>
+            <div className="text-xs text-primary/60 mt-1">{pickupRate}% pickup rate</div>
           </CardContent>
         </Card>
-      ))}
+
+        <Card className="bg-destructive/5 border-destructive/20">
+          <CardContent className="p-6 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <XCircle className="w-5 h-5 text-destructive" />
+              <span className="text-3xl font-bold text-destructive">{totalIncomplete}</span>
+            </div>
+            <div className="text-sm font-medium text-destructive/80 uppercase tracking-wider">Incomplete</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Incomplete Breakdown - 5 Bottom Small Cards */}
+      <div className="grid grid-cols-5 gap-3">
+        {[
+          { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
+          { label: "Busy", value: busy.length, icon: PhoneCall },
+          { label: "Failed", value: failed.length, icon: XCircle },
+          { label: "Rejected", value: rejected.length, icon: PhoneOff },
+          { label: "Voicemail", value: voicemail.length, icon: FileText },
+        ].map((item) => (
+          <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">
+            <CardContent className="p-3 text-center">
+              <div className="text-lg font-bold text-amber-600 mb-0.5">{item.value}</div>
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase truncate" title={item.label}>
+                {item.label}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
