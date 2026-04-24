@@ -1236,6 +1236,13 @@ const CallList = () => {
         })
         .eq("id", callRecord.id);
 
+      // Deduct 1 token for single call
+      await supabase.rpc("deduct_tokens", {
+        p_user_id: user.id,
+        p_amount: 1,
+      });
+      refetchTokens();
+
       // Update debtor contact attempts
       await supabase
         .from("debtors")
@@ -1317,12 +1324,12 @@ const CallList = () => {
       return;
     }
 
-    // Token check temporarily disabled — allow calling even with 0 tokens
-    // const currentTokens = userTokens ?? 0;
-    // if (currentTokens < 1) {
-    //   toast.error(`You have no tokens. Please add tokens to start calling.`);
-    //   return;
-    // }
+    // Token check
+    const currentTokens = userTokens ?? 0;
+    if (currentTokens < 1) {
+      toast.error(`You have no tokens. Please add tokens to start calling.`);
+      return;
+    }
 
     try {
       // Create a call session in the database

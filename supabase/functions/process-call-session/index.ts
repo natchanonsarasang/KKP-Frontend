@@ -678,7 +678,18 @@ async function processSession(supabase: any, sessionId: string) {
             })
             .eq("id", item.debtor_id);
 
-          return { success: true, failed: false, confirmed: false, tokensUsed: 0 }; // Tokens deducted in webhook for real calls
+          // Deduct 1 token for real call
+          console.log(`[Session ${sessionId}] Deducting 1 token for real call initiation`);
+          const { error: deductError } = await supabase.rpc("deduct_tokens", {
+            p_user_id: typedSession.user_id,
+            p_amount: 1,
+          });
+
+          if (deductError) {
+            console.error(`[Session ${sessionId}] Error deducting tokens:`, deductError);
+          }
+
+          return { success: true, failed: false, confirmed: false, tokensUsed: 1 };
         } else {
           throw new Error(data.message || "Call failed");
         }
@@ -718,20 +729,18 @@ async function processSession(supabase: any, sessionId: string) {
     `[Session ${sessionId}] Batch complete: ${completedCount} completed, ${failedCount} failed, ${tokensUsedInBatch} tokens used`,
   );
 
-  // Update session progress (tokens_used only updated for test mode, real mode tokens are deducted in webhook)
-  if (isTestMode) {
-    await supabase
-      .from("call_sessions")
-      .update({
-        completed_calls: typedSession.completed_calls + completedCount,
-        failed_calls: typedSession.failed_calls + failedCount,
-        tokens_used: typedSession.tokens_used + tokensUsedInBatch,
-      })
-      .eq("id", sessionId);
-  } else {
-    // For real mode, we don't update completed/failed here anymore. 
-    // It will be updated in the webhook when the call actually finishes.
-    console.log(`[Session ${sessionId}] Call initiated. Waiting for webhook to update stats.`);
+  // Update session progress
+  await supabase
+    .from("call_sessions")
+    .update({
+      completed_calls: isTestMode ? typedSession.completed_calls + completedCount : undefined,
+      failed_calls: isTestMode ? typedSession.failed_calls + failedCount : undefined,
+      tokens_used: typedSession.tokens_used + tokensUsedInBatch,
+    })
+    .eq("id", sessionId);
+
+  if (!isTestMode) {
+    console.log(`[Session ${sessionId}] Call initiated. Tokens deducted: ${tokensUsedInBatch}. Waiting for webhook to update stats.`);
   }
 
   // Check if more items to process and if we have available slots
