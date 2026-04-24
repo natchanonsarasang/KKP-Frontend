@@ -145,7 +145,14 @@ serve(async (req) => {
       }
     }
 
-    console.log("Resolved owner:", { resolvedUserId, resolvedWorkspaceId });
+    console.log("Resolved owner:", { resolvedUserId, resolvedWorkspaceId, phoneNumber });
+
+    if (!callId && !phoneNumber) {
+      console.error("Critical: No callId and no phoneNumber in payload");
+      return new Response(JSON.stringify({ success: false, message: "Missing identification fields" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // --- Update or create call_record ---
     let callRecordId: string | null = null;
@@ -172,24 +179,6 @@ serve(async (req) => {
           })
           .eq("id", record.id);
         console.log("Call record updated:", record.id);
-      } else if (phoneNumber) {
-        const { data: newRecord } = await supabase
-          .from("call_records")
-          .insert({
-            botnoi_call_id: callId,
-            phone_number: phoneNumber,
-            status: mappedStatus,
-            result_data: payload,
-            call_duration: callDuration ? Math.round(Number(callDuration)) : null,
-            appointment_date: appointmentDate || null,
-            appointment_time: appointmentTime || null,
-            user_id: resolvedUserId,
-            workspace_id: resolvedWorkspaceId,
-          })
-          .select("id")
-          .single();
-        callRecordId = newRecord?.id || null;
-        console.log("Call record created:", callRecordId);
       }
     }
 
