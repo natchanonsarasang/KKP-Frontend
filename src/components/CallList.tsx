@@ -1236,12 +1236,20 @@ const CallList = () => {
         })
         .eq("id", callRecord.id);
 
-      // Deduct 1 token for single call
-      await supabase.rpc("deduct_tokens", {
-        p_user_id: user.id,
-        p_amount: 1,
-      });
-      refetchTokens();
+      // Deduct 1 token for single call (Direct update)
+      const { data: tokenData } = await supabase
+        .from("call_tokens")
+        .select("tokens")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (tokenData && tokenData.tokens > 0) {
+        await supabase
+          .from("call_tokens")
+          .update({ tokens: tokenData.tokens - 1, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id);
+        refetchTokens();
+      }
 
       // Update debtor contact attempts
       await supabase
@@ -1651,7 +1659,7 @@ const CallList = () => {
           <Phone className="w-4 h-4" />
           Call Status
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 w-full">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
           <Card>
             <CardContent className="p-3">
               <div className="text-xl font-semibold">{callListItems?.length || 0}</div>
@@ -1669,7 +1677,7 @@ const CallList = () => {
               <div className="text-xl font-semibold text-success">
                 {callListItems?.filter(item => ["success", "confirmed", "declined", "no_response", "completed"].includes(item.status) || item.picked_up !== null).length || 0}
               </div>
-              <div className="text-xs text-muted-foreground">Finished</div>
+              <div className="text-xs text-muted-foreground">Complete</div>
             </CardContent>
           </Card>
           <Card className="border-success/20 bg-success/5">
@@ -1677,19 +1685,15 @@ const CallList = () => {
               <div className="text-xl font-semibold text-success">
                 {callListItems?.filter(item => item.picked_up === true).length || 0}
               </div>
-              <div className="text-xs text-muted-foreground">Complete</div>
+              <div className="text-xs text-muted-foreground">Picked Up</div>
             </CardContent>
           </Card>
           <Card className="border-muted">
             <CardContent className="p-3">
               <div className="text-xl font-semibold text-muted-foreground">
-                {callListItems?.filter(item => 
-                  item.picked_up === false || 
-                  ["no_answer", "busy", "failed", "rejected", "voicemail", "no_response"].includes(item.status?.toLowerCase() || "") ||
-                  ["no_answer", "busy", "failed", "rejected", "voicemail", "no_response"].includes(item.call_outcome?.toLowerCase() || "")
-                ).length || 0}
+                {callListItems?.filter(item => item.status === "no_answer" || item.picked_up === false).length || 0}
               </div>
-              <div className="text-xs text-muted-foreground">Incomplete</div>
+              <div className="text-xs text-muted-foreground">No Answer</div>
             </CardContent>
           </Card>
           <Card className="border-destructive/20">
@@ -1751,16 +1755,6 @@ const CallList = () => {
         </div>
       </div>
 
-      {/* Tokens Card */}
-      <Card className="border-warning/30 bg-warning/5 w-fit">
-        <CardContent className="p-3 flex items-center gap-3">
-          <Coins className="w-5 h-5 text-warning" />
-          <div>
-            <div className="text-xl font-semibold text-warning">{userTokens ?? 0}</div>
-            <div className="text-xs text-muted-foreground">Call Tokens</div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Business Hours Warning */}
       {settings.businessHoursOnly && !isWithinBusinessHours() && (
@@ -2181,7 +2175,46 @@ const CallList = () => {
                             minute: "2-digit",
                           })}
                         </TableCell>
-
+                        <TableCell className="flex gap-1">
+                          {/* Show view transcript for completed calls, preview for pending */}
+                          {(item.status === "success" || item.status === "confirmed" || item.status === "declined" || item.status === "no_response" || item.status === "no_answer" || item.status === "failed") ? (
+                            (() => {
+                              const { conversationLog } = parseNotesData(item.notes);
+                              return conversationLog ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                  onClick={() => handleViewTranscript(item.notes)}
+                                  title="View conversation"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </Button>
+                              ) : null;
+                            })()
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => handlePreviewCall(item)}
+                              title="Preview call payload"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {(item.status === "pending" || item.status === "retry_pending") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => removeFromListMutation.mutate(item.id)}
+                              disabled={removeFromListMutation.isPending}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     );
                   })}

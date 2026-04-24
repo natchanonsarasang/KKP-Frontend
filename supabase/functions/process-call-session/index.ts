@@ -555,19 +555,23 @@ async function processSession(supabase: any, sessionId: string) {
 
         console.log(`[Session ${sessionId}] Updated debtor ${item.debtor_id} stats`);
 
-        // Deduct tokens for test mode: 4 if picked up, 1 if not
-        const tokensToDeduct = pickedUp ? 4 : 1;
-        console.log(`[Session ${sessionId}] Deducting ${tokensToDeduct} tokens for test call (picked_up: ${pickedUp})`);
-
-        const { data: deductResult, error: deductError } = await supabase.rpc("deduct_tokens", {
-          p_user_id: typedSession.user_id,
-          p_amount: tokensToDeduct,
-        });
-
-        if (deductError) {
-          console.error(`[Session ${sessionId}] Error deducting tokens:`, deductError);
-        } else {
-          console.log(`[Session ${sessionId}] Token deduction result: ${deductResult}`);
+        // Deduct 1 token for test mode call (Direct update)
+        const tokensToDeduct = 1;
+        const { data: currentTokensData } = await supabase
+          .from("call_tokens")
+          .select("tokens")
+          .eq("user_id", typedSession.user_id)
+          .single();
+        
+        if (currentTokensData && currentTokensData.tokens >= tokensToDeduct) {
+          await supabase
+            .from("call_tokens")
+            .update({ 
+              tokens: currentTokensData.tokens - tokensToDeduct, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq("user_id", typedSession.user_id);
+          console.log(`[Session ${sessionId}] Tokens deducted: ${tokensToDeduct}`);
         }
 
         return {
@@ -678,15 +682,22 @@ async function processSession(supabase: any, sessionId: string) {
             })
             .eq("id", item.debtor_id);
 
-          // Deduct 1 token for real call
-          console.log(`[Session ${sessionId}] Deducting 1 token for real call initiation`);
-          const { error: deductError } = await supabase.rpc("deduct_tokens", {
-            p_user_id: typedSession.user_id,
-            p_amount: 1,
-          });
-
-          if (deductError) {
-            console.error(`[Session ${sessionId}] Error deducting tokens:`, deductError);
+          // Deduct 1 token for real call (Direct update)
+          const { data: currentTokensData } = await supabase
+            .from("call_tokens")
+            .select("tokens")
+            .eq("user_id", typedSession.user_id)
+            .single();
+          
+          if (currentTokensData && currentTokensData.tokens > 0) {
+            await supabase
+              .from("call_tokens")
+              .update({ 
+                tokens: currentTokensData.tokens - 1, 
+                updated_at: new Date().toISOString() 
+              })
+              .eq("user_id", typedSession.user_id);
+            console.log(`[Session ${sessionId}] Deducted 1 token for real call initiation`);
           }
 
           return { success: true, failed: false, confirmed: false, tokensUsed: 1 };
