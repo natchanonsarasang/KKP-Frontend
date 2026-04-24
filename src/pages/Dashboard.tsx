@@ -331,7 +331,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      <main className="p-6">
+      <main className="p-6 max-w-7xl mx-auto w-full">
         <StepIndicator activeTab={activeTab} onTabClick={(tab) => setActiveTab(tab)} />
 
         {activeTab === "debtors" && (
