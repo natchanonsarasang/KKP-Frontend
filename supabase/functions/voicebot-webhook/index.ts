@@ -75,7 +75,8 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
-    const pickedUp = hasUsersuser_idspoken_PLACEHOLDER;
+    const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
