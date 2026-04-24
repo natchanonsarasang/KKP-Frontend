@@ -68,22 +68,18 @@ serve(async (req) => {
           Transcript: "${log}"
 
           Categories:
-          1. ลูกค้าไม่รับสาย (No Answer) 
-          2. ลูกค้าตัดสาย (Rejected) 
-          3. ลูกค้าสายไม่ว่าง (Busy) 
-          4. เข้าสู่ระบบฝากข้อความ (Voicemail)
-          5. ลูกค้าไม่สะดวกคุย (Not Convenient)
-          6. ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid) 
-          7. แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow) 
-          8. ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)
-          9. ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer) 
-          10. ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later) 
-          11. ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)
-          12. เสียงแทรก/เสียงรบกวน (Background Noise)
-          13. ลูกค้าพูดเรื่องอื่น (Out of Topic) 
-          14. ลูกค้าเงียบ (Silence)
-          15 สายหลุดระหว่างสนทนา (Dropped Call) 
-          16 ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request) 
+          1. ลูกค้าไม่สะดวกคุย (Not Convenient)
+          2. ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid) 
+          3. แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow) 
+          4. ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)
+          5. ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer) 
+          6. ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later) 
+          7. ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)
+          8. เสียงแทรก/เสียงรบกวน (Background Noise)
+          9. ลูกค้าพูดเรื่องอื่น (Out of Topic) 
+          10. ลูกค้าเงียบ (Silence)
+          11. สายหลุดระหว่างสนทนา (Dropped Call) 
+          12. ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request) 
 
           For category 14, extract the requested callback time.
           Current system time (Bangkok) is: ${currentTime}.
