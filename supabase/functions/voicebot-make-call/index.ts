@@ -28,8 +28,11 @@ serve(async (req) => {
       bot_type: "Confirm1",
       tel_number: phone_number,
       variables: variables || {},
+      asr: {
+        asr_provider: "botnoi-aws-th-noise-classifier-v17c",
+        asr_timeout: 5
+      },
       interruptible: "True",
-      asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
       vad: {
         false_timeout_sec: "5",
         false_silence_sec: "0.1",

@@ -126,8 +126,17 @@ serve(async (req) => {
           bot_type: "Confirm1",
           tel_number: debtor.phone_number,
           variables: debtorVars,
-          interruptible: "true",
-          asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
+          asr: {
+            asr_provider: "botnoi-aws-th-noise-classifier-v17c",
+            asr_timeout: 5
+          },
+          interruptible: "True",
+          vad: {
+            false_timeout_sec: "5",
+            false_silence_sec: "0.1",
+            true_silence_sec: "0.25",
+          },
+
         };
 
         const callResponse = await fetch(CALL_API_URL, {

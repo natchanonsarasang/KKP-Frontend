@@ -45,27 +45,37 @@ serve(async (req) => {
       });
     }
 
-    // Determine if customer picked up based on conversation_log content
-    const hasConversation = conversationLog && conversationLog.trim().length > 20 && conversationLog.includes("User:");
+    // Check if user actually spoke in the conversation
+    // A valid pickup should have at least one "User:" entry with some text after it
+    const userParts = conversationLog ? conversationLog.split("User:") : [];
+    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
 
-    // Map action/status to our internal status
-    let mappedStatus = "pending";
+    // Map Botnoi status to our internal status
+    const rawStatus = (status || "").toLowerCase();
+    let mappedStatus = "failed";
+
     if (["Confirm", "confirm", "yes", "Yes"].includes(action)) {
       mappedStatus = "confirmed";
     } else if (["Decline", "decline", "no", "No"].includes(action)) {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    } else if (status === "failed" || status === "error") {
-      mappedStatus = "failed";
-    } else if (status === "no_answer" || status === "busy" || status === "unreachable") {
+    } else if (rawStatus === "completed") {
+      // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
+      mappedStatus = hasUserSpoken ? "completed" : "no_answer";
+    } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
-    } else if (status === "completed") {
-      // If completed with conversation, treat as completed-with-pickup
-      mappedStatus = hasConversation ? "completed" : "no_answer";
+    } else if (rawStatus === "busy") {
+      mappedStatus = "busy";
+    } else if (rawStatus === "failed" || rawStatus === "error") {
+      mappedStatus = "failed";
+    } else if (rawStatus === "rejected") {
+      mappedStatus = "rejected";
+    } else if (rawStatus === "voicemail") {
+      mappedStatus = "voicemail";
     }
 
-    const pickedUp = hasConversation || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -75,6 +85,9 @@ serve(async (req) => {
       no_answer: "No Answer",
       completed: "Completed",
       failed: "Failed",
+      busy: "Busy",
+      rejected: "Rejected",
+      voicemail: "Voicemail",
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
@@ -240,7 +253,8 @@ serve(async (req) => {
           if (byDebtor) recentItem = byDebtor;
         }
 
-        const finalStatus = pickedUp ? "success" : mappedStatus;
+        let finalStatus = pickedUp ? "success" : mappedStatus;
+        let retryStatus = finalStatus;
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
@@ -253,11 +267,11 @@ serve(async (req) => {
           const currentRetryCount = itemData?.retry_count || 0;
 
           // Determine if we should schedule a retry
-          const MAX_RETRIES = 2;
-          const RETRY_DELAY_MS = 60 * 1000; // 1 minute
-          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response"].includes(mappedStatus);
+          const MAX_RETRIES = 0;
+          const RETRY_DELAY_MS = 5 * 1000; // 5 seconds for faster retries
+          const isRetryable = !pickedUp && ["failed", "no_answer", "no_response", "busy", "rejected", "voicemail"].includes(mappedStatus);
 
-          let retryStatus = finalStatus;
+          retryStatus = finalStatus;
           let nextRetryAt: string | null = null;
           let newRetryCount = currentRetryCount;
 
@@ -316,7 +330,6 @@ serve(async (req) => {
             // Fallback: insert if no "calling" attempt found (e.g. manual calls, legacy)
             await supabase.from("call_attempts").insert({
               call_list_item_id: recentItem.id,
-              call_record_id: callRecordId,
               user_id: resolvedUserId,
               attempt_number: attemptNumber,
               ...attemptUpdateData,
@@ -410,12 +423,32 @@ serve(async (req) => {
     // Trigger next call for active sessions
     const { data: activeSessions } = await supabase
       .from("call_sessions")
-      .select("id")
+      .select("*")
       .eq("status", "running")
+      .eq("workspace_id", resolvedWorkspaceId)
       .limit(10);
 
     if (activeSessions?.length) {
       for (const session of activeSessions) {
+        // Update session stats if this call reached a final state
+        const updates: Record<string, any> = {};
+        if (finalStatus === "success") {
+          updates.completed_calls = (session.completed_calls || 0) + 1;
+          if (mappedStatus === "confirmed") {
+            updates.confirmed_calls = (session.confirmed_calls || 0) + 1;
+          }
+        } else if (retryStatus === "final_failed") {
+          updates.failed_calls = (session.failed_calls || 0) + 1;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          console.log(`Updating session ${session.id} stats:`, updates);
+          await supabase
+            .from("call_sessions")
+            .update(updates)
+            .eq("id", session.id);
+        }
+
         console.log(`Triggering next call for session ${session.id}`);
         fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
           method: "POST",
@@ -424,7 +457,7 @@ serve(async (req) => {
             Authorization: `Bearer ${supabaseKey}`,
           },
           body: JSON.stringify({ action: "continue", session_id: session.id }),
-        }).catch((err) => console.error("Error triggering next call:", err));
+        }).catch((err: any) => console.error("Error triggering next call:", err));
       }
     }
 

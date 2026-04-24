@@ -290,13 +290,13 @@ async function processSession(supabase: any, sessionId: string) {
   // Auto-reset stale "calling" items (stuck for more than 5 minutes)
   const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   const now = Date.now();
-  const staleItems = (callingItems || []).filter((item) => {
+  const staleItems = (callingItems || []).filter((item: any) => {
     if (!item.called_at) return true; // No timestamp = definitely stale
     return now - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (staleItems.length > 0) {
-    const staleIds = staleItems.map((item) => item.id);
+    const staleIds = staleItems.map((item: any) => item.id);
     console.log(`[Session ${sessionId}] Resetting ${staleIds.length} stale "calling" items to "failed"`);
     await supabase
       .from("call_list_items")
@@ -583,8 +583,16 @@ async function processSession(supabase: any, sessionId: string) {
           bot_type: "Confirm1",
           tel_number: debtor.phone_number,
           variables: vars,
-          interruptible: "true",
-          asr: { asr_provider: "botnoi-aws-th-noise-classifier-v17c" },
+          asr: {
+            asr_provider: "botnoi-aws-th-noise-classifier-v17c",
+            asr_timeout: 5
+          },
+          interruptible: "True",
+          vad: {
+            false_timeout_sec: "5",
+            false_silence_sec: "0.1",
+            true_silence_sec: "0.25",
+          },
         };
 
         console.log(`[Session ${sessionId}] Calling ${debtor.phone_number} via Voicebot API...`);
@@ -711,14 +719,20 @@ async function processSession(supabase: any, sessionId: string) {
   );
 
   // Update session progress (tokens_used only updated for test mode, real mode tokens are deducted in webhook)
-  await supabase
-    .from("call_sessions")
-    .update({
-      completed_calls: typedSession.completed_calls + completedCount,
-      failed_calls: typedSession.failed_calls + failedCount,
-      tokens_used: typedSession.tokens_used + tokensUsedInBatch,
-    })
-    .eq("id", sessionId);
+  if (isTestMode) {
+    await supabase
+      .from("call_sessions")
+      .update({
+        completed_calls: typedSession.completed_calls + completedCount,
+        failed_calls: typedSession.failed_calls + failedCount,
+        tokens_used: typedSession.tokens_used + tokensUsedInBatch,
+      })
+      .eq("id", sessionId);
+  } else {
+    // For real mode, we don't update completed/failed here anymore. 
+    // It will be updated in the webhook when the call actually finishes.
+    console.log(`[Session ${sessionId}] Call initiated. Waiting for webhook to update stats.`);
+  }
 
   // Check if more items to process and if we have available slots
   // Exclude pending_retry items whose next_retry_at hasn't passed yet (10 min delay)
@@ -742,13 +756,13 @@ async function processSession(supabase: any, sessionId: string) {
 
   // Reset any stale calls at the end too
   const endNow = Date.now();
-  const endStaleItems = (currentCalling || []).filter((item) => {
+  const endStaleItems = (currentCalling || []).filter((item: any) => {
     if (!item.called_at) return true;
     return endNow - new Date(item.called_at).getTime() > STALE_THRESHOLD_MS;
   });
 
   if (endStaleItems.length > 0) {
-    const endStaleIds = endStaleItems.map((item) => item.id);
+    const endStaleIds = endStaleItems.map((item: any) => item.id);
     console.log(`[Session ${sessionId}] End-of-batch: resetting ${endStaleIds.length} stale items`);
     await supabase
       .from("call_list_items")
@@ -765,6 +779,20 @@ async function processSession(supabase: any, sessionId: string) {
   } else if (count && count > 0) {
     console.log(`[Session ${sessionId}] ${count} more items but no slots available, waiting for webhook...`);
   } else if (callingNow === 0) {
+    // Before completing, double check if there are ANY items waiting for retry delay
+    const { count: waitingForRetry } = await supabase
+      .from("call_list_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", typedSession.workspace_id)
+      .eq("user_id", typedSession.user_id)
+      .in("status", ["pending_retry", "retry_pending"])
+      .gt("next_retry_at", checkNowIso);
+
+    if (waitingForRetry && waitingForRetry > 0) {
+      console.log(`[Session ${sessionId}] No items ready now, but ${waitingForRetry} retries waiting for delay. Keeping session running.`);
+      return;
+    }
+
     console.log(`[Session ${sessionId}] All items processed, completing.`);
     await supabase
       .from("call_sessions")
