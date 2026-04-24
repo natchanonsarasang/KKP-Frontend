@@ -542,11 +542,23 @@ async function classifyCall(
 Choose exactly ONE conversation category from this list:
 ${categoryList}
 
+CRITICAL CLASSIFICATION RULES:
+- ALWAYS classify by the FINAL OUTCOME of the call, not by transient events that occurred mid-conversation.
+- "Repeat Request", "Barge-in", "Background Noise", and "Out of Topic" are TRANSIENT events, NOT final statuses.
+  Only use them if the call ENDED WITHOUT a clear resolution (e.g., the conversation ended while still off-topic, still being interrupted by noise, or still asking to repeat — with no resolved outcome).
+- If the customer eventually confirmed/acknowledged payment info → "Normal Flow".
+- If the customer eventually said they already paid → "Already Paid".
+- If the customer eventually said it's the wrong person → "Wrong Person".
+- If the customer eventually requested to talk to staff → "Transfer".
+- If the customer eventually asked to be called back later → "Call Later".
+- If the customer eventually said it's not convenient → "Not Convenient".
+- Prefer the resolved outcome over any earlier interruption, repeat request, off-topic remark, or background noise.
+
 Output format (STRICT JSON, no markdown):
 {
   "status_id": <number 5-16>,
   "status_name": "<exact English label>",
-  "reason": "<short explanation>",
+  "reason": "<short explanation focused on the FINAL outcome>",
   "chart_update": { "category": "<exact English label>", "increment": 1 }
 }`;
 
