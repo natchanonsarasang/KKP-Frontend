@@ -1461,6 +1461,7 @@ const CallList = () => {
 
   const pendingCount = callListItems?.filter(item => item.status === "pending" || item.status === "retry_pending").length || 0;
   const callingCount = callListItems?.filter(item => item.status === "calling").length || 0;
+  const processedCount = callListItems?.filter(item => item.status === "completed" || item.status === "failed").length || 0;
   
   // New Analytics-style Stats
   const completedCalls = (callListItems || []).filter((item) => item.called_at);
