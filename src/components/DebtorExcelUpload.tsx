@@ -31,6 +31,7 @@ import {
   DEBTOR_CUSTOMER_VARIABLE_KEYS,
   parseDebtAmountForColumn,
   parseDueDateForColumn,
+  constructIsoDateFromThaiParts,
 } from "@/lib/debtorVariables";
 
 interface DebtorRow {
@@ -243,10 +244,21 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
         const batch = debtorRows.slice(i, i + batchSize);
         
         const insertData = batch.map((row) => {
-          const dueDate = parseDueDateForColumn(row.variables.due_date);
+          let dueDate = parseDueDateForColumn(row.variables.due_date);
+          
+          // If the date column only had a day number (like "10"), 
+          // try to construct a full ISO date from day, month, and year parts if they exist.
+          if (!dueDate && row.variables.due_date && row.variables.due_month && row.variables.due_year) {
+            dueDate = constructIsoDateFromThaiParts(
+              row.variables.due_date,
+              row.variables.due_month,
+              row.variables.due_year
+            );
+          }
+
           const variables = {
             ...row.variables,
-            ...(dueDate ? { due_date: dueDate } : {}),
+            ...(dueDate ? { due_date_iso: dueDate } : {}),
           };
           return {
             phone_number: row.phone_number,
