@@ -14,15 +14,8 @@ serve(async (req) => {
   }
 
   try {
-    const { phone_number, variables } = await req.json();
-
-    if (!phone_number) {
-      throw new Error("phone_number is required");
-    }
-
-    console.log("Making call via Voicebot API...");
-    console.log("Input:", { phone_number, variables });
-
+    const { phone_number, variables, interruptible } = await req.json();
+...
     const callPayload = {
       bot_id: BOT_ID,
       bot_type: "Confirm1",
@@ -32,7 +25,7 @@ serve(async (req) => {
         asr_provider: "botnoi-aws-th-noise-classifier-v17c",
         asr_timeout: 5
       },
-      interruptible: "False",
+      interruptible: interruptible || "False",
       vad: {
         false_timeout_sec: "5",
         false_silence_sec: "0.1",

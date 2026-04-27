@@ -26,6 +26,7 @@ interface CallSession {
     businessDays: number[];
     testMode?: boolean;
     timezoneOffset?: number; // UTC offset in minutes
+    interruptible?: boolean;
   };
 }
 
@@ -593,7 +594,7 @@ async function processSession(supabase: any, sessionId: string) {
             asr_provider: "botnoi-aws-th-noise-classifier-v17c",
             asr_timeout: 5
           },
-          interruptible: "False",
+          interruptible: typedSession.settings.interruptible ? "True" : "False",
           vad: {
             false_timeout_sec: "5",
             false_silence_sec: "0.1",

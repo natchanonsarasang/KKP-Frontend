@@ -129,6 +129,7 @@ interface AutoDialSettings {
   concurrentCalls: number;
   testMode: boolean; // Mock mode - simulates calls without hitting real API
   timezoneOffset: number; // UTC offset in minutes (e.g., +7 hours = 420)
+  interruptible: boolean; // Whether the bot can be interrupted
 }
 
 const DEFAULT_SETTINGS: AutoDialSettings = {
@@ -142,6 +143,7 @@ const DEFAULT_SETTINGS: AutoDialSettings = {
   concurrentCalls: 5,
   testMode: false,
   timezoneOffset: -(new Date().getTimezoneOffset()), // Auto-detect user's timezone
+  interruptible: false,
 };
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1211,6 +1213,7 @@ const CallList = () => {
           body: {
             phone_number: debtor.phone_number,
             variables: debtorVars,
+            interruptible: settings.interruptible ? "True" : "False",
           },
         }
       );
@@ -1782,7 +1785,11 @@ const CallList = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {activeSession.status === "running" ? (
-                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? (
+                    <CheckCircle className="w-5 h-5 text-success" />
+                  ) : (
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  )
                 ) : activeSession.status === "stopping" ? (
                   <Square className="w-5 h-5 text-warning" />
                 ) : (
@@ -1790,9 +1797,10 @@ const CallList = () => {
                 )}
                 <div>
                   <p className="font-medium flex items-center gap-2">
-                    {activeSession.status === "running" ? "Calls in Progress" :
-                      activeSession.status === "stopping" ? "Stopping..." :
-                        "Paused"}
+                    {activeSession.status === "running" ? (
+                      (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? "Session Completed" : "Calls in Progress"
+                    ) : activeSession.status === "stopping" ? "Stopping..." :
+                      "Paused"}
                     {settings.testMode && (
                       <Badge variant="outline" className="bg-warning/20 text-warning border-warning text-xs">
                         🧪 TEST MODE
@@ -1800,7 +1808,11 @@ const CallList = () => {
                     )}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {activeSession.error_message || (settings.testMode ? "Simulating calls - no real calls being made" : "Processing calls in background...")}
+                    {activeSession.error_message || (
+                      (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) 
+                        ? "All planned calls have been processed." 
+                        : (settings.testMode ? "Simulating calls - no real calls being made" : "Processing calls in background...")
+                    )}
                   </p>
                 </div>
               </div>
@@ -1819,14 +1831,23 @@ const CallList = () => {
                 )}
                 {activeSession.status === "running" && (
                   <>
-                    <Button size="sm" variant="secondary" onClick={pauseCalling}>
-                      <Square className="w-4 h-4 mr-2" />
-                      Pause
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={stopCalling}>
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Stop
-                    </Button>
+                    {(activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? (
+                      <Button size="sm" variant="outline" onClick={stopCalling}>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Finish Session
+                      </Button>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={pauseCalling}>
+                          <Square className="w-4 h-4 mr-2" />
+                          Pause
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={stopCalling}>
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Stop
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -2411,6 +2432,23 @@ const CallList = () => {
                   🧪 Test mode enabled - calls will be simulated with random outcomes
                 </p>
               )}
+            </div>
+
+            {/* Interruptible Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-primary" />
+                  Interruptible
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Allow the bot to be interrupted by the user speaking
+                </p>
+              </div>
+              <Switch
+                checked={settings.interruptible}
+                onCheckedChange={(checked) => setSettings(s => ({ ...s, interruptible: checked }))}
+              />
             </div>
 
             {/* Max Retries */}

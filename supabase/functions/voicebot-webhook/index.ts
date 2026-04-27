@@ -445,11 +445,17 @@ serve(async (req) => {
         }
 
         if (Object.keys(updates).length > 0) {
-          console.log(`Updating session ${session.id} stats:`, updates);
-          await supabase
-            .from("call_sessions")
-            .update(updates)
-            .eq("id", session.id);
+...
+          // Trigger session processor to handle next calls or completion
+          console.log(`Triggering process-call-session for ${session.id}`);
+          fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({ session_id: session.id, action: "continue" })
+          }).catch(err => console.error("Error triggering session processor:", err));
         }
       }
     }
