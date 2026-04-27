@@ -1177,8 +1177,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
                             const isNumeric = value && !isNaN(Number(String(value).replace(/,/g, '')));
+                            const isYearField = varKey.toLowerCase().includes("year");
+                            
                             let displayValue = value
-                              ? (isNumeric
+                              ? (isNumeric && !isYearField
                                 ? Number(String(value).replace(/,/g, '')).toLocaleString('th-TH')
                                 : String(value))
                               : "-";
