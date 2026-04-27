@@ -32,6 +32,13 @@ import { BestTimeInsights } from "./analytics/BestTimeInsights";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import * as XLSX from "xlsx";
+import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { DateRange as DayPickerRange } from "react-day-picker";
+import { th } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface CallRecord {
   id: string;
@@ -77,7 +84,7 @@ interface Template {
   org_name: string;
 }
 
-type DateRange = "today" | "week" | "month" | "year" | "all";
+type DateRangeType = "today" | "week" | "month" | "year" | "all" | "custom";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   pending: { label: "Pending", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -95,32 +102,53 @@ const CallDashboard = () => {
   const { effectiveUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
 
-  const [dateRange, setDateRange] = useState<DateRange>("month");
+  const [dateRange, setDateRange] = useState<DateRangeType>("month");
+  const [customRange, setCustomRange] = useState<DayPickerRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
   const [searchQuery, setSearchQuery] = useState("");
 
   const getDateFilter = useCallback(() => {
     const now = new Date();
     switch (dateRange) {
       case "today": {
-        const s = new Date(now); s.setHours(0, 0, 0, 0);
-        return s.toISOString();
+        return { 
+          start: startOfDay(now).toISOString(),
+          end: endOfDay(now).toISOString()
+        };
       }
       case "week": {
-        const s = new Date(now); s.setDate(s.getDate() - 7);
-        return s.toISOString();
+        return { 
+          start: subDays(now, 7).toISOString(),
+          end: now.toISOString()
+        };
       }
       case "month": {
-        const s = new Date(now); s.setMonth(s.getMonth() - 1);
-        return s.toISOString();
+        return { 
+          start: subMonths(now, 1).toISOString(),
+          end: now.toISOString()
+        };
       }
       case "year": {
-        const s = new Date(now); s.setFullYear(s.getFullYear() - 1);
-        return s.toISOString();
+        return { 
+          start: subYears(now, 1).toISOString(),
+          end: now.toISOString()
+        };
+      }
+      case "custom": {
+        if (customRange?.from) {
+          return {
+            start: startOfDay(customRange.from).toISOString(),
+            end: customRange.to ? endOfDay(customRange.to).toISOString() : endOfDay(customRange.from).toISOString()
+          };
+        }
+        return { start: undefined, end: undefined };
       }
       default:
-        return undefined;
+        return { start: undefined, end: undefined };
     }
-  }, [dateRange]);
+  }, [dateRange, customRange]);
 
   const { data: callRecords, isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
     queryKey: ["call-records", effectiveUserId, currentWorkspace?.id, dateRange],
@@ -133,8 +161,9 @@ const CallDashboard = () => {
         .order("created_at", { ascending: false });
 
       if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
-      const dateFilter = getDateFilter();
-      if (dateFilter) query = query.gte("created_at", dateFilter);
+      const { start, end } = getDateFilter();
+      if (start) query = query.gte("created_at", start);
+      if (end) query = query.lte("created_at", end);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -155,8 +184,9 @@ const CallDashboard = () => {
         .order("created_at", { ascending: false });
 
       if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
-      const dateFilter = getDateFilter();
-      if (dateFilter) query = query.gte("created_at", dateFilter);
+      const { start, end } = getDateFilter();
+      if (start) query = query.gte("created_at", start);
+      if (end) query = query.lte("created_at", end);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -304,15 +334,55 @@ const CallDashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+          {dateRange === "custom" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "justify-start text-left font-normal h-9 min-w-[240px]",
+                    !customRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customRange?.from ? (
+                    customRange.to ? (
+                      <>
+                        {format(customRange.from, "d MMM yyyy", { locale: th })} -{" "}
+                        {format(customRange.to, "d MMM yyyy", { locale: th })}
+                      </>
+                    ) : (
+                      format(customRange.from, "d MMM yyyy", { locale: th })
+                    )
+                  ) : (
+                    <span>เลือกช่วงวันที่</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={customRange?.from}
+                  selected={customRange}
+                  onSelect={setCustomRange}
+                  numberOfMonths={2}
+                  locale={th}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRangeType)}>
             <SelectTrigger className="w-[140px] h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="today">วันนี้</SelectItem>
-              <SelectItem value="week">7 วัน</SelectItem>
-              <SelectItem value="month">30 วัน</SelectItem>
-              <SelectItem value="year">1 ปี</SelectItem>
+              <SelectItem value="week">7 วันที่ผ่านมา</SelectItem>
+              <SelectItem value="month">30 วันที่ผ่านมา</SelectItem>
+              <SelectItem value="year">1 ปีที่ผ่านมา</SelectItem>
+              <SelectItem value="custom">กำหนดเอง</SelectItem>
               <SelectItem value="all">ทั้งหมด</SelectItem>
             </SelectContent>
           </Select>

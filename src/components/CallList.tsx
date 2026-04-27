@@ -1461,12 +1461,29 @@ const CallList = () => {
 
   const pendingCount = callListItems?.filter(item => item.status === "pending" || item.status === "retry_pending").length || 0;
   const callingCount = callListItems?.filter(item => item.status === "calling").length || 0;
-  const processedCount = callListItems?.filter(item =>
-    ["completed", "success", "confirmed", "declined", "no_answer", "failed", "no_response"].includes(item.status)
-  ).length || 0;
-  const failedCount = callListItems?.filter(item =>
-    ["failed", "no_answer", "no_response"].includes(item.status)
-  ).length || 0;
+  
+  // New Analytics-style Stats
+  const completedCalls = (callListItems || []).filter((item) => item.called_at);
+  const pickedUpCount = completedCalls.filter((item) => item.picked_up).length;
+  
+  const noAnswerCount = completedCalls.filter((item) => 
+    item.call_outcome?.toLowerCase() === "no_answer" || (item.picked_up === false && !item.call_outcome)
+  ).length;
+  const busyCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy").length;
+  const failedCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed").length;
+  const rejectedCount = completedCalls.filter((item) => 
+    item.call_outcome?.toLowerCase() === "rejected" || 
+    item.call_outcome?.toLowerCase() === "declined" || 
+    item.status === "declined" || 
+    (item.call_outcome && (item.call_outcome.includes("ปฏิเสธ") || item.call_outcome.toLowerCase().includes("decline")))
+  ).length;
+  const voicemailCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail").length;
+
+  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount;
+  
+  const pickupRate = completedCalls.length > 0 
+    ? Math.round((pickedUpCount / completedCalls.length) * 100) 
+    : 0;
 
   const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;
   const filteredItems = (callListItems || []).filter(item => {
@@ -1660,106 +1677,35 @@ const CallList = () => {
         </div>
       </div>
 
-      {/* Stats Layer 1: Call Status */}
-      <div className="space-y-2">
-        <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Phone className="w-4 h-4" />
-          Call Status
-        </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-          <Card>
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold">{callListItems?.length || 0}</div>
-              <div className="text-xs text-muted-foreground">Total</div>
-            </CardContent>
-          </Card>
-          <Card className="border-primary/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-primary">{pendingCount}</div>
-              <div className="text-xs text-muted-foreground">Pending</div>
-            </CardContent>
-          </Card>
-          <Card className="border-success/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-success">
-                {callListItems?.filter(item => ["success", "confirmed", "declined", "no_response", "completed"].includes(item.status) || item.picked_up !== null).length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Complete</div>
-            </CardContent>
-          </Card>
-          <Card className="border-success/20 bg-success/5">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-success">
-                {callListItems?.filter(item => item.picked_up === true).length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Picked Up</div>
-            </CardContent>
-          </Card>
-          <Card className="border-muted">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-muted-foreground">
-                {callListItems?.filter(item => item.status === "no_answer" || item.picked_up === false).length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">No Answer</div>
-            </CardContent>
-          </Card>
-          <Card className="border-destructive/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-destructive">
-                {callListItems?.filter(item => item.status === "failed").length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Failed</div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Simplified Stats: 3 Cards in a Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-primary/5 border-primary/20 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <div className="text-3xl font-bold text-primary mb-1">{completedCalls.length}</div>
+            <div className="text-xs font-medium text-primary/80 uppercase tracking-wider">Total Calls Made</div>
+          </CardContent>
+        </Card>
 
-      {/* Stats Layer 2: Picked Up Breakdown */}
-      <div className="space-y-2">
-        <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          Picked Up Breakdown
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="border-success/20 bg-success/5">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-success">
-                {callListItems?.filter(item => item.picked_up === true).length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Total Picked Up</div>
-            </CardContent>
-          </Card>
-          <Card className="border-success/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-success">
-                {callListItems?.filter(item => item.call_outcome === "Confirmed" || item.status === "confirmed").length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Confirmed</div>
-            </CardContent>
-          </Card>
-          <Card className="border-destructive/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-destructive">
-                {callListItems?.filter(item => item.call_outcome === "Declined" || item.status === "declined").length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Declined</div>
-            </CardContent>
-          </Card>
-          <Card className="border-warning/20">
-            <CardContent className="p-3">
-              <div className="text-xl font-semibold text-warning">
-                {callListItems?.filter(item =>
-                  item.picked_up === true &&
-                  item.status !== "confirmed" &&
-                  item.status !== "declined" &&
-                  item.call_outcome !== "Confirmed" &&
-                  item.call_outcome !== "Declined"
-                ).length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">Fallback</div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="bg-success/5 border-success/20 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <CheckCircle className="w-5 h-5 text-success" />
+              <span className="text-2xl font-bold text-success">{pickedUpCount}</span>
+            </div>
+            <div className="text-xs font-medium text-success uppercase tracking-wider">Complete</div>
+            <div className="text-[10px] text-success/70 mt-1">{pickupRate}% pickup rate</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-destructive/5 border-destructive/20 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <XCircle className="w-5 h-5 text-destructive" />
+              <span className="text-2xl font-bold text-destructive">{incompleteCount}</span>
+            </div>
+            <div className="text-xs font-medium text-destructive/80 uppercase tracking-wider">Incomplete</div>
+          </CardContent>
+        </Card>
       </div>
 
 
