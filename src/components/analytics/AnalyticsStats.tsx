@@ -35,23 +35,23 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   return (
     <div className="space-y-6 w-full max-w-5xl mx-auto pb-6">
       {/* 1. Total Calls - Top Large Card */}
-      <Card className="bg-muted/30 border-muted">
+      <Card className="bg-blue-50 border-blue-200 shadow-sm">
         <CardContent className="p-6 text-center">
-          <div className="text-4xl font-bold text-foreground mb-1">{completedCalls.length}</div>
-          <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Calls Made</div>
+          <div className="text-4xl font-bold text-blue-600 mb-1">{completedCalls.length}</div>
+          <div className="text-sm font-medium text-blue-500 uppercase tracking-wider">Total Calls Made</div>
         </CardContent>
       </Card>
 
       {/* 2. Main Status - Two Middle Cards */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-primary/5 border-primary/20">
+        <Card className="bg-emerald-50 border-emerald-200 shadow-sm">
           <CardContent className="p-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <CheckCircle className="w-5 h-5 text-primary" />
-              <span className="text-3xl font-bold text-primary">{pickedUp.length}</span>
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <span className="text-3xl font-bold text-emerald-600">{pickedUp.length}</span>
             </div>
-            <div className="text-sm font-medium text-primary/80 uppercase tracking-wider">Complete</div>
-            <div className="text-xs text-primary/60 mt-1">{pickupRate}% pickup rate</div>
+            <div className="text-sm font-medium text-emerald-600 uppercase tracking-wider">Complete</div>
+            <div className="text-xs text-emerald-500 mt-1">{pickupRate}% pickup rate</div>
           </CardContent>
         </Card>
 

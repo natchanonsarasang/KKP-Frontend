@@ -494,8 +494,8 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
     });
 
     return Object.entries(categories)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+      .map(([name, value]) => ({ name, value }));
+      // Removed sort to lock the order as defined above
   }, [callListItems]);
 
   return (
@@ -533,11 +533,8 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
                 name="Calls"
                 radius={[0, 4, 4, 0]}
                 barSize={20}
-              >
-                {categoryData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
-                ))}
-              </Bar>
+                fill="#6366f1"
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
