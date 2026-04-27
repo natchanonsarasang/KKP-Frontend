@@ -32,7 +32,7 @@ serve(async (req) => {
         asr_provider: "botnoi-aws-th-noise-classifier-v17c",
         asr_timeout: 5
       },
-      interruptible: "True",
+      interruptible: "False",
       vad: {
         false_timeout_sec: "5",
         false_silence_sec: "0.1",
