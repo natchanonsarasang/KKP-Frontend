@@ -413,7 +413,7 @@ serve(async (req) => {
         }
 
         if (Object.keys(updates).length > 0) {
-...
+          await supabase.from("call_sessions").update(updates).eq("id", session.id);
           // Trigger session processor to handle next calls or completion
           console.log(`Triggering process-call-session for ${session.id}`);
           fetch(`${supabaseUrl}/functions/v1/process-call-session`, {
