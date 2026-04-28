@@ -103,13 +103,12 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       </div>
 
       {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
           { label: "Busy", value: busy.length, icon: PhoneCall },
           { label: "Failed", value: failed.length, icon: XCircle },
           { label: "Rejected", value: rejected.length, icon: PhoneOff },
-          { label: "Hanged Up", value: hangedUp.length, icon: PhoneOff },
           { label: "Voicemail", value: voicemail.length, icon: FileText },
         ].map((item) => (
           <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">
