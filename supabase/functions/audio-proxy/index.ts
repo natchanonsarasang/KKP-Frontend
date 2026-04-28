@@ -84,9 +84,9 @@ serve(async (req) => {
       headers['Content-Length'] = contentLength;
     }
 
-    console.log('Streaming audio, content-type:', contentType);
+    console.log('Returning audio binary, content-type:', sourceContentType, 'bytes:', audioBuffer.byteLength);
 
-    return new Response(response.body, {
+    return new Response(audioBuffer, {
       status: 200,
       headers,
     });
