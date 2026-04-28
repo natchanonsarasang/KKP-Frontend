@@ -98,9 +98,8 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const isIncomplete = mappedStatus === "incomplete";
-    const pickedUp = !isIncomplete && (hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus));
-    let finalStatus: string = isIncomplete ? "incomplete" : (pickedUp ? "success" : "failed");
+    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -109,7 +108,6 @@ serve(async (req) => {
       no_response: "No Response",
       no_answer: "No Answer",
       completed: "Completed",
-      incomplete: "Incomplete",
       failed: "Failed",
       busy: "Busy",
       rejected: "Rejected",
@@ -120,15 +118,10 @@ serve(async (req) => {
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
     // --- AI Categorization (strict status classifier) ---
-    // Skip categorization entirely for "hanged_up"/incomplete calls
     let aiCategory: string | null = null;
-    if (!isIncomplete) {
-      const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
-      aiCategory = aiResult.category;
-      console.log("AI Classification:", aiResult);
-    } else {
-      console.log("Skipping AI categorization: status is incomplete (hanged_up)");
-    }
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    aiCategory = aiResult.category;
+    console.log("AI Classification:", aiResult);
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
