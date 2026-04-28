@@ -15,7 +15,7 @@ serve(async (req) => {
 
   try {
     const { phone_number, variables, interruptible } = await req.json();
-...
+
     const callPayload = {
       bot_id: BOT_ID,
       bot_type: "Confirm1",
