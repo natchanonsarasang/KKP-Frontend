@@ -2714,6 +2714,33 @@ const CallList = () => {
                   >
                     Your browser does not support the audio element.
                   </audio>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={async () => {
+                      try {
+                        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?download=1&filename=call_audio.mp3&url=${encodeURIComponent(transcriptData.audioUrl!)}`;
+                        const res = await fetch(proxyUrl);
+                        if (!res.ok) throw new Error("Download failed");
+                        const blob = await res.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = 'call_audio.mp3';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                      } catch (err) {
+                        console.error("Audio download error:", err);
+                        toast.error("Failed to download audio");
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Audio
+                  </Button>
                 </div>
               )}
 
