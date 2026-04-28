@@ -7,6 +7,7 @@ interface CallListItem {
   picked_up: boolean | null;
   call_outcome: string | null;
   called_at: string | null;
+  call_record?: { result_data?: { status?: string } | null } | null;
 }
 
 interface AnalyticsStatsProps {
