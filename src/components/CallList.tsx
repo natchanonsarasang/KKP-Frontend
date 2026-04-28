@@ -1472,7 +1472,7 @@ const CallList = () => {
   
   const categorizedStats = completedCallsStats.map(item => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
-    const resultDataStatus = (item.call_record as any)?.result_data?.status;
+    const resultDataStatus = (item as any).call_record?.result_data?.status;
     const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
     
     let resolved = "pending";
