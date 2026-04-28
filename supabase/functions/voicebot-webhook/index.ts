@@ -84,7 +84,8 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
-    const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
+    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
