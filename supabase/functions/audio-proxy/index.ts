@@ -25,35 +25,58 @@ serve(async (req) => {
 
     console.log('Proxying audio from:', audioUrl);
 
-    // Fetch the audio from the source
-    const response = await fetch(audioUrl, {
+    // Try fetching the audio from the source. Some buckets need a Referer.
+    let response = await fetch(audioUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AudioProxy/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://voicebot.botnoi.ai/',
+        'Accept': '*/*',
       },
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch audio:', response.status, response.statusText);
-      return new Response(JSON.stringify({ error: 'Failed to fetch audio', status: response.status }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Retry without referer
+      response = await fetch(audioUrl);
     }
 
-    // Get content type from response or default to audio/wav
-    const contentType = response.headers.get('content-type') || 'audio/wav';
+    if (!response.ok) {
+      console.error('Failed to fetch audio:', response.status, response.statusText);
+      return new Response(
+        JSON.stringify({
+          error: 'Audio source is not accessible',
+          status: response.status,
+          detail: 'The upstream audio file is private or expired and cannot be downloaded.',
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Detect actual format from URL extension; default to wav (what voicebot returns)
+    const lowerUrl = audioUrl.toLowerCase();
+    const isWav = lowerUrl.includes('.wav');
+    const sourceContentType = response.headers.get('content-type') || (isWav ? 'audio/wav' : 'audio/mpeg');
     const contentLength = response.headers.get('content-length');
 
-    // Stream the audio back
+    // Read full body so we return a real binary file (not a stream that may break mid-download)
+    const audioBuffer = await response.arrayBuffer();
+
     const headers: Record<string, string> = {
       ...corsHeaders,
-      'Content-Type': download ? 'audio/mpeg' : contentType,
+      'Content-Type': sourceContentType,
       'Cache-Control': 'public, max-age=3600',
+      'Content-Length': String(audioBuffer.byteLength),
     };
 
     if (download) {
-      // Sanitize filename
-      const safeName = filenameParam.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Force the filename extension to match the actual binary format
+      let safeName = filenameParam.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const desiredExt = isWav ? '.wav' : '.mp3';
+      if (!safeName.toLowerCase().endsWith(desiredExt)) {
+        safeName = safeName.replace(/\.(mp3|wav|m4a|ogg)$/i, '') + desiredExt;
+      }
       headers['Content-Disposition'] = `attachment; filename="${safeName}"`;
     }
 
@@ -61,9 +84,9 @@ serve(async (req) => {
       headers['Content-Length'] = contentLength;
     }
 
-    console.log('Streaming audio, content-type:', contentType);
+    console.log('Returning audio binary, content-type:', sourceContentType, 'bytes:', audioBuffer.byteLength);
 
-    return new Response(response.body, {
+    return new Response(audioBuffer, {
       status: 200,
       headers,
     });
