@@ -194,7 +194,8 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
 
     callListItems.forEach((item) => {
       const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
-      const rawStatus = (item.status || "").toLowerCase().replace(/_/g, " ");
+      const resultDataStatus = item.call_record?.result_data?.status;
+      const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
       
       let outcome = "pending";
       

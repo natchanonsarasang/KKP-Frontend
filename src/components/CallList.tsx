@@ -1463,27 +1463,49 @@ const CallList = () => {
   const callingCount = callListItems?.filter(item => item.status === "calling").length || 0;
   const processedCount = callListItems?.filter(item => item.status === "completed" || item.status === "failed").length || 0;
   
-  // New Analytics-style Stats
-  const completedCalls = (callListItems || []).filter((item) => item.called_at);
-  const pickedUpCount = completedCalls.filter((item) => item.picked_up).length;
+  // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
+  const completedCallsStats = (callListItems || []).filter((item) => 
+    item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending")
+  );
   
-  const noAnswerCount = completedCalls.filter((item) => 
-    item.call_outcome?.toLowerCase() === "no_answer" || (item.picked_up === false && !item.call_outcome)
-  ).length;
-  const busyCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy").length;
-  const failedCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed").length;
-  const rejectedCount = completedCalls.filter((item) => 
-    item.call_outcome?.toLowerCase() === "rejected" || 
-    item.call_outcome?.toLowerCase() === "declined" || 
-    item.status === "declined" || 
-    (item.call_outcome && (item.call_outcome.includes("ปฏิเสธ") || item.call_outcome.toLowerCase().includes("decline")))
-  ).length;
-  const voicemailCount = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail").length;
+  const pickedUpCount = completedCallsStats.filter((item) => item.picked_up).length;
+  
+  const categorizedStats = completedCallsStats.map(item => {
+    const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
+    const resultDataStatus = (item.call_record as any)?.result_data?.status;
+    const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
+    
+    let resolved = "pending";
+    
+    if (rawOutcome.includes("confirmed")) resolved = "confirmed";
+    else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) resolved = "rejected";
+    else if (rawOutcome.includes("hanged up")) resolved = "hanged_up";
+    else if (rawOutcome === "no answer") resolved = "no_answer";
+    else if (rawOutcome === "voicemail") resolved = "voicemail";
+    else if (rawOutcome === "busy") resolved = "busy";
+    else if (rawOutcome === "failed") resolved = "failed";
+    else if (item.picked_up === false) resolved = "no_answer";
+    else if (rawStatus === "no answer") resolved = "no_answer";
+    else if (rawStatus === "busy") resolved = "busy";
+    else if (rawStatus === "failed") resolved = "failed";
+    else if (rawStatus === "rejected" || rawStatus === "declined") resolved = "rejected";
+    else if (rawStatus === "hanged up") resolved = "hanged_up";
+    else if (item.picked_up === true) resolved = "completed";
+    
+    return { ...item, resolved };
+  });
 
-  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount;
+  const noAnswerCount = categorizedStats.filter(i => i.resolved === "no_answer").length;
+  const busyCount = categorizedStats.filter(i => i.resolved === "busy").length;
+  const failedCount = categorizedStats.filter(i => i.resolved === "failed").length;
+  const rejectedCount = categorizedStats.filter(i => i.resolved === "rejected").length;
+  const hangedUpCount = categorizedStats.filter(i => i.resolved === "hanged_up").length;
+  const voicemailCount = categorizedStats.filter(i => i.resolved === "voicemail").length;
+
+  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + hangedUpCount + voicemailCount;
   
-  const pickupRate = completedCalls.length > 0 
-    ? Math.round((pickedUpCount / completedCalls.length) * 100) 
+  const pickupRate = completedCallsStats.length > 0 
+    ? Math.round((pickedUpCount / completedCallsStats.length) * 100) 
     : 0;
 
   const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;

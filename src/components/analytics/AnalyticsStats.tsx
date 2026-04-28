@@ -24,7 +24,8 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   // Categorize each attempted call into exactly one outcome for consistent reporting
   const categorized = completedCalls.map(item => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
-    const rawStatus = (item.status || "").toLowerCase().replace(/_/g, " ");
+    const resultDataStatus = item.call_record?.result_data?.status;
+    const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
     
     // Outcome resolution logic (Mirroring OutcomeDistributionChart)
     let resolved = "pending";
