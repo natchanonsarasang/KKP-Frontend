@@ -1068,7 +1068,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           disabled={sendToCallListMutation.isPending}
                         />
                       </TableHead>
-                      <TableHead className="text-xs w-20">ID</TableHead>
+                      <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
@@ -1150,10 +1150,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {debtors.map((debtor) => {
+                    {[...debtors].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((debtor, index) => {
                       const phoneStats = callStats?.[debtor.phone_number];
                       const isAdding = addingToCallList === debtor.id;
                       const isSelected = selectedDebtors.has(debtor.id);
+                      const rowNumber = index + 1;
 
                       return (
                         <TableRow
@@ -1168,7 +1169,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             />
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground font-mono">
-                            {debtor.id.slice(0, 8)}
+                            {rowNumber}
                           </TableCell>
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
