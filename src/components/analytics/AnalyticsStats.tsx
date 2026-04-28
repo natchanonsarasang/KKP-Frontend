@@ -14,24 +14,42 @@ interface AnalyticsStatsProps {
 }
 
 export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
-  const completedCalls = callListItems.filter((item) => item.called_at);
+  // Use status to determine if a call was attempted if called_at is missing
+  const completedCalls = callListItems.filter((item) => 
+    item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending")
+  );
+  
   const pickedUp = completedCalls.filter((item) => item.picked_up);
   
-  // Specific Incomplete Statuses
-  const noAnswer = completedCalls.filter((item) => 
-    item.call_outcome?.toLowerCase() === "no_answer" || 
-    item.status?.toLowerCase() === "no_answer" ||
-    (item.picked_up === false && !item.call_outcome)
-  );
-  const busy = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy" || item.status?.toLowerCase() === "busy");
-  const failed = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed" || item.status?.toLowerCase() === "failed");
-  const rejected = completedCalls.filter((item) => 
-    item.call_outcome?.toLowerCase() === "rejected" || 
-    item.call_outcome?.toLowerCase() === "declined" ||
-    item.status?.toLowerCase() === "rejected" ||
-    item.status?.toLowerCase() === "declined"
-  );
-  const voicemail = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail" || item.status?.toLowerCase() === "voicemail");
+  // Categorize each attempted call into exactly one outcome for consistent reporting
+  const categorized = completedCalls.map(item => {
+    const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
+    const rawStatus = (item.status || "").toLowerCase().replace(/_/g, " ");
+    
+    // Outcome resolution logic (Mirroring OutcomeDistributionChart)
+    let resolved = "pending";
+    
+    if (rawOutcome.includes("confirmed")) resolved = "confirmed";
+    else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) resolved = "rejected";
+    else if (rawOutcome === "no answer") resolved = "no_answer";
+    else if (rawOutcome === "voicemail") resolved = "voicemail";
+    else if (rawOutcome === "busy") resolved = "busy";
+    else if (rawOutcome === "failed") resolved = "failed";
+    else if (item.picked_up === false) resolved = "no_answer";
+    else if (rawStatus === "no answer") resolved = "no_answer";
+    else if (rawStatus === "busy") resolved = "busy";
+    else if (rawStatus === "failed") resolved = "failed";
+    else if (rawStatus === "rejected" || rawStatus === "declined") resolved = "rejected";
+    else if (item.picked_up === true) resolved = "completed";
+    
+    return { ...item, resolved };
+  });
+
+  const noAnswer = categorized.filter(i => i.resolved === "no_answer");
+  const busy = categorized.filter(i => i.resolved === "busy");
+  const failed = categorized.filter(i => i.resolved === "failed");
+  const rejected = categorized.filter(i => i.resolved === "rejected");
+  const voicemail = categorized.filter(i => i.resolved === "voicemail");
 
   const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
   

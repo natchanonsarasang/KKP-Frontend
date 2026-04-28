@@ -193,17 +193,36 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
     const outcomes: Record<string, number> = {};
 
     callListItems.forEach((item) => {
-      const outcome = item.call_outcome || (item.picked_up === false ? "no_answer" : "pending");
+      const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
+      const rawStatus = (item.status || "").toLowerCase().replace(/_/g, " ");
+      
+      let outcome = "pending";
+      
+      if (rawOutcome.includes("confirmed")) outcome = "confirmed";
+      else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) outcome = "rejected";
+      else if (rawOutcome === "no answer") outcome = "no_answer";
+      else if (rawOutcome === "voicemail") outcome = "voicemail";
+      else if (rawOutcome === "busy") outcome = "busy";
+      else if (rawOutcome === "failed") outcome = "failed";
+      else if (item.picked_up === false) outcome = "no_answer";
+      else if (rawStatus === "no answer") outcome = "no_answer";
+      else if (rawStatus === "busy") outcome = "busy";
+      else if (rawStatus === "failed") outcome = "failed";
+      else if (rawStatus === "rejected" || rawStatus === "declined") outcome = "rejected";
+      else if (item.picked_up === true) outcome = "completed";
+      
       outcomes[outcome] = (outcomes[outcome] || 0) + 1;
     });
 
     const labels: Record<string, string> = {
       confirmed: "Confirmed",
-      declined: "Declined",
+      rejected: "Rejected",
       no_answer: "No Answer",
       pending: "Pending",
       failed: "Failed",
       completed: "Completed",
+      busy: "Busy",
+      voicemail: "Voicemail",
     };
 
     return Object.entries(outcomes).map(([key, value]) => ({
