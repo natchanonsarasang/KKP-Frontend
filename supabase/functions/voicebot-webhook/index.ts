@@ -80,9 +80,8 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
-      // "hanged_up" is explicitly classified as "incomplete" — never mapped to complete/no_answer/failed
-      mappedStatus = "incomplete";
+    // NOTE: "hanged_up" / "hangup" / "hung_up" are filtered out at the top of this handler.
+    // They never reach this mapping block. Do not add a branch for them here.
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
@@ -99,9 +98,8 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const isIncomplete = mappedStatus === "incomplete";
-    const pickedUp = !isIncomplete && (hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus));
-    let finalStatus: string = isIncomplete ? "incomplete" : (pickedUp ? "success" : "failed");
+    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -110,7 +108,6 @@ serve(async (req) => {
       no_response: "No Response",
       no_answer: "No Answer",
       completed: "Completed",
-      incomplete: "Incomplete",
       failed: "Failed",
       busy: "Busy",
       rejected: "Rejected",
@@ -121,15 +118,10 @@ serve(async (req) => {
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
     // --- AI Categorization (strict status classifier) ---
-    // Skip categorization entirely for "hanged_up"/incomplete calls
     let aiCategory: string | null = null;
-    if (!isIncomplete) {
-      const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
-      aiCategory = aiResult.category;
-      console.log("AI Classification:", aiResult);
-    } else {
-      console.log("Skipping AI categorization: status is incomplete (hanged_up)");
-    }
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    aiCategory = aiResult.category;
+    console.log("AI Classification:", aiResult);
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -300,7 +292,7 @@ serve(async (req) => {
 
         // Retry logic disabled: failed/no_response calls are marked failed immediately.
         // No pending_retry, no automatic re-call. Manual retry only via the UI.
-        finalStatus = isIncomplete ? "incomplete" : (pickedUp ? "success" : "failed");
+        finalStatus = pickedUp ? "success" : "failed";
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {

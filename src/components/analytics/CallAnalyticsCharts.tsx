@@ -197,12 +197,20 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
       const resultDataStatus = item.call_record?.result_data?.status;
       const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
-      
+
+      // GLOBAL EXCLUSION: skip "hanged_up"/"incomplete" entirely
+      if (
+        rawOutcome.includes("hanged") ||
+        rawStatus.includes("hanged") ||
+        rawStatus === "incomplete"
+      ) {
+        return;
+      }
+
       let outcome = "pending";
-      
+
       if (rawOutcome.includes("confirmed")) outcome = "confirmed";
       else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) outcome = "rejected";
-      else if (rawOutcome.includes("hanged up")) outcome = "hanged_up";
       else if (rawOutcome === "no answer") outcome = "no_answer";
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
@@ -212,16 +220,14 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       else if (rawStatus === "busy") outcome = "busy";
       else if (rawStatus === "failed") outcome = "failed";
       else if (rawStatus === "rejected" || rawStatus === "declined") outcome = "rejected";
-      else if (rawStatus === "hanged up") outcome = "hanged_up";
       else if (item.picked_up === true) outcome = "completed";
-      
+
       outcomes[outcome] = (outcomes[outcome] || 0) + 1;
     });
 
     const labels: Record<string, string> = {
       confirmed: "Confirmed",
       rejected: "Rejected",
-      hanged_up: "Hanged Up",
       no_answer: "No Answer",
       pending: "Pending",
       failed: "Failed",

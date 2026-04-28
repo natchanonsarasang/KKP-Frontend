@@ -15,25 +15,33 @@ interface AnalyticsStatsProps {
 }
 
 export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
+  // GLOBAL EXCLUSION: drop any "hanged_up" / "incomplete" records before any computation
+  const visibleItems = callListItems.filter((item) => {
+    const s = (item.status || "").toLowerCase();
+    const r = ((item as any).call_record?.result_data?.status || "").toLowerCase();
+    const o = (item.call_outcome || "").toLowerCase();
+    return s !== "hanged_up" && s !== "incomplete"
+      && r !== "hanged_up" && r !== "incomplete"
+      && !o.includes("hanged");
+  });
+
   // Use status to determine if a call was attempted if called_at is missing
-  const completedCalls = callListItems.filter((item) => 
+  const completedCalls = visibleItems.filter((item) =>
     item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending")
   );
-  
+
   const pickedUp = completedCalls.filter((item) => item.picked_up);
-  
+
   // Categorize each attempted call into exactly one outcome for consistent reporting
   const categorized = completedCalls.map(item => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
     const resultDataStatus = item.call_record?.result_data?.status;
     const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
-    
-    // Outcome resolution logic (Mirroring OutcomeDistributionChart)
+
     let resolved = "pending";
-    
+
     if (rawOutcome.includes("confirmed")) resolved = "confirmed";
     else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) resolved = "rejected";
-    else if (rawOutcome.includes("hanged up")) resolved = "hanged_up";
     else if (rawOutcome === "no answer") resolved = "no_answer";
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
@@ -43,9 +51,8 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
     else if (rawStatus === "busy") resolved = "busy";
     else if (rawStatus === "failed") resolved = "failed";
     else if (rawStatus === "rejected" || rawStatus === "declined") resolved = "rejected";
-    else if (rawStatus === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === true) resolved = "completed";
-    
+
     return { ...item, resolved };
   });
 
@@ -53,13 +60,12 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   const busy = categorized.filter(i => i.resolved === "busy");
   const failed = categorized.filter(i => i.resolved === "failed");
   const rejected = categorized.filter(i => i.resolved === "rejected");
-  const hangedUp = categorized.filter(i => i.resolved === "hanged_up");
   const voicemail = categorized.filter(i => i.resolved === "voicemail");
 
-  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + hangedUp.length + voicemail.length;
-  
-  const pickupRate = completedCalls.length > 0 
-    ? Math.round((pickedUp.length / completedCalls.length) * 100) 
+  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
+
+  const pickupRate = completedCalls.length > 0
+    ? Math.round((pickedUp.length / completedCalls.length) * 100)
     : 0;
 
   return (
@@ -97,13 +103,12 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       </div>
 
       {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
           { label: "Busy", value: busy.length, icon: PhoneCall },
           { label: "Failed", value: failed.length, icon: XCircle },
           { label: "Rejected", value: rejected.length, icon: PhoneOff },
-          { label: "Hanged Up", value: hangedUp.length, icon: PhoneOff },
           { label: "Voicemail", value: voicemail.length, icon: FileText },
         ].map((item) => (
           <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">

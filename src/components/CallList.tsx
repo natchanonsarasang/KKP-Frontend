@@ -329,6 +329,8 @@ const CallList = () => {
           .from("call_list_items")
           .select("*")
           .eq("workspace_id", currentWorkspace.id)
+          // Exclude "hanged_up"/"incomplete" entirely from the system
+          .not("status", "in", '("hanged_up","incomplete")')
           .order("created_at", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -341,7 +343,11 @@ const CallList = () => {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allItems = [...allItems, ...data];
+          // Defensive client-side filter in case any leak through
+          const filtered = data.filter(
+            (it: any) => it.status !== "hanged_up" && it.status !== "incomplete"
+          );
+          allItems = [...allItems, ...filtered];
           page++;
           hasMore = data.length === pageSize;
         } else {
@@ -443,7 +449,8 @@ const CallList = () => {
       const { data, error } = await supabase
         .from("call_records")
         .select("phone_number, status")
-        .eq("workspace_id", currentWorkspace.id);
+        .eq("workspace_id", currentWorkspace.id)
+        .not("status", "in", '("hanged_up","incomplete")');
 
       if (error) throw error;
 
@@ -1464,22 +1471,31 @@ const CallList = () => {
   const processedCount = callListItems?.filter(item => item.status === "completed" || item.status === "failed").length || 0;
   
   // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
-  const completedCallsStats = (callListItems || []).filter((item) => 
+  // GLOBAL EXCLUSION: drop "hanged_up"/"incomplete" rows before any computation
+  const visibleCallListItems = (callListItems || []).filter((item) => {
+    const s = (item.status || "").toLowerCase();
+    const r = ((item as any).call_record?.result_data?.status || "").toLowerCase();
+    const o = (item.call_outcome || "").toLowerCase();
+    return s !== "hanged_up" && s !== "incomplete"
+      && r !== "hanged_up" && r !== "incomplete"
+      && !o.includes("hanged");
+  });
+
+  const completedCallsStats = visibleCallListItems.filter((item) =>
     item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending")
   );
-  
+
   const pickedUpCount = completedCallsStats.filter((item) => item.picked_up).length;
-  
+
   const categorizedStats = completedCallsStats.map(item => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
     const resultDataStatus = (item as any).call_record?.result_data?.status;
     const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
-    
+
     let resolved = "pending";
-    
+
     if (rawOutcome.includes("confirmed")) resolved = "confirmed";
     else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) resolved = "rejected";
-    else if (rawOutcome.includes("hanged up")) resolved = "hanged_up";
     else if (rawOutcome === "no answer") resolved = "no_answer";
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
@@ -1489,9 +1505,8 @@ const CallList = () => {
     else if (rawStatus === "busy") resolved = "busy";
     else if (rawStatus === "failed") resolved = "failed";
     else if (rawStatus === "rejected" || rawStatus === "declined") resolved = "rejected";
-    else if (rawStatus === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === true) resolved = "completed";
-    
+
     return { ...item, resolved };
   });
 
@@ -1499,13 +1514,12 @@ const CallList = () => {
   const busyCount = categorizedStats.filter(i => i.resolved === "busy").length;
   const failedCount = categorizedStats.filter(i => i.resolved === "failed").length;
   const rejectedCount = categorizedStats.filter(i => i.resolved === "rejected").length;
-  const hangedUpCount = categorizedStats.filter(i => i.resolved === "hanged_up").length;
   const voicemailCount = categorizedStats.filter(i => i.resolved === "voicemail").length;
 
-  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + hangedUpCount + voicemailCount;
-  
-  const pickupRate = completedCallsStats.length > 0 
-    ? Math.round((pickedUpCount / completedCallsStats.length) * 100) 
+  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount;
+
+  const pickupRate = completedCallsStats.length > 0
+    ? Math.round((pickedUpCount / completedCallsStats.length) * 100)
     : 0;
 
   const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;
