@@ -329,6 +329,8 @@ const CallList = () => {
           .from("call_list_items")
           .select("*")
           .eq("workspace_id", currentWorkspace.id)
+          // Exclude "hanged_up"/"incomplete" entirely from the system
+          .not("status", "in", '("hanged_up","incomplete")')
           .order("created_at", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -341,7 +343,11 @@ const CallList = () => {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allItems = [...allItems, ...data];
+          // Defensive client-side filter in case any leak through
+          const filtered = data.filter(
+            (it: any) => it.status !== "hanged_up" && it.status !== "incomplete"
+          );
+          allItems = [...allItems, ...filtered];
           page++;
           hasMore = data.length === pageSize;
         } else {
