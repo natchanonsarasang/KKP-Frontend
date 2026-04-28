@@ -289,7 +289,7 @@ serve(async (req) => {
 
         // Retry logic disabled: failed/no_response calls are marked failed immediately.
         // No pending_retry, no automatic re-call. Manual retry only via the UI.
-        finalStatus = pickedUp ? "success" : "failed";
+        finalStatus = isIncomplete ? "incomplete" : (pickedUp ? "success" : "failed");
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
