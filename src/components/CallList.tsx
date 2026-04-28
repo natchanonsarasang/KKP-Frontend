@@ -1704,7 +1704,7 @@ const CallList = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-primary/5 border-primary/20 shadow-sm">
           <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold text-primary mb-1">{completedCalls.length}</div>
+            <div className="text-3xl font-bold text-primary mb-1">{completedCallsStats.length}</div>
             <div className="text-xs font-medium text-primary/80 uppercase tracking-wider">Total Calls Made</div>
           </CardContent>
         </Card>
