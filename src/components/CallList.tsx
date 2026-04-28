@@ -449,7 +449,8 @@ const CallList = () => {
       const { data, error } = await supabase
         .from("call_records")
         .select("phone_number, status")
-        .eq("workspace_id", currentWorkspace.id);
+        .eq("workspace_id", currentWorkspace.id)
+        .not("status", "in", '("hanged_up","incomplete")');
 
       if (error) throw error;
 
