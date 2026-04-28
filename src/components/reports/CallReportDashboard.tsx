@@ -837,16 +837,43 @@ const CallReportDashboard = () => {
                             </TableCell>
                             <TableCell>
                               {audioUrl ? (
-                                <a
-                                  href={audioUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                                    <Volume2 className="w-3 h-3 mr-1" />
-                                    ฟัง
+                                <div className="flex gap-1">
+                                  <a
+                                    href={audioUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                                      <Volume2 className="w-3 h-3 mr-1" />
+                                      ฟัง
+                                    </Button>
+                                  </a>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={async () => {
+                                      try {
+                                        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?download=1&filename=call_audio.mp3&url=${encodeURIComponent(audioUrl)}`;
+                                        const res = await fetch(proxyUrl);
+                                        if (!res.ok) throw new Error("Download failed");
+                                        const blob = await res.blob();
+                                        const blobUrl = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = blobUrl;
+                                        a.download = 'call_audio.mp3';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(blobUrl);
+                                      } catch (err) {
+                                        console.error("Audio download error:", err);
+                                      }
+                                    }}
+                                  >
+                                    <Download className="w-3 h-3" />
                                   </Button>
-                                </a>
+                                </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground">-</span>
                               )}
