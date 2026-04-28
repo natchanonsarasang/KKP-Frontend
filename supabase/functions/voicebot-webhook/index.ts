@@ -69,8 +69,11 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    } else if (rawStatus === "completed" || rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
-      // If Botnoi says completed/hanged_up, but no one actually spoke, treat it as no_answer (retryable)
+    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      // Preserve "hanged_up" as its own distinct, completed status — never downgrade to no_answer/failed
+      mappedStatus = "hanged_up";
+    } else if (rawStatus === "completed") {
+      // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
@@ -85,7 +88,7 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "hanged_up", "completed"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
@@ -95,6 +98,7 @@ serve(async (req) => {
       no_response: "No Response",
       no_answer: "No Answer",
       completed: "Completed",
+      hanged_up: "Hanged Up",
       failed: "Failed",
       busy: "Busy",
       rejected: "Rejected",
