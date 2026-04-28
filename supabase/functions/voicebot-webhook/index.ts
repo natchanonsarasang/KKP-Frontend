@@ -339,43 +339,11 @@ serve(async (req) => {
             });
             console.log(`Call attempt inserted (fallback) for item ${recentItem.id}, attempt ${attemptNumber}`);
           }
-        } else if (debtorId) {
-          const { data: newItem } = await supabase
-            .from("call_list_items")
-            .insert({
-              debtor_id: debtorId,
-              user_id: resolvedUserId,
-              workspace_id: resolvedWorkspaceId,
-              status: finalStatus,
-              call_outcome: callOutcome,
-              picked_up: pickedUp,
-              notes: notesData,
-              call_record_id: callRecordId,
-              ai_category: aiCategory,
-              called_at: new Date().toISOString(),
-            })
-            .select("id")
-            .single();
-          console.log("Call list item auto-created");
-
-          // Log attempt for auto-created item
-          if (newItem) {
-            await supabase.from("call_attempts").insert({
-              call_list_item_id: newItem.id,
-              call_record_id: callRecordId,
-              user_id: resolvedUserId,
-              attempt_number: 1,
-              status: finalStatus,
-              call_outcome: callOutcome,
-              picked_up: pickedUp,
-              ai_category: aiCategory,
-              conversation_log: conversationLog || null,
-              audio_url: audioUrl || null,
-              call_duration: callDuration ? Math.round(Number(callDuration)) : null,
-              error_reason: mappedStatus === "failed" || mappedStatus === "no_answer" ? payload.error || status : null,
-            });
-            console.log("Initial attempt logged for auto-created item");
-          }
+        } else {
+          // Do NOT auto-create call_list_items rows from late webhooks.
+          // If the item was cleared by the user (Clear All / Clear Pending),
+          // re-inserting here causes deleted rows to reappear in the queue.
+          console.log("No matching call_list_item found; skipping auto-create to respect user clears.");
         }
 
         // Deduct tokens: 4 if picked up, 1 if not
