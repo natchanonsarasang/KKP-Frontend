@@ -110,9 +110,15 @@ serve(async (req) => {
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
     // --- AI Categorization (strict status classifier) ---
-    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
-    const aiCategory = aiResult.category;
-    console.log("AI Classification:", aiResult);
+    // Skip categorization entirely for "hanged_up"/incomplete calls
+    let aiCategory: string | null = null;
+    if (!isIncomplete) {
+      const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+      aiCategory = aiResult.category;
+      console.log("AI Classification:", aiResult);
+    } else {
+      console.log("Skipping AI categorization: status is incomplete (hanged_up)");
+    }
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
