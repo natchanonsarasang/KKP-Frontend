@@ -31,6 +31,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
     
     if (rawOutcome.includes("confirmed")) resolved = "confirmed";
     else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) resolved = "rejected";
+    else if (rawOutcome.includes("hanged up")) resolved = "hanged_up";
     else if (rawOutcome === "no answer") resolved = "no_answer";
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
@@ -40,6 +41,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
     else if (rawStatus === "busy") resolved = "busy";
     else if (rawStatus === "failed") resolved = "failed";
     else if (rawStatus === "rejected" || rawStatus === "declined") resolved = "rejected";
+    else if (rawStatus === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === true) resolved = "completed";
     
     return { ...item, resolved };
@@ -49,9 +51,10 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   const busy = categorized.filter(i => i.resolved === "busy");
   const failed = categorized.filter(i => i.resolved === "failed");
   const rejected = categorized.filter(i => i.resolved === "rejected");
+  const hangedUp = categorized.filter(i => i.resolved === "hanged_up");
   const voicemail = categorized.filter(i => i.resolved === "voicemail");
 
-  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
+  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + hangedUp.length + voicemail.length;
   
   const pickupRate = completedCalls.length > 0 
     ? Math.round((pickedUp.length / completedCalls.length) * 100) 
@@ -91,13 +94,14 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
         </Card>
       </div>
 
-      {/* 3. Incomplete Breakdown - 5 Bottom Small Cards */}
-      <div className="grid grid-cols-5 gap-3">
+      {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
           { label: "Busy", value: busy.length, icon: PhoneCall },
           { label: "Failed", value: failed.length, icon: XCircle },
           { label: "Rejected", value: rejected.length, icon: PhoneOff },
+          { label: "Hanged Up", value: hangedUp.length, icon: PhoneOff },
           { label: "Voicemail", value: voicemail.length, icon: FileText },
         ].map((item) => (
           <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">

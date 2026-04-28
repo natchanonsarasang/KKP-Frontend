@@ -200,6 +200,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       
       if (rawOutcome.includes("confirmed")) outcome = "confirmed";
       else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) outcome = "rejected";
+      else if (rawOutcome.includes("hanged up")) outcome = "hanged_up";
       else if (rawOutcome === "no answer") outcome = "no_answer";
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
@@ -209,6 +210,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       else if (rawStatus === "busy") outcome = "busy";
       else if (rawStatus === "failed") outcome = "failed";
       else if (rawStatus === "rejected" || rawStatus === "declined") outcome = "rejected";
+      else if (rawStatus === "hanged up") outcome = "hanged_up";
       else if (item.picked_up === true) outcome = "completed";
       
       outcomes[outcome] = (outcomes[outcome] || 0) + 1;
@@ -217,6 +219,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
     const labels: Record<string, string> = {
       confirmed: "Confirmed",
       rejected: "Rejected",
+      hanged_up: "Hanged Up",
       no_answer: "No Answer",
       pending: "Pending",
       failed: "Failed",
