@@ -47,9 +47,15 @@ serve(async (req) => {
     // Stream the audio back
     const headers: Record<string, string> = {
       ...corsHeaders,
-      'Content-Type': contentType,
+      'Content-Type': download ? 'audio/mpeg' : contentType,
       'Cache-Control': 'public, max-age=3600',
     };
+
+    if (download) {
+      // Sanitize filename
+      const safeName = filenameParam.replace(/[^a-zA-Z0-9._-]/g, '_');
+      headers['Content-Disposition'] = `attachment; filename="${safeName}"`;
+    }
 
     if (contentLength) {
       headers['Content-Length'] = contentLength;
