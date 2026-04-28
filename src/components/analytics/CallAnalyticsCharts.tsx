@@ -36,6 +36,7 @@ interface CallListItem {
   created_at: string;
   template_id: string | null;
   ai_category?: string | null;
+  call_record?: { result_data?: { status?: string } | null } | null;
 }
 
 interface Template {
