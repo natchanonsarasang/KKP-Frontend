@@ -88,8 +88,9 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "hanged_up", "completed"].includes(mappedStatus);
-    let finalStatus: string = pickedUp ? "success" : "failed";
+    const isIncomplete = mappedStatus === "incomplete";
+    const pickedUp = !isIncomplete && (hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus));
+    let finalStatus: string = isIncomplete ? "incomplete" : (pickedUp ? "success" : "failed");
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -98,7 +99,7 @@ serve(async (req) => {
       no_response: "No Response",
       no_answer: "No Answer",
       completed: "Completed",
-      hanged_up: "Hanged Up",
+      incomplete: "Incomplete",
       failed: "Failed",
       busy: "Busy",
       rejected: "Rejected",
