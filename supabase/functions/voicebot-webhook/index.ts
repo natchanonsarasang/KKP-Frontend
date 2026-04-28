@@ -70,8 +70,8 @@ serve(async (req) => {
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
     } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
-      // Preserve "hanged_up" as its own distinct, completed status — never downgrade to no_answer/failed
-      mappedStatus = "hanged_up";
+      // "hanged_up" is explicitly classified as "incomplete" — never mapped to complete/no_answer/failed
+      mappedStatus = "incomplete";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
