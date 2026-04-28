@@ -69,8 +69,8 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    } else if (rawStatus === "completed") {
-      // If Botnoi says completed, but no one actually spoke, treat it as no_answer (retryable)
+    } else if (rawStatus === "completed" || rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      // If Botnoi says completed/hanged_up, but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
@@ -84,7 +84,8 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
-    const pickedUp = hasUserSpoken || ["confirmed", "declined", "no_response"].includes(mappedStatus);
+    const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
+    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
