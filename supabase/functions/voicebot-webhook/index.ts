@@ -48,6 +48,17 @@ serve(async (req) => {
 
     console.log("Extracted:", { callId, status, action, phoneNumber });
 
+    // GLOBAL FILTER: Completely ignore "hanged_up" payloads.
+    // These must NOT be mapped, stored, queued, displayed, or analyzed anywhere.
+    const rawStatusEarly = String(status || "").toLowerCase();
+    if (rawStatusEarly === "hanged_up" || rawStatusEarly === "hangup" || rawStatusEarly === "hung_up") {
+      console.log("Ignoring 'hanged_up' payload — excluded from all processing.");
+      return new Response(
+        JSON.stringify({ success: true, message: "hanged_up ignored" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!callId && !phoneNumber) {
       return new Response(JSON.stringify({ success: true, message: "No identifiable data" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
