@@ -102,12 +102,30 @@ const CallDashboard = () => {
   const { effectiveUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
 
-  const [dateRange, setDateRange] = useState<DateRangeType>("month");
+  const [dateRange, setDateRange] = useState<DateRangeType>("today");
   const [customRange, setCustomRange] = useState<DayPickerRange | undefined>({
-    from: subDays(new Date(), 30),
+    from: new Date(),
     to: new Date(),
   });
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleDateRangeChange = (v: string) => {
+    const range = v as DateRangeType;
+    setDateRange(range);
+    
+    const now = new Date();
+    if (range === "today") {
+      setCustomRange({ from: now, to: now });
+    } else if (range === "week") {
+      setCustomRange({ from: subDays(now, 7), to: now });
+    } else if (range === "month") {
+      setCustomRange({ from: subMonths(now, 1), to: now });
+    } else if (range === "year") {
+      setCustomRange({ from: subYears(now, 1), to: now });
+    } else if (range === "all") {
+      setCustomRange(undefined);
+    }
+  };
 
   const getDateFilter = useCallback(() => {
     const now = new Date();
@@ -151,7 +169,7 @@ const CallDashboard = () => {
   }, [dateRange, customRange]);
 
   const { data: callRecords, isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
-    queryKey: ["call-records", effectiveUserId, currentWorkspace?.id, dateRange],
+    queryKey: ["call-records", effectiveUserId, currentWorkspace?.id, dateRange, customRange],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
       let query = supabase
@@ -174,7 +192,7 @@ const CallDashboard = () => {
   });
 
   const { data: callListItems, isLoading: loadingItems, refetch: refetchItems } = useQuery({
-    queryKey: ["call-list-items-analytics", effectiveUserId, currentWorkspace?.id, dateRange],
+    queryKey: ["call-list-items-analytics", effectiveUserId, currentWorkspace?.id, dateRange, customRange],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
       let query = supabase
@@ -334,55 +352,59 @@ const CallDashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {dateRange === "custom" && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "justify-start text-left font-normal h-9 min-w-[240px]",
-                    !customRange && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customRange?.from ? (
-                    customRange.to ? (
-                      <>
-                        {format(customRange.from, "d MMM yyyy", { locale: th })} -{" "}
-                        {format(customRange.to, "d MMM yyyy", { locale: th })}
-                      </>
-                    ) : (
-                      format(customRange.from, "d MMM yyyy", { locale: th })
-                    )
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "justify-start text-left font-normal h-9 min-w-[240px]",
+                  !customRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {customRange?.from ? (
+                  customRange.to ? (
+                    <>
+                      {format(customRange.from, "d MMM yyyy", { locale: th })} -{" "}
+                      {format(customRange.to, "d MMM yyyy", { locale: th })}
+                    </>
                   ) : (
-                    <span>เลือกช่วงวันที่</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={customRange?.from}
-                  selected={customRange}
-                  onSelect={setCustomRange}
-                  numberOfMonths={2}
-                  locale={th}
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRangeType)}>
+                    format(customRange.from, "d MMM yyyy", { locale: th })
+                  )
+                ) : (
+                  <span>เลือกช่วงวันที่</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={customRange?.from || new Date()}
+                selected={customRange}
+                onSelect={(range) => {
+                  setCustomRange(range);
+                  if (range) setDateRange("custom");
+                }}
+                numberOfMonths={2}
+                locale={th}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select 
+            value={dateRange === "custom" ? "" : dateRange} 
+            onValueChange={handleDateRangeChange}
+          >
             <SelectTrigger className="w-[140px] h-9 text-sm">
-              <SelectValue />
+              <SelectValue placeholder="เลือกช่วงเวลา" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="today">วันนี้</SelectItem>
               <SelectItem value="week">7 วันที่ผ่านมา</SelectItem>
               <SelectItem value="month">30 วันที่ผ่านมา</SelectItem>
               <SelectItem value="year">1 ปีที่ผ่านมา</SelectItem>
-              <SelectItem value="custom">กำหนดเอง</SelectItem>
               <SelectItem value="all">ทั้งหมด</SelectItem>
             </SelectContent>
           </Select>

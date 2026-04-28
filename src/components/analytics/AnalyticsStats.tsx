@@ -19,12 +19,19 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   
   // Specific Incomplete Statuses
   const noAnswer = completedCalls.filter((item) => 
-    item.call_outcome?.toLowerCase() === "no_answer" || (item.picked_up === false && !item.call_outcome)
+    item.call_outcome?.toLowerCase() === "no_answer" || 
+    item.status?.toLowerCase() === "no_answer" ||
+    (item.picked_up === false && !item.call_outcome)
   );
-  const busy = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy");
-  const failed = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed");
-  const rejected = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "rejected" || item.call_outcome?.toLowerCase() === "declined");
-  const voicemail = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail");
+  const busy = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "busy" || item.status?.toLowerCase() === "busy");
+  const failed = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "failed" || item.status?.toLowerCase() === "failed");
+  const rejected = completedCalls.filter((item) => 
+    item.call_outcome?.toLowerCase() === "rejected" || 
+    item.call_outcome?.toLowerCase() === "declined" ||
+    item.status?.toLowerCase() === "rejected" ||
+    item.status?.toLowerCase() === "declined"
+  );
+  const voicemail = completedCalls.filter((item) => item.call_outcome?.toLowerCase() === "voicemail" || item.status?.toLowerCase() === "voicemail");
 
   const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
   
