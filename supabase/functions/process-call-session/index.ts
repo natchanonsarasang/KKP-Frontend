@@ -414,6 +414,7 @@ async function processSession(supabase: any, sessionId: string) {
 
   const BOT_ID = "69d7214db875327d960ef7ac";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
+  const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -609,6 +610,7 @@ async function processSession(supabase: any, sessionId: string) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${CALL_API_BEARER_TOKEN}`,
           },
           body: JSON.stringify(callPayload),
         });

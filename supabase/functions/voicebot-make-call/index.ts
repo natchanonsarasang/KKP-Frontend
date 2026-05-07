@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const BOT_ID = "69d7214db875327d960ef7ac";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
+const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,7 +38,10 @@ serve(async (req) => {
 
     const response = await fetch(CALL_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${CALL_API_BEARER_TOKEN}`,
+      },
       body: JSON.stringify(callPayload),
     });
 
