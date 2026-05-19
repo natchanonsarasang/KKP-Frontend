@@ -26,7 +26,8 @@ import {
   OutcomeDistributionChart,
   TemplatePerformanceChart,
   TrendChart,
-  AICategoryDistributionChart,
+  MainStatusOverview,
+  SubStatusOverview,
 } from "./analytics/CallAnalyticsCharts";
 import { BestTimeInsights } from "./analytics/BestTimeInsights";
 import { useAdmin } from "@/contexts/AdminContext";
