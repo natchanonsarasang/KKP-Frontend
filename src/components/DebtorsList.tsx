@@ -1145,6 +1145,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       </TableHead>
                       <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
+                      <TableHead className="text-xs">Latest Call Status</TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
