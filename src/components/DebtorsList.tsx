@@ -1105,11 +1105,18 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 <SelectItem value="all">All Call Statuses</SelectItem>
                 <SelectItem value="never">Never Called</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
-                {CALL_STATUS_CATEGORIES.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>
-                    {c.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Main Status</SelectLabel>
+                  {MAIN_STATUSES.map((s) => (
+                    <SelectItem key={`main-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Sub Status</SelectLabel>
+                  {SUB_STATUSES.map((s) => (
+                    <SelectItem key={`sub-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Button
