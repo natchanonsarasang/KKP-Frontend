@@ -1159,7 +1159,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                         </TableHead>
                       ))}
                       <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs">Latest Call Status</TableHead>
                       <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("picked_up_count")}
