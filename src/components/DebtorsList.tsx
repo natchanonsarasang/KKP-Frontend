@@ -71,6 +71,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
 } from "@/lib/debtorVariables";
+import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel } from "@/lib/callStatuses";
 
 function buildVariablesToSave(
   tv: Record<string, string>,
