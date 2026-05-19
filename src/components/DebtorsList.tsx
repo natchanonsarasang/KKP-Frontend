@@ -1057,6 +1057,21 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={callStatusFilter} onValueChange={handleCallStatusChange}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All Call Statuses" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover max-h-80">
+              <SelectItem value="all">All Call Statuses</SelectItem>
+              <SelectItem value="never">Never Called</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+              {CALL_STATUS_CATEGORIES.map((c) => (
+                <SelectItem key={c.id} value={c.name}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}
