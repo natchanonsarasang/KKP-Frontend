@@ -48,3 +48,24 @@ export function resolveLatestStatusLabel(rawCategory: string | null | undefined)
   if (MAIN_STATUS_NAMES.has(rawCategory)) return LABEL_BY_NAME[rawCategory] ?? rawCategory;
   return "Other";
 }
+
+export type CallStatusTone =
+  | "callback"
+  | "transfer"
+  | "soft-callback"
+  | "done"
+  | "skip"
+  | "other"
+  | "none";
+
+export function resolveLatestStatusTone(rawCategory: string | null | undefined): CallStatusTone {
+  if (!rawCategory) return "none";
+  switch (rawCategory) {
+    case "Call Later":      return "callback";
+    case "Transfer":        return "transfer";
+    case "Not Convenient":  return "soft-callback";
+    case "Normal Flow":     return "done";
+    case "Wrong Person":    return "skip";
+    default:                return "other";
+  }
+}

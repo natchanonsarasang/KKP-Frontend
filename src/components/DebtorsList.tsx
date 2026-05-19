@@ -71,7 +71,17 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
 } from "@/lib/debtorVariables";
-import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel } from "@/lib/callStatuses";
+import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel, resolveLatestStatusTone, type CallStatusTone } from "@/lib/callStatuses";
+
+const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
+  callback:        "bg-warning/15 text-warning border-warning/40",
+  transfer:        "bg-warning/15 text-warning border-warning/40",
+  "soft-callback": "bg-warning/10 text-warning border-warning/25",
+  done:            "bg-success/15 text-success border-success/30",
+  skip:            "bg-destructive/10 text-destructive border-destructive/30",
+  other:           "bg-muted text-muted-foreground border-border",
+  none:            "",
+};
 
 function buildVariablesToSave(
   tv: Record<string, string>,
@@ -1250,11 +1260,29 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
                           </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
-                            </span>
+                          <TableCell className="whitespace-nowrap">
+                            {(() => {
+                              const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
+                              const label = resolveLatestStatusLabel(raw);
+                              const tone = resolveLatestStatusTone(raw);
+                              if (tone === "none") {
+                                return <span className="text-sm text-muted-foreground">–</span>;
+                              }
+                              const isHighPriority = tone === "callback" || tone === "transfer";
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={`gap-1.5 font-medium ${STATUS_TONE_CLASS[tone]}`}
+                                >
+                                  {isHighPriority && (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+                                  )}
+                                  {label}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
+
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
