@@ -1282,6 +1282,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
                             <span className={`text-sm font-medium ${(phoneStats?.picked_up || 0) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
                               {phoneStats?.picked_up || 0}
                             </span>
