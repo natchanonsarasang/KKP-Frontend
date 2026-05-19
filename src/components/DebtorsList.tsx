@@ -1260,11 +1260,29 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
                           </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
-                            </span>
+                          <TableCell className="whitespace-nowrap">
+                            {(() => {
+                              const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
+                              const label = resolveLatestStatusLabel(raw);
+                              const tone = resolveLatestStatusTone(raw);
+                              if (tone === "none") {
+                                return <span className="text-sm text-muted-foreground">–</span>;
+                              }
+                              const isHighPriority = tone === "callback" || tone === "transfer";
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={`gap-1.5 font-medium ${STATUS_TONE_CLASS[tone]}`}
+                                >
+                                  {isHighPriority && (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+                                  )}
+                                  {label}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
+
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
