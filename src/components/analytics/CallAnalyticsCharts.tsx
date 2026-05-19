@@ -15,6 +15,18 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
+import { MAIN_STATUSES, SUB_STATUSES, resolveMainStatus, resolveSubStatus } from "@/lib/callStatuses";
+
+// Tailwind class palettes for the Main Status cards (mapped by status key).
+const MAIN_STATUS_CARD_CLASSES: Record<string, { bg: string; border: string; text: string }> = {
+  acknowledged:        { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  promised:            { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700" },
+  restructure:         { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-700" },
+  callback_scheduled:  { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-700" },
+  already_paid:        { bg: "bg-teal-50",    border: "border-teal-200",    text: "text-teal-700" },
+  not_reached:         { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700" },
+  refused:             { bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-700" },
+};
 
 interface CallRecord {
   id: string;
