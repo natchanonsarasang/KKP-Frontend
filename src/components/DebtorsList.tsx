@@ -217,13 +217,17 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     if (callStatusFilter === "all" || !latestStatusByDebtor) return null;
     const ids: string[] = [];
     latestStatusByDebtor.forEach((cat, debtorId) => {
+      if (callStatusFilter === "never") return; // handled separately
       const label = resolveLatestStatusLabel(cat);
-      if (callStatusFilter === "never") {
-        // handled separately below — these debtors are NOT in the map at all
+      if (callStatusFilter === "Other") {
+        if (label === "Other") ids.push(debtorId);
         return;
       }
-      if (callStatusFilter === "Other" && label === "Other") ids.push(debtorId);
-      else if (cat === callStatusFilter) ids.push(debtorId);
+      // Match by resolved label (works whether DB stores English, Thai, or raw keywords)
+      const mainOrSub = resolveMainStatus(cat) ?? resolveSubStatus(cat);
+      if (mainOrSub?.label === callStatusFilter || cat === callStatusFilter) {
+        ids.push(debtorId);
+      }
     });
     return ids;
   }, [callStatusFilter, latestStatusByDebtor]);
