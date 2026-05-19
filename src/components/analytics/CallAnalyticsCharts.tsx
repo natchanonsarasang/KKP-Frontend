@@ -572,3 +572,249 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
     </Card>
   );
 };
+
+// ============================================================
+// Main Status Overview — primary collection outcomes
+// ============================================================
+
+const MAIN_STATUSES: { key: string; label: string; color: string; bg: string; border: string; text: string; match: (cat: string) => boolean }[] = [
+  {
+    key: "acknowledged",
+    label: "Acknowledged",
+    color: "#10b981",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+    match: (c) => c.includes("acknowledge") || c.includes("normal flow") || c.includes("แจ้งข้อมูลครบกำหนด"),
+  },
+  {
+    key: "promised",
+    label: "Promised to Pay",
+    color: "#3b82f6",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    text: "text-blue-700",
+    match: (c) => c.includes("promise") || c.includes("ยืนยันชำระ") || c.includes("รับปาก"),
+  },
+  {
+    key: "restructure",
+    label: "Restructure Requested",
+    color: "#8b5cf6",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-700",
+    match: (c) => c.includes("restructure") || c.includes("ปรับโครงสร้าง"),
+  },
+  {
+    key: "callback_scheduled",
+    label: "Callback Scheduled",
+    color: "#f59e0b",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-700",
+    match: (c) => c.includes("callback scheduled") || c.includes("scheduled callback"),
+  },
+  {
+    key: "already_paid",
+    label: "Already Paid",
+    color: "#14b8a6",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    text: "text-teal-700",
+    match: (c) => c.includes("already paid") || c.includes("ชำระเรียบร้อย"),
+  },
+  {
+    key: "not_reached",
+    label: "Not Reached",
+    color: "#64748b",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    text: "text-slate-700",
+    match: () => false,
+  },
+  {
+    key: "refused",
+    label: "Refused",
+    color: "#f43f5e",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    text: "text-rose-700",
+    match: (c) => c.includes("refuse") || c.includes("declined") || c.includes("rejected") || c.includes("ปฏิเสธ"),
+  },
+];
+
+export const MainStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
+  const data = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(MAIN_STATUSES.map((s) => [s.key, 0]));
+
+    callListItems.forEach((item) => {
+      const s = (item.status || "").toLowerCase();
+      const r = (item.call_record?.result_data?.status || "").toLowerCase();
+      const o = (item.call_outcome || "").toLowerCase();
+      if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
+
+      if (
+        item.picked_up === false ||
+        o === "no answer" || o === "no_answer" || o === "busy" || o === "failed" ||
+        r === "no answer" || r === "busy" || r === "failed"
+      ) {
+        counts["not_reached"]++;
+        return;
+      }
+
+      const cat = (item.ai_category || "").toLowerCase();
+      const matched = MAIN_STATUSES.find((m) => m.key !== "not_reached" && m.match(cat));
+      if (matched) counts[matched.key]++;
+    });
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return MAIN_STATUSES.map((s) => ({
+      ...s,
+      value: counts[s.key],
+      pct: total > 0 ? Math.round((counts[s.key] / total) * 100) : 0,
+      total,
+    }));
+  }, [callListItems]);
+
+  const total = data[0]?.total ?? 0;
+  const pieData = data.filter((d) => d.value > 0).map((d) => ({ name: d.label, value: d.value, color: d.color }));
+
+  return (
+    <Card className="shadow-sm border-blue-100">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-blue-900">Main Status Overview</CardTitle>
+        <p className="text-xs text-muted-foreground">Primary collection outcomes across all calls</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+          <div className="h-64">
+            {pieData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                No data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={2} dataKey="value">
+                    {pieData.map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    formatter={(v: number, n: string) => [`${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`, n]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {data.map((s) => (
+              <div
+                key={s.key}
+                className={`${s.bg} ${s.border} border rounded-lg p-3 transition-all hover:shadow-sm`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                  <span className={`text-[11px] font-semibold ${s.text} uppercase tracking-wide truncate`}>
+                    {s.label}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className={`text-xl font-bold ${s.text}`}>{s.value}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{s.pct}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ============================================================
+// SubStatus Overview — secondary conversation behaviors
+// ============================================================
+
+const SUB_STATUSES: { key: string; label: string; match: (cat: string) => boolean }[] = [
+  { key: "not_convenient", label: "Not Convenient", match: (c) => c.includes("not convenient") || c.includes("ไม่สะดวก") },
+  { key: "wrong_person", label: "Wrong Person", match: (c) => c.includes("wrong person") || c.includes("ไม่ใช่ผู้") },
+  { key: "call_later", label: "Call Later", match: (c) => c.includes("call later") || c.includes("นัดหมายให้ติดต่อใหม่") },
+  { key: "transfer", label: "Transfer", match: (c) => c.includes("transfer") || c.includes("ขอคุยกับเจ้าหน้าที่") },
+  { key: "background_noise", label: "Background Noise", match: (c) => c.includes("background noise") || c.includes("เสียงแทรก") || c.includes("เสียงรบกวน") },
+  { key: "silence", label: "Silence", match: (c) => c.includes("silence") || c.includes("เงียบ") },
+  { key: "dropped_call", label: "Dropped Call", match: (c) => c.includes("dropped") || c.includes("สายหลุด") },
+  { key: "out_of_topic", label: "Out of Topic", match: (c) => c.includes("out of topic") || c.includes("พูดเรื่องอื่น") },
+];
+
+export const SubStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
+  const data = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(SUB_STATUSES.map((s) => [s.key, 0]));
+
+    callListItems.forEach((item) => {
+      const s = (item.status || "").toLowerCase();
+      const r = (item.call_record?.result_data?.status || "").toLowerCase();
+      const o = (item.call_outcome || "").toLowerCase();
+      if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
+
+      const cat = (item.ai_category || "").toLowerCase();
+      if (!cat) return;
+      const matched = SUB_STATUSES.find((m) => m.match(cat));
+      if (matched) counts[matched.key]++;
+    });
+
+    return SUB_STATUSES.map((s) => ({ name: s.label, value: counts[s.key] }));
+  }, [callListItems]);
+
+  const hasData = data.some((d) => d.value > 0);
+
+  return (
+    <Card className="shadow-sm border-blue-100">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-blue-900">SubStatus Overview</CardTitle>
+        <p className="text-xs text-muted-foreground">Secondary conversation behaviors observed</p>
+      </CardHeader>
+      <CardContent>
+        <div className="h-72">
+          {!hasData ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              No conversation insights yet
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ top: 5, right: 24, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
+                  width={130}
+                  className="text-muted-foreground"
+                />
+                <Tooltip
+                  cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                  formatter={(v: number) => [`${v} calls`, "Count"]}
+                />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 6, 6, 0]} barSize={18} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
