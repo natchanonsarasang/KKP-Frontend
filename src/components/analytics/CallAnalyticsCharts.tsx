@@ -589,72 +589,6 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
 // Main Status Overview — primary collection outcomes
 // ============================================================
 
-const MAIN_STATUSES: { key: string; label: string; color: string; bg: string; border: string; text: string; match: (cat: string) => boolean }[] = [
-  {
-    key: "acknowledged",
-    label: "Acknowledged",
-    color: "#10b981",
-    bg: "bg-emerald-50",
-    border: "border-emerald-200",
-    text: "text-emerald-700",
-    match: (c) => c.includes("acknowledge") || c.includes("normal flow") || c.includes("แจ้งข้อมูลครบกำหนด"),
-  },
-  {
-    key: "promised",
-    label: "Promised to Pay",
-    color: "#3b82f6",
-    bg: "bg-blue-50",
-    border: "border-blue-200",
-    text: "text-blue-700",
-    match: (c) => c.includes("promise") || c.includes("ยืนยันชำระ") || c.includes("รับปาก"),
-  },
-  {
-    key: "restructure",
-    label: "Restructure Requested",
-    color: "#8b5cf6",
-    bg: "bg-violet-50",
-    border: "border-violet-200",
-    text: "text-violet-700",
-    match: (c) => c.includes("restructure") || c.includes("ปรับโครงสร้าง"),
-  },
-  {
-    key: "callback_scheduled",
-    label: "Callback Scheduled",
-    color: "#f59e0b",
-    bg: "bg-amber-50",
-    border: "border-amber-200",
-    text: "text-amber-700",
-    match: (c) => c.includes("callback scheduled") || c.includes("scheduled callback"),
-  },
-  {
-    key: "already_paid",
-    label: "Already Paid",
-    color: "#14b8a6",
-    bg: "bg-teal-50",
-    border: "border-teal-200",
-    text: "text-teal-700",
-    match: (c) => c.includes("already paid") || c.includes("ชำระเรียบร้อย"),
-  },
-  {
-    key: "not_reached",
-    label: "Not Reached",
-    color: "#64748b",
-    bg: "bg-slate-50",
-    border: "border-slate-200",
-    text: "text-slate-700",
-    match: () => false,
-  },
-  {
-    key: "refused",
-    label: "Refused",
-    color: "#f43f5e",
-    bg: "bg-rose-50",
-    border: "border-rose-200",
-    text: "text-rose-700",
-    match: (c) => c.includes("refuse") || c.includes("declined") || c.includes("rejected") || c.includes("ปฏิเสธ"),
-  },
-];
-
 export const MainStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const data = useMemo(() => {
     const counts: Record<string, number> = Object.fromEntries(MAIN_STATUSES.map((s) => [s.key, 0]));
@@ -665,23 +599,19 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
       const o = (item.call_outcome || "").toLowerCase();
       if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
 
-      if (
-        item.picked_up === false ||
-        o === "no answer" || o === "no_answer" || o === "busy" || o === "failed" ||
-        r === "no answer" || r === "busy" || r === "failed"
-      ) {
-        counts["not_reached"]++;
-        return;
-      }
-
-      const cat = (item.ai_category || "").toLowerCase();
-      const matched = MAIN_STATUSES.find((m) => m.key !== "not_reached" && m.match(cat));
+      const matched = resolveMainStatus(item.ai_category, {
+        picked_up: item.picked_up,
+        status: item.status,
+        call_outcome: item.call_outcome,
+        result_status: item.call_record?.result_data?.status ?? null,
+      });
       if (matched) counts[matched.key]++;
     });
 
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     return MAIN_STATUSES.map((s) => ({
       ...s,
+      ...(MAIN_STATUS_CARD_CLASSES[s.key] ?? { bg: "bg-muted", border: "border-border", text: "text-foreground" }),
       value: counts[s.key],
       pct: total > 0 ? Math.round((counts[s.key] / total) * 100) : 0,
       total,
