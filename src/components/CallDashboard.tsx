@@ -431,11 +431,15 @@ const CallDashboard = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <AnalyticsStats callListItems={callListItems || []} />
-            <div className="grid grid-cols-1 gap-4">
-              <AICategoryDistributionChart callListItems={callListItems || []} />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <MainStatusOverview callListItems={callListItems || []} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SubStatusOverview callListItems={callListItems || []} />
               <OutcomeDistributionChart callListItems={callListItems || []} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
               <BestTimeInsights callListItems={callListItems || []} />
             </div>
