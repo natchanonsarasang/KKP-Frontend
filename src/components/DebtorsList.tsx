@@ -1081,6 +1081,21 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base font-medium">Debtor List</CardTitle>
           <div className="flex items-center gap-2">
+            <Select value={callStatusFilter} onValueChange={handleCallStatusChange}>
+              <SelectTrigger className="h-8 w-56 text-xs">
+                <SelectValue placeholder="All Call Statuses" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover max-h-80">
+                <SelectItem value="all">All Call Statuses</SelectItem>
+                <SelectItem value="never">Never Called</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+                {CALL_STATUS_CATEGORIES.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="default"
               size="sm"
