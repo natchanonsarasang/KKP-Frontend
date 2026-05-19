@@ -676,6 +676,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     setPage(0);
   };
 
+  const handleCallStatusChange = (value: string) => {
+    setCallStatusFilter(value);
+    setPage(0);
+  };
+
   // Fetch aggregate stats separately using count queries to avoid 1000 row limit
   const { data: statsData } = useQuery({
     queryKey: ["debtors-stats", effectiveUserId, currentWorkspace?.id],
