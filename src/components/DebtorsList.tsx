@@ -1250,6 +1250,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
                           </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
+                            </span>
+                          </TableCell>
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
@@ -1280,11 +1285,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             >
                               {statusConfig[debtor.status]?.label || debtor.status}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
-                            </span>
                           </TableCell>
                           <TableCell>
                             <span className={`text-sm font-medium ${(phoneStats?.picked_up || 0) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
