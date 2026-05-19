@@ -71,7 +71,17 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
 } from "@/lib/debtorVariables";
-import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel } from "@/lib/callStatuses";
+import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel, resolveLatestStatusTone, type CallStatusTone } from "@/lib/callStatuses";
+
+const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
+  callback:        "bg-warning/15 text-warning border-warning/40",
+  transfer:        "bg-warning/15 text-warning border-warning/40",
+  "soft-callback": "bg-warning/10 text-warning border-warning/25",
+  done:            "bg-success/15 text-success border-success/30",
+  skip:            "bg-destructive/10 text-destructive border-destructive/30",
+  other:           "bg-muted text-muted-foreground border-border",
+  none:            "",
+};
 
 function buildVariablesToSave(
   tv: Record<string, string>,
