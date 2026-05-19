@@ -73,7 +73,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
 } from "@/lib/debtorVariables";
-import { CALL_STATUS_CATEGORIES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
+import { MAIN_STATUSES, SUB_STATUSES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
 
 const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
   callback:        "bg-warning/15 text-warning border-warning/40",
