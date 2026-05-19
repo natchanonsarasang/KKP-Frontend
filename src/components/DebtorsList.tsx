@@ -1057,21 +1057,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={callStatusFilter} onValueChange={handleCallStatusChange}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="All Call Statuses" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover max-h-80">
-              <SelectItem value="all">All Call Statuses</SelectItem>
-              <SelectItem value="never">Never Called</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-              {CALL_STATUS_CATEGORIES.map((c) => (
-                <SelectItem key={c.id} value={c.name}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}
@@ -1096,6 +1081,21 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base font-medium">Debtor List</CardTitle>
           <div className="flex items-center gap-2">
+            <Select value={callStatusFilter} onValueChange={handleCallStatusChange}>
+              <SelectTrigger className="h-8 w-56 text-xs">
+                <SelectValue placeholder="All Call Statuses" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover max-h-80">
+                <SelectItem value="all">All Call Statuses</SelectItem>
+                <SelectItem value="never">Never Called</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+                {CALL_STATUS_CATEGORIES.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="default"
               size="sm"
@@ -1145,6 +1145,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       </TableHead>
                       <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
+                      <TableHead className="text-xs">Latest Call Status</TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
@@ -1158,7 +1159,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                         </TableHead>
                       ))}
                       <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs">Latest Call Status</TableHead>
                       <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort("picked_up_count")}
@@ -1250,6 +1250,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
                           </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
+                            </span>
+                          </TableCell>
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
                             // Format numbers with commas for Debt, Installment, or any numeric-looking values
@@ -1280,11 +1285,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             >
                               {statusConfig[debtor.status]?.label || debtor.status}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {resolveLatestStatusLabel(latestStatusByDebtor?.get(debtor.id) ?? null)}
-                            </span>
                           </TableCell>
                           <TableCell>
                             <span className={`text-sm font-medium ${(phoneStats?.picked_up || 0) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
