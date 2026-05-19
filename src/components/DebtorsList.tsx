@@ -178,9 +178,49 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   const pageSize = 50;
 
+  // Latest call status per debtor (from call_list_items.ai_category, ordered by called_at)
+  const { data: latestStatusByDebtor } = useQuery({
+    queryKey: ["debtor-latest-call-status", effectiveUserId, currentWorkspace?.id],
+    queryFn: async () => {
+      const map = new Map<string, string | null>();
+      if (!currentWorkspace?.id) return map;
+      let q = supabase
+        .from("call_list_items")
+        .select("debtor_id, ai_category, called_at, created_at")
+        .eq("workspace_id", currentWorkspace.id)
+        .order("called_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (effectiveUserId) q = q.eq("user_id", effectiveUserId);
+      const { data, error } = await q.limit(5000);
+      if (error) throw error;
+      (data ?? []).forEach((row: { debtor_id: string; ai_category: string | null }) => {
+        if (!map.has(row.debtor_id)) map.set(row.debtor_id, row.ai_category ?? null);
+      });
+      return map;
+    },
+    enabled: !!effectiveUserId && !!currentWorkspace?.id,
+    refetchInterval: 10000,
+  });
+
+  // Debtor IDs matching the active call-status filter (server-side scope)
+  const filteredDebtorIds = useMemo<string[] | null>(() => {
+    if (callStatusFilter === "all" || !latestStatusByDebtor) return null;
+    const ids: string[] = [];
+    latestStatusByDebtor.forEach((cat, debtorId) => {
+      const label = resolveLatestStatusLabel(cat);
+      if (callStatusFilter === "never") {
+        // handled separately below — these debtors are NOT in the map at all
+        return;
+      }
+      if (callStatusFilter === "Other" && label === "Other") ids.push(debtorId);
+      else if (cat === callStatusFilter) ids.push(debtorId);
+    });
+    return ids;
+  }, [callStatusFilter, latestStatusByDebtor]);
+
   // Server-side paginated query with sorting and filtering
   const { data: debtorsData, isLoading, isFetching } = useQuery({
-    queryKey: ["debtors", searchQuery, statusFilter, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id],
+    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id],
     queryFn: async () => {
       let query = supabase
         .from("debtors")
@@ -201,6 +241,20 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         query = query.eq("status", statusFilter);
       }
 
+      // Apply call-status filter
+      if (callStatusFilter === "never") {
+        const calledIds = Array.from(latestStatusByDebtor?.keys() ?? []);
+        if (calledIds.length > 0) {
+          query = query.not("id", "in", `(${calledIds.map((i) => `"${i}"`).join(",")})`);
+        }
+      } else if (callStatusFilter !== "all") {
+        const ids = filteredDebtorIds ?? [];
+        if (ids.length === 0) {
+          return { debtors: [] as Debtor[], totalCount: 0 };
+        }
+        query = query.in("id", ids);
+      }
+
       // Apply search filter (server-side)
       if (searchQuery) {
         query = query.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
@@ -209,7 +263,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       // Apply sorting - handle variable column sorting with JSONB
       if (sortField.startsWith("var:")) {
         const varKey = sortField.replace("var:", "");
-        // Sort by JSONB field using ->> operator for text extraction
         query = query.order(`variables->${varKey}`, { ascending: sortDirection === "asc", nullsFirst: false });
       } else {
         query = query.order(sortField, { ascending: sortDirection === "asc", nullsFirst: false });
