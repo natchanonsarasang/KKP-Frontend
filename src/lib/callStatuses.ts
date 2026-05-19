@@ -1,53 +1,15 @@
-// Single source of truth for call outcome categories used across UI.
-// Keep this in sync with CONVERSATION_CATEGORIES in supabase/functions/voicebot-webhook/index.ts
-
-export interface CallStatusDef {
-  id: number;
-  name: string;          // canonical value stored in DB (call_list_items.ai_category)
-  label: string;         // user-facing English label
-  thai: string;
-}
-
-export const CALL_STATUS_CATEGORIES: CallStatusDef[] = [
-  { id: 5,  name: "Not Convenient",   label: "Not Convenient",          thai: "ลูกค้าไม่สะดวกคุย" },
-  { id: 6,  name: "Already Paid",     label: "Already Paid",            thai: "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว" },
-  { id: 7,  name: "Normal Flow",      label: "Appointment Scheduled",   thai: "นัดหมายชำระแล้ว" },
-  { id: 8,  name: "Wrong Person",     label: "Wrong Person",            thai: "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน" },
-  { id: 9,  name: "Transfer",         label: "Requested Agent Transfer", thai: "ลูกค้าขอคุยกับเจ้าหน้าที่" },
-  { id: 10, name: "Call Later",       label: "Call Back Later",         thai: "ลูกค้านัดหมายให้ติดต่อใหม่" },
-  { id: 11, name: "Barge-in",         label: "Barge-in",                thai: "ลูกค้าสอบถามข้อมูลระหว่างสนทนา" },
-  { id: 12, name: "Background Noise", label: "Background Noise",        thai: "เสียงแทรก/เสียงรบกวน" },
-  { id: 13, name: "Out of Topic",     label: "Out of Topic",            thai: "ลูกค้าพูดเรื่องอื่น" },
-  { id: 14, name: "Silence",          label: "Silence",                 thai: "ลูกค้าเงียบ" },
-  { id: 15, name: "Dropped Call",     label: "Dropped Call",            thai: "สายหลุดระหว่างสนทนา" },
-  { id: 16, name: "Repeat Request",   label: "Repeat Request",          thai: "ลูกค้าแจ้งให้ทวนประโยคเดิม" },
-];
-
-// The 5 "main" statuses that get a custom display label; anything else → "Other"
-const MAIN_STATUS_NAMES = new Set([
-  "Normal Flow",
-  "Call Later",
-  "Not Convenient",
-  "Wrong Person",
-  "Transfer",
-]);
-
-const LABEL_BY_NAME: Record<string, string> = CALL_STATUS_CATEGORIES.reduce(
-  (acc, c) => ({ ...acc, [c.name]: c.label }),
-  {} as Record<string, string>
-);
-
-/**
- * Resolve the display label for a debtor's latest call outcome.
- *  - null/empty (never called) → "-"
- *  - one of the 5 main statuses → mapped label
- *  - any other recorded status → "Other"
- */
-export function resolveLatestStatusLabel(rawCategory: string | null | undefined): string {
-  if (!rawCategory) return "-";
-  if (MAIN_STATUS_NAMES.has(rawCategory)) return LABEL_BY_NAME[rawCategory] ?? rawCategory;
-  return "Other";
-}
+// =====================================================================
+// Single source of truth for ALL call-status taxonomy used across the UI.
+//
+// Two domains:
+//   1) MAIN_STATUSES  — primary collection outcomes (what happened, business-wise)
+//   2) SUB_STATUSES   — secondary conversation behaviors (what happened, mechanically)
+//
+// Change a label / color / matcher here and it propagates to:
+//   - Analytics dashboard (Main Status Overview + SubStatus Overview charts)
+//   - Debtor List "Latest Call Status" badge column
+//   - Debtor List call-status filter dropdown
+// =====================================================================
 
 export type CallStatusTone =
   | "callback"
@@ -58,14 +20,240 @@ export type CallStatusTone =
   | "other"
   | "none";
 
+export interface StatusDef {
+  /** Stable id used as React key / filter value */
+  key: string;
+  /** English UI label */
+  label: string;
+  /** Thai display label */
+  thai: string;
+  /** Hex color used in charts and badge dots */
+  color: string;
+  /** Tailwind tone bucket used for badge styling */
+  tone: CallStatusTone;
+  /** Returns true if a raw ai_category (lower-cased) belongs to this status */
+  match: (lowerCat: string) => boolean;
+}
+
+// ---------------------------------------------------------------------
+// 1. MAIN STATUSES — primary collection outcomes
+// ---------------------------------------------------------------------
+export const MAIN_STATUSES: StatusDef[] = [
+  {
+    key: "acknowledged",
+    label: "Acknowledged",
+    thai: "รับทราบ",
+    color: "#10b981",
+    tone: "done",
+    match: (c) => c.includes("acknowledge") || c.includes("normal flow") || c.includes("แจ้งข้อมูลครบกำหนด") || c.includes("รับทราบ"),
+  },
+  {
+    key: "promised",
+    label: "Promised to Pay",
+    thai: "รับปากชำระ",
+    color: "#3b82f6",
+    tone: "done",
+    match: (c) => c.includes("promise") || c.includes("ยืนยันชำระ") || c.includes("รับปาก"),
+  },
+  {
+    key: "restructure",
+    label: "Restructure Requested",
+    thai: "ขอปรับโครงสร้างหนี้",
+    color: "#8b5cf6",
+    tone: "soft-callback",
+    match: (c) => c.includes("restructure") || c.includes("ปรับโครงสร้าง"),
+  },
+  {
+    key: "callback_scheduled",
+    label: "Callback Scheduled",
+    thai: "นัดติดต่อใหม่",
+    color: "#f59e0b",
+    tone: "callback",
+    match: (c) => c.includes("callback scheduled") || c.includes("scheduled callback") || c.includes("นัดติดต่อ"),
+  },
+  {
+    key: "already_paid",
+    label: "Already Paid",
+    thai: "ชำระเรียบร้อยแล้ว",
+    color: "#14b8a6",
+    tone: "done",
+    match: (c) => c.includes("already paid") || c.includes("ชำระเรียบร้อย"),
+  },
+  {
+    key: "not_reached",
+    label: "Not Reached",
+    thai: "ติดต่อไม่ได้",
+    color: "#64748b",
+    tone: "other",
+    // Inferred from call-level signals (picked_up=false, busy, failed, no answer),
+    // never from ai_category alone, so matcher returns false.
+    match: () => false,
+  },
+  {
+    key: "refused",
+    label: "Refused",
+    thai: "ปฏิเสธ",
+    color: "#f43f5e",
+    tone: "skip",
+    match: (c) => c.includes("refuse") || c.includes("declined") || c.includes("rejected") || c.includes("ปฏิเสธ"),
+  },
+];
+
+// ---------------------------------------------------------------------
+// 2. SUB STATUSES — secondary conversation behaviors
+// ---------------------------------------------------------------------
+export const SUB_STATUSES: StatusDef[] = [
+  {
+    key: "not_convenient",
+    label: "Not Convenient",
+    thai: "ไม่สะดวกคุย",
+    color: "#f59e0b",
+    tone: "soft-callback",
+    match: (c) => c.includes("not convenient") || c.includes("ไม่สะดวก"),
+  },
+  {
+    key: "wrong_person",
+    label: "Wrong Person",
+    thai: "ไม่ใช่ผู้เอาประกัน",
+    color: "#ef4444",
+    tone: "skip",
+    match: (c) => c.includes("wrong person") || c.includes("ไม่ใช่ผู้"),
+  },
+  {
+    key: "call_later",
+    label: "Call Later",
+    thai: "นัดหมายให้ติดต่อใหม่",
+    color: "#f97316",
+    tone: "callback",
+    match: (c) => c.includes("call later") || c.includes("นัดหมายให้ติดต่อใหม่"),
+  },
+  {
+    key: "transfer",
+    label: "Transfer",
+    thai: "ขอคุยกับเจ้าหน้าที่",
+    color: "#a855f7",
+    tone: "transfer",
+    match: (c) => c.includes("transfer") || c.includes("ขอคุยกับเจ้าหน้าที่"),
+  },
+  {
+    key: "background_noise",
+    label: "Background Noise",
+    thai: "เสียงแทรก/เสียงรบกวน",
+    color: "#06b6d4",
+    tone: "other",
+    match: (c) => c.includes("background noise") || c.includes("เสียงแทรก") || c.includes("เสียงรบกวน"),
+  },
+  {
+    key: "silence",
+    label: "Silence",
+    thai: "ลูกค้าเงียบ",
+    color: "#71717a",
+    tone: "other",
+    match: (c) => c.includes("silence") || c.includes("เงียบ"),
+  },
+  {
+    key: "dropped_call",
+    label: "Dropped Call",
+    thai: "สายหลุดระหว่างสนทนา",
+    color: "#ec4899",
+    tone: "other",
+    match: (c) => c.includes("dropped") || c.includes("สายหลุด"),
+  },
+  {
+    key: "out_of_topic",
+    label: "Out of Topic",
+    thai: "พูดเรื่องอื่น",
+    color: "#22c55e",
+    tone: "other",
+    match: (c) => c.includes("out of topic") || c.includes("พูดเรื่องอื่น"),
+  },
+];
+
+// Convenience union for places that don't care about the domain.
+export const ALL_STATUSES: StatusDef[] = [...MAIN_STATUSES, ...SUB_STATUSES];
+
+// ---------------------------------------------------------------------
+// Resolvers
+// ---------------------------------------------------------------------
+export interface ResolveContext {
+  picked_up?: boolean | null;
+  status?: string | null;
+  call_outcome?: string | null;
+  result_status?: string | null;
+}
+
+/**
+ * Resolve the MAIN status for a raw ai_category, optionally factoring in
+ * call-level signals so unanswered calls land in "Not Reached".
+ */
+export function resolveMainStatus(
+  rawCategory: string | null | undefined,
+  ctx?: ResolveContext,
+): StatusDef | null {
+  if (ctx) {
+    const s = (ctx.status || "").toLowerCase();
+    const o = (ctx.call_outcome || "").toLowerCase();
+    const r = (ctx.result_status || "").toLowerCase();
+    if (
+      ctx.picked_up === false ||
+      o === "no answer" || o === "no_answer" || o === "busy" || o === "failed" ||
+      r === "no answer" || r === "busy" || r === "failed" ||
+      s === "no_answer" || s === "busy" || s === "failed"
+    ) {
+      return MAIN_STATUSES.find((m) => m.key === "not_reached") ?? null;
+    }
+  }
+  if (!rawCategory) return null;
+  const cat = rawCategory.toLowerCase();
+  return MAIN_STATUSES.find((m) => m.key !== "not_reached" && m.match(cat)) ?? null;
+}
+
+/** Resolve the SUB status (conversation behavior) for a raw ai_category. */
+export function resolveSubStatus(rawCategory: string | null | undefined): StatusDef | null {
+  if (!rawCategory) return null;
+  const cat = rawCategory.toLowerCase();
+  return SUB_STATUSES.find((s) => s.match(cat)) ?? null;
+}
+
+/**
+ * For the Debtor List "Latest Call Status" badge column.
+ *   - never called  → "-"
+ *   - matches main  → main label
+ *   - matches sub   → sub label
+ *   - otherwise     → "Other"
+ */
+export function resolveLatestStatusLabel(rawCategory: string | null | undefined): string {
+  if (!rawCategory) return "-";
+  const main = resolveMainStatus(rawCategory);
+  if (main) return main.label;
+  const sub = resolveSubStatus(rawCategory);
+  if (sub) return sub.label;
+  return "Other";
+}
+
 export function resolveLatestStatusTone(rawCategory: string | null | undefined): CallStatusTone {
   if (!rawCategory) return "none";
-  switch (rawCategory) {
-    case "Call Later":      return "callback";
-    case "Transfer":        return "transfer";
-    case "Not Convenient":  return "soft-callback";
-    case "Normal Flow":     return "done";
-    case "Wrong Person":    return "skip";
-    default:                return "other";
-  }
+  const main = resolveMainStatus(rawCategory);
+  if (main) return main.tone;
+  const sub = resolveSubStatus(rawCategory);
+  if (sub) return sub.tone;
+  return "other";
 }
+
+// ---------------------------------------------------------------------
+// LEGACY — kept for backward-compatibility with any older imports.
+// Prefer MAIN_STATUSES / SUB_STATUSES for all new code.
+// ---------------------------------------------------------------------
+export interface CallStatusDef {
+  id: number;
+  name: string;
+  label: string;
+  thai: string;
+}
+
+export const CALL_STATUS_CATEGORIES: CallStatusDef[] = ALL_STATUSES.map((s, i) => ({
+  id: i + 1,
+  name: s.label,   // value stored as filter selection
+  label: s.label,
+  thai: s.thai,
+}));

@@ -50,7 +50,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -71,7 +73,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
 } from "@/lib/debtorVariables";
-import { CALL_STATUS_CATEGORIES, resolveLatestStatusLabel, resolveLatestStatusTone, type CallStatusTone } from "@/lib/callStatuses";
+import { MAIN_STATUSES, SUB_STATUSES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
 
 const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
   callback:        "bg-warning/15 text-warning border-warning/40",
@@ -217,13 +219,17 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     if (callStatusFilter === "all" || !latestStatusByDebtor) return null;
     const ids: string[] = [];
     latestStatusByDebtor.forEach((cat, debtorId) => {
+      if (callStatusFilter === "never") return; // handled separately
       const label = resolveLatestStatusLabel(cat);
-      if (callStatusFilter === "never") {
-        // handled separately below — these debtors are NOT in the map at all
+      if (callStatusFilter === "Other") {
+        if (label === "Other") ids.push(debtorId);
         return;
       }
-      if (callStatusFilter === "Other" && label === "Other") ids.push(debtorId);
-      else if (cat === callStatusFilter) ids.push(debtorId);
+      // Match by resolved label (works whether DB stores English, Thai, or raw keywords)
+      const mainOrSub = resolveMainStatus(cat) ?? resolveSubStatus(cat);
+      if (mainOrSub?.label === callStatusFilter || cat === callStatusFilter) {
+        ids.push(debtorId);
+      }
     });
     return ids;
   }, [callStatusFilter, latestStatusByDebtor]);
@@ -1099,11 +1105,18 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 <SelectItem value="all">All Call Statuses</SelectItem>
                 <SelectItem value="never">Never Called</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
-                {CALL_STATUS_CATEGORIES.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>
-                    {c.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Main Status</SelectLabel>
+                  {MAIN_STATUSES.map((s) => (
+                    <SelectItem key={`main-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Sub Status</SelectLabel>
+                  {SUB_STATUSES.map((s) => (
+                    <SelectItem key={`sub-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Button
