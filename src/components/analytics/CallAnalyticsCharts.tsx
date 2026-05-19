@@ -685,17 +685,6 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
 // SubStatus Overview — secondary conversation behaviors
 // ============================================================
 
-const SUB_STATUSES: { key: string; label: string; match: (cat: string) => boolean }[] = [
-  { key: "not_convenient", label: "Not Convenient", match: (c) => c.includes("not convenient") || c.includes("ไม่สะดวก") },
-  { key: "wrong_person", label: "Wrong Person", match: (c) => c.includes("wrong person") || c.includes("ไม่ใช่ผู้") },
-  { key: "call_later", label: "Call Later", match: (c) => c.includes("call later") || c.includes("นัดหมายให้ติดต่อใหม่") },
-  { key: "transfer", label: "Transfer", match: (c) => c.includes("transfer") || c.includes("ขอคุยกับเจ้าหน้าที่") },
-  { key: "background_noise", label: "Background Noise", match: (c) => c.includes("background noise") || c.includes("เสียงแทรก") || c.includes("เสียงรบกวน") },
-  { key: "silence", label: "Silence", match: (c) => c.includes("silence") || c.includes("เงียบ") },
-  { key: "dropped_call", label: "Dropped Call", match: (c) => c.includes("dropped") || c.includes("สายหลุด") },
-  { key: "out_of_topic", label: "Out of Topic", match: (c) => c.includes("out of topic") || c.includes("พูดเรื่องอื่น") },
-];
-
 export const SubStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const data = useMemo(() => {
     const counts: Record<string, number> = Object.fromEntries(SUB_STATUSES.map((s) => [s.key, 0]));
@@ -706,9 +695,7 @@ export const SubStatusOverview = ({ callListItems }: { callListItems: CallListIt
       const o = (item.call_outcome || "").toLowerCase();
       if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
 
-      const cat = (item.ai_category || "").toLowerCase();
-      if (!cat) return;
-      const matched = SUB_STATUSES.find((m) => m.match(cat));
+      const matched = resolveSubStatus(item.ai_category);
       if (matched) counts[matched.key]++;
     });
 
