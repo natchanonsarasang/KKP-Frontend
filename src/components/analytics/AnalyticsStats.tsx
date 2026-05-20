@@ -109,7 +109,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
           { label: "Failed", value: failed.length, icon: XCircle, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
           { label: "Rejected", value: rejected.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
           { label: "Voicemail", value: voicemail.length, icon: FileText, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
-          { label: "HANG UP", value: hangup.length, icon: PhoneOff, cardClass: "bg-yellow-300/40", valueClass: "text-yellow-700" },
+          { label: "HANG UP", value: hangup.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
         ].map((item) => (
           <Card key={item.label} className={`border-none shadow-sm ${item.cardClass}`}>
             <CardContent className="p-3 text-center">
