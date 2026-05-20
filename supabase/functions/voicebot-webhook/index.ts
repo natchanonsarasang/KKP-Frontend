@@ -66,9 +66,18 @@ serve(async (req) => {
     }
 
     // Check if user actually spoke in the conversation
-    // A valid pickup should have at least one "User:" entry with some text after it
+    // A valid pickup should have at least one "User:" entry with real speech
+    // "TIMEOUT" markers from ASR indicate the user turn existed but the customer stayed silent.
     const userParts = conversationLog ? conversationLog.split("User:") : [];
-    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
+    const hasUserSpoken =
+      userParts.length > 1 &&
+      userParts.some(
+        (p, i) =>
+          i > 0 &&
+          p.trim().length > 0 &&
+          !p.toUpperCase().includes("TIMEOUT"),
+      );
+    const isSilence = userParts.length > 1 && !hasUserSpoken;
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
