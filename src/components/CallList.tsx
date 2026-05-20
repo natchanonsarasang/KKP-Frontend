@@ -345,7 +345,7 @@ const CallList = () => {
         if (data && data.length > 0) {
           // Defensive client-side filter in case any leak through
           const filtered = data.filter(
-            (it: any) => it.status !== "hanged_up" && it.status !== "incomplete"
+            (it: any) => it.status !== "incomplete"
           );
           allItems = [...allItems, ...filtered];
           page++;
