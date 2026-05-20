@@ -15,14 +15,11 @@ interface AnalyticsStatsProps {
 }
 
 export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
-  // GLOBAL EXCLUSION: drop any "hanged_up" / "incomplete" records before any computation
+  // GLOBAL EXCLUSION: drop any "incomplete" records before any computation (hanged_up IS counted)
   const visibleItems = callListItems.filter((item) => {
     const s = (item.status || "").toLowerCase();
     const r = ((item as any).call_record?.result_data?.status || "").toLowerCase();
-    const o = (item.call_outcome || "").toLowerCase();
-    return s !== "hanged_up" && s !== "incomplete"
-      && r !== "hanged_up" && r !== "incomplete"
-      && !o.includes("hanged");
+    return s !== "incomplete" && r !== "incomplete";
   });
 
   // Use status to determine if a call was attempted if called_at is missing
