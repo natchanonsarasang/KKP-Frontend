@@ -80,8 +80,8 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    // NOTE: "hanged_up" / "hangup" / "hung_up" are filtered out at the top of this handler.
-    // They never reach this mapping block. Do not add a branch for them here.
+    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";
