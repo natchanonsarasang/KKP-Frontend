@@ -85,9 +85,19 @@ export const MAIN_STATUSES: StatusDef[] = [
     thai: "ติดต่อไม่ได้",
     color: "#64748b",
     tone: "other",
-    // Inferred from call-level signals (picked_up=false, busy, failed, no answer),
-    // never from ai_category alone, so matcher returns false.
-    match: () => false,
+    // Usually inferred from call-level signals (picked_up=false, busy, failed, no answer),
+    // but also match when ai_category itself was written as a "not reached"-style label.
+    match: (c) =>
+      c.includes("not reached") ||
+      c.includes("not_reached") ||
+      c.includes("no answer") ||
+      c.includes("no_answer") ||
+      c === "busy" ||
+      c === "failed" ||
+      c === "unreachable" ||
+      c.includes("voicemail") ||
+      c.includes("ติดต่อไม่ได้") ||
+      c.includes("ไม่รับสาย"),
   },
   {
     key: "refused",
