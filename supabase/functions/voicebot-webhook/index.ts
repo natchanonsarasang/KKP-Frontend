@@ -456,9 +456,11 @@ serve(async (req) => {
   }
 });
 
-// Strict call classifier
-// STEP 1: Check json_log status first → No Answer / Rejected / Busy / Voicemail
-// STEP 2: If none, classify conversation_log into one of 12 conversation categories
+// Strict call classifier — aligned with src/lib/callStatuses.ts (15-status taxonomy)
+// STEP 1: Check json_log status first → Not Reached (no_answer/busy/voicemail/rejected/unreachable)
+// STEP 2: Rule-based audio-quality detection → Background Noise
+// STEP 3: AI classifies conversation_log into one of the 15 Main/Sub categories,
+//         prioritizing the FINAL business outcome over transient behaviors.
 type ClassifyResult = {
   status_id: number;
   status_name: string;
@@ -466,96 +468,139 @@ type ClassifyResult = {
   reason: string;
 };
 
-const SYSTEM_STATUS_MAP: Record<string, { id: number; name: string; category: string; thai: string }> = {
-  no_answer: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  "no answer": { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  unreachable: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  rejected: { id: 2, name: "Rejected", category: "Rejected", thai: "ลูกค้าตัดสาย" },
-  busy: { id: 3, name: "Busy", category: "Busy", thai: "ลูกค้าสายไม่ว่าง" },
-  voicemail: { id: 4, name: "Voicemail", category: "Voicemail", thai: "เข้าสู่ระบบฝากข้อความ" },
+// System-level statuses from the telephony layer all collapse to "Not Reached"
+// in the new taxonomy (the customer could not actually be contacted).
+const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
+  no_answer:   { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
+  "no answer": { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
+  unreachable: { name: "Not Reached", thai: "ติดต่อไม่ได้" },
+  rejected:    { name: "Not Reached", thai: "ลูกค้าตัดสาย" },
+  busy:        { name: "Not Reached", thai: "ลูกค้าสายไม่ว่าง" },
+  voicemail:   { name: "Not Reached", thai: "เข้าสู่ระบบฝากข้อความ" },
+  failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
-const CONVERSATION_CATEGORIES = [
-  { id: 5, name: "Not Convenient", thai: "ลูกค้าไม่สะดวกคุย" },
-  { id: 6, name: "Already Paid", thai: "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว" },
-  { id: 7, name: "Normal Flow", thai: "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ" },
-  { id: 8, name: "Wrong Person", thai: "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน" },
-  { id: 9, name: "Transfer", thai: "ลูกค้าขอคุยกับเจ้าหน้าที่" },
-  { id: 10, name: "Call Later", thai: "ลูกค้านัดหมายให้ติดต่อใหม่" },
-  { id: 11, name: "Barge-in", thai: "ลูกค้าสอบถามข้อมูลระหว่างสนทนา" },
-  { id: 12, name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน" },
-  { id: 13, name: "Out of Topic", thai: "ลูกค้าพูดเรื่องอื่น" },
-  { id: 14, name: "Silence", thai: "ลูกค้าเงียบ" },
-  { id: 15, name: "Dropped Call", thai: "สายหลุดระหว่างสนทนา" },
-  { id: 16, name: "Repeat Request", thai: "ลูกค้าแจ้งให้ทวนประโยคเดิม" },
+// 15-status taxonomy — must stay in sync with MAIN_STATUSES + SUB_STATUSES
+// in src/lib/callStatuses.ts. The `name` field is what gets persisted into
+// call_list_items.ai_category and consumed by the Analytics dashboard.
+const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
+  // --- Main outcomes ---
+  { id: 1,  name: "Acknowledged",          thai: "รับทราบ",                  group: "main" },
+  { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
+  { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
+  { id: 4,  name: "Callback Scheduled",    thai: "นัดติดต่อใหม่",              group: "main" },
+  { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
+  { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
+  { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
+  // --- Conversation behaviors ---
+  { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
+  { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
+  { id: 10, name: "Call Later",            thai: "นัดหมายให้ติดต่อใหม่",        group: "sub"  },
+  { id: 11, name: "Transfer",              thai: "ขอคุยกับเจ้าหน้าที่",         group: "sub"  },
+  { id: 12, name: "Background Noise",      thai: "เสียงแทรก/เสียงรบกวน",       group: "sub"  },
+  { id: 13, name: "Silence",               thai: "ลูกค้าเงียบ",                group: "sub"  },
+  { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
+  { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
 ];
+
+// Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
+const AUDIO_QUALITY_PATTERNS: RegExp[] = [
+  /can'?t hear/i,
+  /cannot hear/i,
+  /hard to hear/i,
+  /loud noise/i,
+  /too noisy/i,
+  /background noise/i,
+  /unclear audio/i,
+  /audio (is )?unclear/i,
+  /breaking up/i,
+  /ไม่ได้ยิน/,
+  /เสียงไม่ชัด/,
+  /เสียงดัง/,
+  /เสียงรบกวน/,
+  /เสียงแทรก/,
+];
+
+function detectAudioQualityIssue(log: string): boolean {
+  return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
+}
+
+function makeResult(name: string, reason: string): ClassifyResult {
+  const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
+  return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
+}
 
 async function classifyCall(
   payload: Record<string, unknown>,
   log: string,
   apiKey: string | undefined,
 ): Promise<ClassifyResult> {
-  // STEP 1: System-level status check (json_log)
+  // STEP 1: System-level status check (telephony layer)
   const rawStatus = String(payload.status || "").toLowerCase().trim();
   const sys = SYSTEM_STATUS_MAP[rawStatus];
   if (sys) {
-    return {
-      status_id: sys.id,
-      status_name: sys.name,
-      category: sys.category,
-      reason: `System status: ${rawStatus} → ${sys.thai}`,
-    };
+    return makeResult(sys.name, `System status: ${rawStatus} → ${sys.thai}`);
   }
 
-  // STEP 2: Conversation analysis required
+  // STEP 2: No / empty conversation → Not Reached
   if (!log || log.trim().length < 5) {
-    const silence = CONVERSATION_CATEGORIES.find((c) => c.name === "Silence")!;
-    return {
-      status_id: silence.id,
-      status_name: silence.name,
-      category: silence.name,
-      reason: "No conversation log present",
-    };
+    return makeResult("Not Reached", "No conversation log present");
+  }
+
+  // STEP 3: Rule-based audio-quality detection (runs before AI)
+  if (detectAudioQualityIssue(log)) {
+    return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
   }
 
   if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, defaulting to Normal Flow");
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI key missing" };
+    console.warn("LOVABLE_API_KEY not found, defaulting to Acknowledged");
+    return makeResult("Acknowledged", "AI key missing");
   }
 
   const categoryList = CONVERSATION_CATEGORIES.map(
-    (c) => `${c.id}. ${c.name} (${c.thai})`,
+    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
   ).join("\n");
 
   const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
-Choose exactly ONE conversation category from this list:
+Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
-CRITICAL CLASSIFICATION RULES:
-- ALWAYS classify by the FINAL OUTCOME of the call, not by transient events that occurred mid-conversation.
-- "Repeat Request", "Barge-in", "Background Noise", and "Out of Topic" are TRANSIENT events, NOT final statuses.
-  Only use them if the call ENDED WITHOUT a clear resolution (e.g., the conversation ended while still off-topic, still being interrupted by noise, or still asking to repeat — with no resolved outcome).
-- If the customer eventually confirmed/acknowledged payment info → "Normal Flow".
-- If the customer eventually said they already paid → "Already Paid".
-- If the customer eventually said it's the wrong person → "Wrong Person".
-- If the customer eventually requested to talk to staff → "Transfer".
-- If the customer eventually asked to be called back later → "Call Later".
-- If the customer eventually said it's not convenient → "Not Convenient".
-- Prefer the resolved outcome over any earlier interruption, repeat request, off-topic remark, or background noise.
+CATEGORY DEFINITIONS
 
-BARGE-IN vs DROPPED CALL (IMPORTANT DISTINCTION):
-- "Barge-in" = the customer INTERRUPTED the bot to ASK A QUESTION or interact mid-call. Use this even if the call ended abruptly afterward, as long as there was a customer question/interaction before the end.
-- "Dropped Call" = the call was cut off / disconnected with NO question or interaction from the customer (pure disconnection, silence, or technical drop with no engagement).
-- Examples:
-  * Customer asked a question mid-call → call ended → "Barge-in"
-  * Call suddenly disconnected, no customer interaction at all → "Dropped Call"
+Main Outcomes (business result of the call — ALWAYS PREFER THESE):
+- Acknowledged           → Customer acknowledges/understands the debt info but does NOT explicitly promise payment, refuse, or request restructuring. Normal informational flow.
+- Promised to Pay        → Customer explicitly confirms they will pay, or gives a specific payment date/time/amount.
+- Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
+- Callback Scheduled     → A specific callback time/date is agreed (customer or bot proposes and the other agrees). Different from a vague "call me sometime".
+- Already Paid           → Customer states the payment has already been completed/settled.
+- Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
+- Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
 
-Output format (STRICT JSON, no markdown):
+Conversation Behaviors (use ONLY when no clear business outcome above exists):
+- Not Convenient   → Customer says it is not a convenient time but did not commit to a callback time.
+- Wrong Person     → Customer says this is not the policyholder / wrong number.
+- Call Later       → Customer vaguely asks to be called another time without a fixed schedule.
+- Transfer         → Customer asks to speak to a human agent / staff.
+- Background Noise → Audio quality issues, loud background, customer cannot hear clearly, transcript dominated by noise.
+- Silence          → Customer remained silent throughout / no verbal response.
+- Dropped Call     → Call disconnected with no meaningful customer interaction (pure cutoff).
+- Out of Topic     → Customer kept talking about unrelated topics with no resolution.
+
+CRITICAL CLASSIFICATION RULES
+1. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior.
+   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Callback Scheduled) appear in the same call, choose the BUSINESS OUTCOME.
+2. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
+3. Decide based on the FINAL state of the call, not transient mid-call events.
+4. "Promised to Pay" requires an explicit commitment from the customer — not just acknowledgement.
+5. "Callback Scheduled" requires a concrete time/date agreement. Otherwise prefer "Call Later".
+6. "Refused" requires a clear refusal — not just reluctance or "not convenient".
+7. If unsure between Acknowledged and a behavior category, prefer Acknowledged when the customer engaged with the debt info.
+
+Output format (STRICT JSON, no markdown, no commentary):
 {
-  "status_id": <number 5-16>,
-  "status_name": "<exact English label>",
-  "reason": "<short explanation focused on the FINAL outcome>",
-  "chart_update": { "category": "<exact English label>", "increment": 1 }
+  "status_name": "<exact English label from the list>",
+  "confidence": <number between 0 and 1>,
+  "reason": "<short explanation focused on the FINAL outcome>"
 }`;
 
   try {
@@ -575,16 +620,17 @@ Output format (STRICT JSON, no markdown):
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI request failed" };
+      return makeResult("Acknowledged", "AI request failed");
     }
 
     const result = await response.json();
     const content = result.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(content);
 
-    const chartCategory: string = parsed?.chart_update?.category || parsed?.status_name;
+    const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
+    const normalized = String(aiName).trim().toLowerCase();
     const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === String(chartCategory || "").toLowerCase(),
+      (c) => c.name.toLowerCase() === normalized,
     );
 
     if (match) {
@@ -596,10 +642,11 @@ Output format (STRICT JSON, no markdown):
       };
     }
 
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Unmatched AI category" };
+    console.warn("Unmatched AI category, defaulting to Acknowledged:", aiName);
+    return makeResult("Acknowledged", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Classifier exception" };
+    return makeResult("Acknowledged", "Classifier exception");
   }
 }
 
