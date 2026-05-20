@@ -66,9 +66,18 @@ serve(async (req) => {
     }
 
     // Check if user actually spoke in the conversation
-    // A valid pickup should have at least one "User:" entry with some text after it
+    // A valid pickup should have at least one "User:" entry with real speech
+    // "TIMEOUT" markers from ASR indicate the user turn existed but the customer stayed silent.
     const userParts = conversationLog ? conversationLog.split("User:") : [];
-    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
+    const hasUserSpoken =
+      userParts.length > 1 &&
+      userParts.some(
+        (p, i) =>
+          i > 0 &&
+          p.trim().length > 0 &&
+          !p.toUpperCase().includes("TIMEOUT"),
+      );
+    const isSilence = userParts.length > 1 && !hasUserSpoken;
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
@@ -98,7 +107,7 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
@@ -547,7 +556,17 @@ async function classifyCall(
     return makeResult("Not Reached", "No conversation log present");
   }
 
-  // STEP 3: Rule-based audio-quality detection (runs before AI)
+  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
+  const userTurns = log.split("User:").slice(1);
+  const hasRealSpeech = userTurns.some((t) => {
+    const text = t.trim().toUpperCase();
+    return text.length > 0 && !text.includes("TIMEOUT");
+  });
+  if (userTurns.length > 0 && !hasRealSpeech) {
+    return makeResult("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
+  }
+
+  // STEP 4: Rule-based audio-quality detection (runs before AI)
   if (detectAudioQualityIssue(log)) {
     return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
   }
