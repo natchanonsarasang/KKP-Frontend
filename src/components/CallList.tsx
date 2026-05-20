@@ -818,6 +818,11 @@ const CallList = () => {
     },
   });
 
+  // Queue-only statuses — these are the active queue. Completed/historical
+  // statuses are intentionally excluded so clearing the queue never wipes
+  // Latest Call Status / call history shown on the Debtor List.
+  const QUEUE_STATUSES = ["pending", "retry_pending", "calling", "scheduled"] as const;
+
   // Clear pending items only
   const clearPendingMutation = useMutation({
     mutationFn: async () => {
@@ -838,23 +843,28 @@ const CallList = () => {
     },
   });
 
-  // Clear completed items
+  // Clear completed items (explicit user action to wipe history rows)
   const clearCompletedMutation = useMutation({
     mutationFn: async () => {
+      if (!currentWorkspace?.id) throw new Error("No workspace selected");
       const { error } = await supabase
         .from("call_list_items")
         .delete()
-        .in("status", ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"]);
+        .in("status", ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"])
+        .eq("workspace_id", currentWorkspace.id)
+        .eq("user_id", effectiveUserId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       queryClient.invalidateQueries({ queryKey: ["available-debtors-for-call"] });
+      queryClient.invalidateQueries({ queryKey: ["debtor-latest-call-status"] });
       toast.success("Cleared completed calls");
     },
   });
 
-  // Clear all items from call list
+  // Clear the active queue only. Preserves completed/failed history so the
+  // Debtor List "Latest Call Status" remains intact.
   const clearAllMutation = useMutation({
     mutationFn: async () => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
@@ -862,6 +872,7 @@ const CallList = () => {
       const { error } = await supabase
         .from("call_list_items")
         .delete()
+        .in("status", QUEUE_STATUSES as unknown as string[])
         .eq("workspace_id", currentWorkspace.id)
         .eq("user_id", effectiveUserId);
       if (error) throw error;
@@ -870,7 +881,7 @@ const CallList = () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       queryClient.invalidateQueries({ queryKey: ["available-debtors-for-call"] });
       queryClient.invalidateQueries({ queryKey: ["all-active-debtors"] });
-      toast.success("Cleared all calls from queue");
+      toast.success("Queue cleared (call history preserved)");
     },
   });
 
