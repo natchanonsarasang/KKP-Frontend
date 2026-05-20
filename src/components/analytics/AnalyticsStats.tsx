@@ -43,6 +43,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
     else if (rawOutcome === "failed") resolved = "failed";
+    else if (rawStatus === "hanged up" || rawOutcome === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === false) resolved = "no_answer";
     else if (rawStatus === "no answer") resolved = "no_answer";
     else if (rawStatus === "busy") resolved = "busy";
@@ -58,8 +59,9 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   const failed = categorized.filter(i => i.resolved === "failed");
   const rejected = categorized.filter(i => i.resolved === "rejected");
   const voicemail = categorized.filter(i => i.resolved === "voicemail");
+  const hangup = categorized.filter(i => i.resolved === "hanged_up");
 
-  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
+  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length + hangup.length;
 
   const pickupRate = completedCalls.length > 0
     ? Math.round((pickedUp.length / completedCalls.length) * 100)
