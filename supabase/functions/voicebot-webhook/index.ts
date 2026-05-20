@@ -84,7 +84,10 @@ serve(async (req) => {
       mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
-      mappedStatus = hasUserSpoken ? "completed" : "no_answer";
+      mappedStatus =
+        (hasUserSpoken || isSilence)
+          ? "completed"
+          : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
     } else if (rawStatus === "busy") {
