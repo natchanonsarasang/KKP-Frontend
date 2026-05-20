@@ -215,7 +215,7 @@ export function resolveMainStatus(
   }
   if (!rawCategory) return null;
   const cat = rawCategory.toLowerCase();
-  return MAIN_STATUSES.find((m) => m.key !== "not_reached" && m.match(cat)) ?? null;
+  return MAIN_STATUSES.find((m) => m.match(cat)) ?? null;
 }
 
 /** Resolve the SUB status (conversation behavior) for a raw ai_category. */
