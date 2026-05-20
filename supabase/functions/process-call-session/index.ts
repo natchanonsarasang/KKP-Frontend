@@ -412,7 +412,7 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
 
-  const BOT_ID = "69d7214db875327d960ef7ac";
+  const BOT_ID = "6a06964fb875327d960f05f0";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 
