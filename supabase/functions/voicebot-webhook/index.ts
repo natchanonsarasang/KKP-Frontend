@@ -556,7 +556,17 @@ async function classifyCall(
     return makeResult("Not Reached", "No conversation log present");
   }
 
-  // STEP 3: Rule-based audio-quality detection (runs before AI)
+  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
+  const userTurns = log.split("User:").slice(1);
+  const hasRealSpeech = userTurns.some((t) => {
+    const text = t.trim().toUpperCase();
+    return text.length > 0 && !text.includes("TIMEOUT");
+  });
+  if (userTurns.length > 0 && !hasRealSpeech) {
+    return makeResult("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
+  }
+
+  // STEP 4: Rule-based audio-quality detection (runs before AI)
   if (detectAudioQualityIssue(log)) {
     return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
   }
