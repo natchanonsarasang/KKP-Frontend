@@ -48,16 +48,7 @@ serve(async (req) => {
 
     console.log("Extracted:", { callId, status, action, phoneNumber });
 
-    // GLOBAL FILTER: Completely ignore "hanged_up" payloads.
-    // These must NOT be mapped, stored, queued, displayed, or analyzed anywhere.
-    const rawStatusEarly = String(status || "").toLowerCase();
-    if (rawStatusEarly === "hanged_up" || rawStatusEarly === "hangup" || rawStatusEarly === "hung_up") {
-      console.log("Ignoring 'hanged_up' payload — excluded from all processing.");
-      return new Response(
-        JSON.stringify({ success: true, message: "hanged_up ignored" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Note: "hanged_up" payloads are now processed normally and mapped to "hanged_up" status.
 
     if (!callId && !phoneNumber) {
       return new Response(JSON.stringify({ success: true, message: "No identifiable data" }), {
@@ -89,8 +80,8 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    // NOTE: "hanged_up" / "hangup" / "hung_up" are filtered out at the top of this handler.
-    // They never reach this mapping block. Do not add a branch for them here.
+    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
       mappedStatus = hasUserSpoken ? "completed" : "no_answer";

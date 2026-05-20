@@ -15,14 +15,11 @@ interface AnalyticsStatsProps {
 }
 
 export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
-  // GLOBAL EXCLUSION: drop any "hanged_up" / "incomplete" records before any computation
+  // GLOBAL EXCLUSION: drop any "incomplete" records before any computation (hanged_up IS counted)
   const visibleItems = callListItems.filter((item) => {
     const s = (item.status || "").toLowerCase();
     const r = ((item as any).call_record?.result_data?.status || "").toLowerCase();
-    const o = (item.call_outcome || "").toLowerCase();
-    return s !== "hanged_up" && s !== "incomplete"
-      && r !== "hanged_up" && r !== "incomplete"
-      && !o.includes("hanged");
+    return s !== "incomplete" && r !== "incomplete";
   });
 
   // Use status to determine if a call was attempted if called_at is missing
@@ -46,6 +43,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
     else if (rawOutcome === "failed") resolved = "failed";
+    else if (rawStatus === "hanged up" || rawOutcome === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === false) resolved = "no_answer";
     else if (rawStatus === "no answer") resolved = "no_answer";
     else if (rawStatus === "busy") resolved = "busy";
@@ -61,8 +59,9 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
   const failed = categorized.filter(i => i.resolved === "failed");
   const rejected = categorized.filter(i => i.resolved === "rejected");
   const voicemail = categorized.filter(i => i.resolved === "voicemail");
+  const hangup = categorized.filter(i => i.resolved === "hanged_up");
 
-  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length;
+  const totalIncomplete = noAnswer.length + busy.length + failed.length + rejected.length + voicemail.length + hangup.length;
 
   const pickupRate = completedCalls.length > 0
     ? Math.round((pickedUp.length / completedCalls.length) * 100)
@@ -103,17 +102,18 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       </div>
 
       {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
-          { label: "Busy", value: busy.length, icon: PhoneCall },
-          { label: "Failed", value: failed.length, icon: XCircle },
-          { label: "Rejected", value: rejected.length, icon: PhoneOff },
-          { label: "Voicemail", value: voicemail.length, icon: FileText },
+          { label: "No Answer", value: noAnswer.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Busy", value: busy.length, icon: PhoneCall, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Failed", value: failed.length, icon: XCircle, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Rejected", value: rejected.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Voicemail", value: voicemail.length, icon: FileText, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "HANG UP", value: hangup.length, icon: PhoneOff, cardClass: "bg-yellow-300/40", valueClass: "text-yellow-700" },
         ].map((item) => (
-          <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">
+          <Card key={item.label} className={`border-none shadow-sm ${item.cardClass}`}>
             <CardContent className="p-3 text-center">
-              <div className="text-lg font-bold text-amber-600 mb-0.5">{item.value}</div>
+              <div className={`text-lg font-bold mb-0.5 ${item.valueClass}`}>{item.value}</div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase truncate" title={item.label}>
                 {item.label}
               </div>

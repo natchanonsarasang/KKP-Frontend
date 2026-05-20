@@ -329,8 +329,8 @@ const CallList = () => {
           .from("call_list_items")
           .select("*")
           .eq("workspace_id", currentWorkspace.id)
-          // Exclude "hanged_up"/"incomplete" entirely from the system
-          .not("status", "in", '("hanged_up","incomplete")')
+          // Exclude "incomplete" entirely from the system (hanged_up rows ARE included)
+          .not("status", "in", '("incomplete")')
           .order("created_at", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -345,7 +345,7 @@ const CallList = () => {
         if (data && data.length > 0) {
           // Defensive client-side filter in case any leak through
           const filtered = data.filter(
-            (it: any) => it.status !== "hanged_up" && it.status !== "incomplete"
+            (it: any) => it.status !== "incomplete"
           );
           allItems = [...allItems, ...filtered];
           page++;
@@ -1482,14 +1482,11 @@ const CallList = () => {
   const processedCount = callListItems?.filter(item => item.status === "completed" || item.status === "failed").length || 0;
   
   // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
-  // GLOBAL EXCLUSION: drop "hanged_up"/"incomplete" rows before any computation
+  // GLOBAL EXCLUSION: drop "incomplete" rows before any computation (hanged_up IS counted)
   const visibleCallListItems = (callListItems || []).filter((item) => {
     const s = (item.status || "").toLowerCase();
     const r = ((item as any).call_record?.result_data?.status || "").toLowerCase();
-    const o = (item.call_outcome || "").toLowerCase();
-    return s !== "hanged_up" && s !== "incomplete"
-      && r !== "hanged_up" && r !== "incomplete"
-      && !o.includes("hanged");
+    return s !== "incomplete" && r !== "incomplete";
   });
 
   const completedCallsStats = visibleCallListItems.filter((item) =>
@@ -1511,6 +1508,7 @@ const CallList = () => {
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
     else if (rawOutcome === "failed") resolved = "failed";
+    else if (rawStatus === "hanged up" || rawOutcome === "hanged up") resolved = "hanged_up";
     else if (item.picked_up === false) resolved = "no_answer";
     else if (rawStatus === "no answer") resolved = "no_answer";
     else if (rawStatus === "busy") resolved = "busy";
@@ -1526,8 +1524,9 @@ const CallList = () => {
   const failedCount = categorizedStats.filter(i => i.resolved === "failed").length;
   const rejectedCount = categorizedStats.filter(i => i.resolved === "rejected").length;
   const voicemailCount = categorizedStats.filter(i => i.resolved === "voicemail").length;
+  const hangupCount = categorizedStats.filter(i => i.resolved === "hanged_up").length;
 
-  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount;
+  const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount + hangupCount;
 
   const pickupRate = completedCallsStats.length > 0
     ? Math.round((pickedUpCount / completedCallsStats.length) * 100)
