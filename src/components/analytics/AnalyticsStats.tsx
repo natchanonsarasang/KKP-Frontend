@@ -102,17 +102,18 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
       </div>
 
       {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "No Answer", value: noAnswer.length, icon: PhoneOff },
-          { label: "Busy", value: busy.length, icon: PhoneCall },
-          { label: "Failed", value: failed.length, icon: XCircle },
-          { label: "Rejected", value: rejected.length, icon: PhoneOff },
-          { label: "Voicemail", value: voicemail.length, icon: FileText },
+          { label: "No Answer", value: noAnswer.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Busy", value: busy.length, icon: PhoneCall, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Failed", value: failed.length, icon: XCircle, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Rejected", value: rejected.length, icon: PhoneOff, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "Voicemail", value: voicemail.length, icon: FileText, cardClass: "bg-amber-500/10", valueClass: "text-amber-600" },
+          { label: "HANG UP", value: hangup.length, icon: PhoneOff, cardClass: "bg-yellow-300/40", valueClass: "text-yellow-700" },
         ].map((item) => (
-          <Card key={item.label} className="border-none shadow-sm bg-amber-500/10">
+          <Card key={item.label} className={`border-none shadow-sm ${item.cardClass}`}>
             <CardContent className="p-3 text-center">
-              <div className="text-lg font-bold text-amber-600 mb-0.5">{item.value}</div>
+              <div className={`text-lg font-bold mb-0.5 ${item.valueClass}`}>{item.value}</div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase truncate" title={item.label}>
                 {item.label}
               </div>
