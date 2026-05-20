@@ -107,7 +107,7 @@ serve(async (req) => {
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
 
     // Map to English outcome
