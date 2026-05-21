@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
+import { getThaiDateToday } from "@/lib/debtorVariables";
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
