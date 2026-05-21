@@ -26,12 +26,12 @@ serve(async (req) => {
       "Tel. Number": phone_number,
       template_id: template_id,
     };
-    
+
     // Only add Appointment Date if constructed_message is provided
     if (constructed_message) {
       callPayload["Appointment Date"] = constructed_message;
     }
-    
+
     console.log("Final payload to Botnoi:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {

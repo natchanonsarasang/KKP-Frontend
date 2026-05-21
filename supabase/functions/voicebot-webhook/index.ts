@@ -48,16 +48,7 @@ serve(async (req) => {
 
     console.log("Extracted:", { callId, status, action, phoneNumber });
 
-    // GLOBAL FILTER: Completely ignore "hanged_up" payloads.
-    // These must NOT be mapped, stored, queued, displayed, or analyzed anywhere.
-    const rawStatusEarly = String(status || "").toLowerCase();
-    if (rawStatusEarly === "hanged_up" || rawStatusEarly === "hangup" || rawStatusEarly === "hung_up") {
-      console.log("Ignoring 'hanged_up' payload — excluded from all processing.");
-      return new Response(
-        JSON.stringify({ success: true, message: "hanged_up ignored" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Note: "hanged_up" payloads are now processed normally and mapped to "hanged_up" status.
 
     if (!callId && !phoneNumber) {
       return new Response(JSON.stringify({ success: true, message: "No identifiable data" }), {
@@ -66,9 +57,18 @@ serve(async (req) => {
     }
 
     // Check if user actually spoke in the conversation
-    // A valid pickup should have at least one "User:" entry with some text after it
+    // A valid pickup should have at least one "User:" entry with real speech
+    // "TIMEOUT" markers from ASR indicate the user turn existed but the customer stayed silent.
     const userParts = conversationLog ? conversationLog.split("User:") : [];
-    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
+    const hasUserSpoken =
+      userParts.length > 1 &&
+      userParts.some(
+        (p, i) =>
+          i > 0 &&
+          p.trim().length > 0 &&
+          !p.toUpperCase().includes("TIMEOUT"),
+      );
+    const isSilence = userParts.length > 1 && !hasUserSpoken;
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
@@ -80,11 +80,14 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    // NOTE: "hanged_up" / "hangup" / "hung_up" are filtered out at the top of this handler.
-    // They never reach this mapping block. Do not add a branch for them here.
+    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
-      mappedStatus = hasUserSpoken ? "completed" : "no_answer";
+      mappedStatus =
+        (hasUserSpoken || isSilence)
+          ? "completed"
+          : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
     } else if (rawStatus === "busy") {
@@ -97,9 +100,29 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
+    // If timeout/no-answer happened AFTER the bot already asked about callback
+    // availability (day/time/convenience), reclassify as "Not Convenient" instead.
+    if (mappedStatus === "no_answer" && conversationLog) {
+      const botParts = conversationLog.split(/Bot:|Assistant:/i).slice(1);
+      const lastBotMsg = (botParts[botParts.length - 1] || "").toLowerCase();
+      const allBotText = botParts.join(" ").toLowerCase();
+      const callbackKeywords = [
+        "convenient", "callback", "call back", "call you back",
+        "what day", "what time", "which day", "which time",
+        "when would", "when can", "when is", "available",
+        "สะดวก", "นัด", "วันไหน", "เวลาไหน", "ติดต่อใหม่", "โทรกลับ",
+      ];
+      const askedAboutCallback =
+        callbackKeywords.some((k) => lastBotMsg.includes(k)) ||
+        callbackKeywords.some((k) => allBotText.includes(k));
+      if (askedAboutCallback) {
+        mappedStatus = "not_convenient";
+      }
+    }
+
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
-    let finalStatus: string = pickedUp ? "success" : "failed";
+    const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    let finalStatus: string = mappedStatus === "hanged_up" ? "failed" : (pickedUp ? "success" : "failed");
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -112,6 +135,8 @@ serve(async (req) => {
       busy: "Busy",
       rejected: "Rejected",
       voicemail: "Voicemail",
+      hanged_up: "Hangup",
+      not_convenient: "Not Convenient",
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
@@ -547,7 +572,17 @@ async function classifyCall(
     return makeResult("Not Reached", "No conversation log present");
   }
 
-  // STEP 3: Rule-based audio-quality detection (runs before AI)
+  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
+  const userTurns = log.split("User:").slice(1);
+  const hasRealSpeech = userTurns.some((t) => {
+    const text = t.trim().toUpperCase();
+    return text.length > 0 && !text.includes("TIMEOUT");
+  });
+  if (userTurns.length > 0 && !hasRealSpeech) {
+    return makeResult("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
+  }
+
+  // STEP 4: Rule-based audio-quality detection (runs before AI)
   if (detectAudioQualityIssue(log)) {
     return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
   }
