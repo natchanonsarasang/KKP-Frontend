@@ -1345,6 +1345,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("last_contact_at")}
                         </div>
                       </TableHead>
+                      <TableHead
+                        className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("date_con")}
+                      >
+                        <div className="flex items-center whitespace-nowrap">
+                          Callback Date
+                          {getSortIcon("date_con")}
+                        </div>
+                      </TableHead>
                       <TableHead className="text-xs w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
