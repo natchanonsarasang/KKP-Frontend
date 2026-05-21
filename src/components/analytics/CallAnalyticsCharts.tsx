@@ -19,7 +19,7 @@ import { MAIN_STATUSES, SUB_STATUSES, resolveMainStatus, resolveSubStatus } from
 
 // Tailwind class palettes for the Main Status cards (mapped by status key).
 const MAIN_STATUS_CARD_CLASSES: Record<string, { bg: string; border: string; text: string }> = {
-  acknowledged: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  planned_more_than_3: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
   promised: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
   restructure: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
   inconvenient_with_date: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
