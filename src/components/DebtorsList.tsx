@@ -151,6 +151,7 @@ interface Debtor {
   reject_count: number;
   other_count: number;
   variables: Record<string, string> | null;
+  date_con: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
