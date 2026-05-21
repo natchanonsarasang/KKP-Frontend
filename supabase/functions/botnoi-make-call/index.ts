@@ -22,16 +22,29 @@ serve(async (req) => {
     console.log("Input:", { phone_number, template_id, constructed_message });
 
     // Build the call payload - pack the full constructed message into Appointment Date
-    const callPayload: Record<string, string> = {
-      "Tel. Number": phone_number,
-      template_id: template_id,
+    const callPayload = {
+      outbound_id: "mock-outbound-0001",
+      phonenumber: phone_number,
+      bot_id: "6a06964fb875327d960f05f0", // ใส่ bot_id ที่คุณต้องการใช้
+      flow: constructed_message,
+      speaker: "212",
+      language: "th",
+      tts: "voicebot-premium",
+      asr_provider: "botnoi-aws-th-noise-classifier-v17c",
+      asr_language_code: "th",
+      asr_vad_rules: {
+        false_timeout_sec: 1,
+        false_silence_sec: 0.1,
+        true_silence_sec: 0.25,
+      },
+      interruptible: "True",
     };
-    
+
     // Only add Appointment Date if constructed_message is provided
     if (constructed_message) {
       callPayload["Appointment Date"] = constructed_message;
     }
-    
+
     console.log("Final payload to Botnoi:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch("https://api-voice.botnoi.ai/api/voicebot/confirm/call", {
