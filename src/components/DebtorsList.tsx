@@ -1,4 +1,9 @@
 import { useMemo, useState } from "react";
+import { format, startOfDay, endOfDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -166,6 +171,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [callStatusFilter, setCallStatusFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
   const [addingToCallList, setAddingToCallList] = useState<string | null>(null);
@@ -236,7 +242,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   // Server-side paginated query with sorting and filtering
   const { data: debtorsData, isLoading, isFetching } = useQuery({
-    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id],
+    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id, dateRange?.from?.toISOString() ?? null, dateRange?.to?.toISOString() ?? null],
     queryFn: async () => {
       let query = supabase
         .from("debtors")
@@ -274,6 +280,14 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       // Apply search filter (server-side)
       if (searchQuery) {
         query = query.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
+      }
+
+      // Apply date range filter on last_contact_at
+      if (dateRange?.from) {
+        query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte("last_contact_at", endOfDay(dateRange.to).toISOString());
       }
 
       // Apply sorting - handle variable column sorting with JSONB
@@ -1097,6 +1111,60 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 justify-start text-left font-normal gap-2 min-w-[220px]"
+              >
+                <CalendarIcon className="h-4 w-4 opacity-60" />
+                {dateRange?.from ? (
+                  <span className="flex-1 truncate">
+                    {format(dateRange.from, "d MMM yyyy")} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy")}
+                  </span>
+                ) : (
+                  <span className="flex-1 text-muted-foreground">Filter by date</span>
+                )}
+                {dateRange?.from && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Clear date range"
+                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDateRange(undefined);
+                      setPage(0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDateRange(undefined);
+                        setPage(0);
+                      }
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={dateRange}
+                onSelect={(range) => {
+                  setDateRange(range);
+                  setPage(0);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}

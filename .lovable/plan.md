@@ -1,21 +1,53 @@
-## Goal
-Add a new `overdue_installments` field (number input) to the debtor variables system. It appears in the Add/Edit form as a numeric input, in the downloadable Excel template, and is recognized during Excel import — all stored inside `debtors.variables` (no DB schema change).
+# Add Date Range Filter for Last Contact Date
 
-## Changes
+Add a date range picker filter to `src/components/DebtorsList.tsx` that filters debtors by `last_contact_at`.
 
-### 1. `src/lib/debtorVariables.ts`
-- Append `"overdue_installments"` to `DEBTOR_CUSTOMER_VARIABLE_KEYS`.
-- Add `overdue_installments: "Overdue Installments"` to `DEBTOR_CUSTOMER_VARIABLE_LABELS`.
+## Scope
 
-This cascades into the import validator and template-header generator automatically, since both iterate over `DEBTOR_CUSTOMER_VARIABLE_KEYS`.
+Only `src/components/DebtorsList.tsx` is modified. No changes to table columns, existing Status/Call Status filters, sort logic, or other files.
 
-### 2. `src/components/DebtorsList.tsx` — Add/Edit Debtor dialog
-The existing dynamic loop renders all generic keys as `<Input>` (text). To make `overdue_installments` a number input without disturbing the layout, render it with `type="number"`, `min="0"`, `step="1"` inside the same loop (small conditional on `key === "overdue_installments"`). The value is still stored as a string in `templateVariables` and persisted into `variables` JSON exactly like the other fields — keeping submit/payload logic untouched.
+## UI
 
-### 3. `src/components/DebtorExcelUpload.tsx`
-- Add a sample value for the new column in `downloadTemplate()`'s switch (e.g. `case "overdue_installments": return "2";`) so the downloaded template shows a realistic numeric example.
-- Import parsing already handles arbitrary string values per key, so no extra validation branch needed; numeric content from the cell is captured as-is.
+Placement: header row immediately after the "All Status" `<Select>` (after line 1099), before the loader/results count.
+
+A single shadcn `<Popover>` whose trigger is a `<Button variant="outline">` styled to match the adjacent dropdown height/width:
+
+- Empty state label: `"Filter by date"` with a `CalendarIcon`
+- Set state label: `"<from> - <to>"` formatted as `d MMM yyyy` via `date-fns/format` (e.g. `21 May 2026 - 21 May 2026`); if `from === to`, still render the same `"<date> - <date>"` pattern per spec
+- When a range is set, show a small `×` button inside the trigger area that clears the range and stops propagation so the popover does not open
+
+Popover content uses shadcn `<Calendar mode="range" numberOfMonths={2} />` with `className="p-3 pointer-events-auto"`, `selected={dateRange}`, `onSelect={setDateRange}`, and `initialFocus`.
+
+## State
+
+```ts
+const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+// DateRange from "react-day-picker": { from?: Date; to?: Date }
+```
+
+Reset `page` to 1 whenever the range changes (same pattern used by `handleStatusChange`).
+
+## Filter logic
+
+Extend the existing `debtors` query (around line 239):
+
+- Add `dateRange?.from?.toISOString()` and `dateRange?.to?.toISOString()` to the `queryKey`
+- Inside the query builder, when `dateRange?.from` is set: `query = query.gte("last_contact_at", startOfDay(from).toISOString())`
+- When `dateRange?.to` is set: `query = query.lte("last_contact_at", endOfDay(to).toISOString())`
+- If only `from` is set (single-day selection in progress), apply just the `gte`. Single-day filter = `from === to`, both bounds applied.
+
+`startOfDay` / `endOfDay` come from `date-fns` (already a transitive dep via shadcn calendar; will import explicitly).
+
+## Imports to add
+
+- `Popover, PopoverContent, PopoverTrigger` from `@/components/ui/popover`
+- `Calendar` from `@/components/ui/calendar`
+- `CalendarIcon`, `X` from `lucide-react`
+- `format, startOfDay, endOfDay` from `date-fns`
+- `type DateRange` from `react-day-picker`
 
 ## Out of scope
-- No DB migration — value lives in existing `variables` JSONB.
-- No changes to voicebot call payload, templates, or unrelated form fields/layout.
+
+- No DB schema changes
+- No edits to other files
+- No changes to existing Status / Call Status filters, sorting, columns, or row rendering
