@@ -1,11 +1,11 @@
 /** Template / customer fields stored in `debtors.variables`. */
 export const DEBTOR_CUSTOMER_VARIABLE_KEYS = [
-  "policy_number",
+  "policy_no",
   "name",
   "due_date",
   "due_month",
   "due_year",
-  "price",
+  "outstanding_amount",
   "paid_date",
   "paid_month",
   "paid_year",
@@ -18,12 +18,12 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   DebtorCustomerVariableKey,
   string
 > = {
-  policy_number: "Policy number",
+  policy_no: "Policy number",
   name: "Name",
   due_date: "Due date",
   due_month: "Due month",
   due_year: "Due year",
-  price: "Price",
+  outstanding_amount: "Outstanding amount",
   paid_date: "Paid date",
   paid_month: "Paid month",
   paid_year: "Paid year",

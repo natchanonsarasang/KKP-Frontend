@@ -101,12 +101,12 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     const sampleRow = headers.map((h) => {
       switch (h) {
         case "phone_number": return "0891234567";
-        case "policy_number": return "J12345";
+        case "policy_no": return "J12345";
         case "name": return "สมหญิง";
         case "due_date": return "10";
         case "due_month": return "เมษายน";
         case "due_year": return "2569";
-        case "price": return "4000";
+        case "outstanding_amount": return "4000";
         case "paid_date": return "30";
         case "paid_month": return "เมษายน";
         case "paid_year": return "2569";
@@ -308,9 +308,9 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
           <DialogDescription>
            Upload an Excel file (.xlsx). First column = phone number. Remaining columns should
             match bot variables such as{" "}
-            <code className="text-xs">policy_number</code>,{" "}
+            <code className="text-xs">policy_no</code>,{" "}
             <code className="text-xs">name</code>,{" "}
-            <code className="text-xs">price</code>, etc.
+            <code className="text-xs">outstanding_amount</code>, etc.
           </DialogDescription>
         </DialogHeader>
 

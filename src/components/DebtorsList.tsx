@@ -897,7 +897,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 <p className="text-xs text-muted-foreground mt-1">
                   Variables sent to bot:{" "}
                   <code className="text-xs bg-muted px-1 rounded">
-                    {"{policy_number}"}
+                    {"{policy_no}"}
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">
@@ -905,7 +905,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">
-                    {"{price}"}
+                    {"{outstanding_amount}"}
                   </code>
                   ,{" "}
                   <code className="text-xs bg-muted px-1 rounded">

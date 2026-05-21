@@ -209,6 +209,42 @@ function amountToThaiWords(amountStr: string): string {
   return numberToThaiWords(Math.floor(num));
 }
 
+function toThaiDigitSpeech(value: string): string {
+  const normalized = value.replace(/\s+/g, "").trim();
+  if (!normalized) return value;
+
+  let hasDigit = false;
+  const parts: string[] = [];
+  for (const ch of normalized) {
+    if (thaiNumbers[ch]) {
+      parts.push(thaiNumbers[ch]);
+      hasDigit = true;
+      continue;
+    }
+    if (/[A-Za-z]/.test(ch)) {
+      parts.push(ch.toUpperCase());
+      continue;
+    }
+    if (/[-_/]/.test(ch)) continue;
+    parts.push(ch);
+  }
+
+  return hasDigit ? parts.join(" ") : value;
+}
+
+function prepareVoicebotVariables(input: Record<string, string> | null | undefined): Record<string, string> {
+  const vars: Record<string, string> = { ...(input || {}) };
+  const policyNo = vars.policy_no;
+  if (policyNo) {
+    const raw = String(policyNo).trim();
+    if (raw) {
+      vars.policy_no_raw = raw;
+      vars.policy_no = toThaiDigitSpeech(raw);
+    }
+  }
+  return vars;
+}
+
 function isWithinBusinessHours(settings: CallSession["settings"]): boolean {
   // Skip business hours check in test mode
   if (settings.testMode) {
@@ -452,7 +488,7 @@ async function processSession(supabase: any, sessionId: string) {
     }
 
     const template = item.template_id ? templateMap.get(item.template_id) : defaultTemplate;
-    const vars = debtor.variables || {};
+    const vars = prepareVoicebotVariables(debtor.variables);
 
     console.log(
       `[Session ${sessionId}] Processing call for ${debtor.phone_number} with ${Object.keys(vars).length} variables`,
