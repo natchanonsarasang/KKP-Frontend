@@ -46,10 +46,7 @@ function toThaiDigitSpeech(value: string): string {
 }
 
 function prepareVoicebotVariables(input: unknown): Record<string, unknown> {
-  const vars =
-    input && typeof input === "object"
-      ? { ...(input as Record<string, unknown>) }
-      : {};
+  const vars = input && typeof input === "object" ? { ...(input as Record<string, unknown>) } : {};
 
   const policyNo = vars.policy_no;
   if (policyNo !== undefined && policyNo !== null) {
@@ -60,19 +57,20 @@ function prepareVoicebotVariables(input: unknown): Record<string, unknown> {
     }
   }
 
-  const date_today = new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    calendar: 'buddhist',
-  }).format(new Date()).replace(/(\S+)\s/, '$1 ที่ ');
+  const date_today = new Intl.DateTimeFormat("th-TH", {
+    timeZone: "Asia/Bangkok",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    calendar: "buddhist",
+  })
+    .format(new Date())
+    .replace(/(\S+)\s/, "$1 ที่ ");
   vars.date_today = date_today;
-
+  console.log(vars);
   return vars;
 }
-
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -89,7 +87,7 @@ serve(async (req) => {
       variables: prepareVoicebotVariables(variables),
       asr: {
         asr_provider: "botnoi-aws-th-noise-classifier-v17c",
-        asr_timeout: 5
+        asr_timeout: 5,
       },
       interruptible: interruptible || "False",
       vad: {
@@ -105,7 +103,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${CALL_API_BEARER_TOKEN}`,
+        Authorization: `Bearer ${CALL_API_BEARER_TOKEN}`,
       },
       body: JSON.stringify(callPayload),
     });
