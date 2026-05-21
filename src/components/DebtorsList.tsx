@@ -280,12 +280,25 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       }
 
       // Apply date range filter on last_contact_at
-      if (dateRange?.from) {
-        query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
+      const now = new Date();
+      let fromIso: string | undefined;
+      let toIso: string | undefined;
+      if (dateRange === "today") {
+        const s = new Date(now); s.setHours(0, 0, 0, 0); fromIso = s.toISOString();
+      } else if (dateRange === "week") {
+        const s = new Date(now); s.setDate(s.getDate() - 7); fromIso = s.toISOString();
+      } else if (dateRange === "month") {
+        const s = new Date(now); s.setMonth(s.getMonth() - 1); fromIso = s.toISOString();
+      } else if (dateRange === "year") {
+        const s = new Date(now); s.setFullYear(s.getFullYear() - 1); fromIso = s.toISOString();
+      } else if (dateRange === "custom") {
+        if (customStart) fromIso = new Date(customStart).toISOString();
+        if (customEnd) {
+          const e = new Date(customEnd); e.setHours(23, 59, 59, 999); toIso = e.toISOString();
+        }
       }
-      if (dateRange?.to) {
-        query = query.lte("last_contact_at", endOfDay(dateRange.to).toISOString());
-      }
+      if (fromIso) query = query.gte("last_contact_at", fromIso);
+      if (toIso) query = query.lte("last_contact_at", toIso);
 
       // Apply sorting - handle variable column sorting with JSONB
       if (sortField.startsWith("var:")) {
