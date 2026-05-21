@@ -566,7 +566,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   // Make call mutation - directly call the debtor
   const makeCallMutation = useMutation({
     mutationFn: async (debtor: Debtor) => {
-      const debtorVars = (debtor.variables || {}) as Record<string, string>;
+      const debtorVars = {
+        ...((debtor.variables || {}) as Record<string, string>),
+        date_today: getThaiDateToday(),
+      };
 
       console.log("Calling via voicebot-make-call with variables:", debtorVars);
 
