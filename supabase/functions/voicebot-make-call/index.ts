@@ -60,8 +60,19 @@ function prepareVoicebotVariables(input: unknown): Record<string, unknown> {
     }
   }
 
+  const date_today = new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    calendar: 'buddhist',
+  }).format(new Date()).replace(/(\S+)\s/, '$1 ที่ ');
+  vars.date_today = date_today;
+
   return vars;
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
