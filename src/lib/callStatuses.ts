@@ -64,12 +64,31 @@ export const MAIN_STATUSES: StatusDef[] = [
     match: (c) => c.includes("restructure") || c.includes("ปรับโครงสร้าง"),
   },
   {
-    key: "callback_scheduled",
-    label: "Callback Scheduled",
-    thai: "นัดติดต่อใหม่",
+    key: "inconvenient_with_date",
+    label: "Inconvenient (With Date)",
+    thai: "ไม่สะดวก (มีนัดหมาย)",
     color: "#f59e0b",
     tone: "callback",
-    match: (c) => c.includes("callback scheduled") || c.includes("scheduled callback") || c.includes("นัดติดต่อ"),
+    match: (c) =>
+      c.includes("inconvenient with date") ||
+      c.includes("inconvenient (with date)") ||
+      c.includes("ไม่สะดวก (มีนัดหมาย)") ||
+      c.includes("ไม่สะดวกมีนัดหมาย") ||
+      c.includes("callback scheduled") ||
+      c.includes("scheduled callback") ||
+      c.includes("นัดติดต่อ"),
+  },
+  {
+    key: "inconvenient_without_date",
+    label: "Inconvenient (Without Date)",
+    thai: "ไม่สะดวก (ไม่มีนัดหมาย)",
+    color: "#f97316",
+    tone: "soft-callback",
+    match: (c) =>
+      c.includes("inconvenient without date") ||
+      c.includes("inconvenient (without date)") ||
+      c.includes("ไม่สะดวก (ไม่มีนัดหมาย)") ||
+      c.includes("ไม่สะดวกไม่มีนัดหมาย"),
   },
   {
     key: "already_paid",
