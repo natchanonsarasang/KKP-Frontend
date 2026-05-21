@@ -287,8 +287,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (dateRange?.from) {
         query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
       }
-      if (dateRange?.to) {
-        query = query.lte("last_contact_at", endOfDay(dateRange.to).toISOString());
+      if (dateRange?.to || dateRange?.from) {
+        query = query.lte("last_contact_at", endOfDay(dateRange.to ?? dateRange.from!).toISOString());
       }
 
       // Apply sorting - handle variable column sorting with JSONB
