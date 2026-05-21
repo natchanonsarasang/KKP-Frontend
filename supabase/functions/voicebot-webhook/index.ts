@@ -426,8 +426,12 @@ serve(async (req) => {
           updateData.last_response = "unknown";
         }
 
+        // Extract callback date from conversation log (LLM-backed)
+        const dateCon = await extractCallbackDate(conversationLog, LOVABLE_API_KEY);
+        updateData.date_con = dateCon;
+
         await supabase.from("debtors").update(updateData).eq("id", debtor.id);
-        console.log("Debtor stats updated");
+        console.log("Debtor stats updated", { date_con: dateCon });
       }
     }
 
@@ -686,4 +690,95 @@ Output format (STRICT JSON, no markdown, no commentary):
     return makeResult("Acknowledged", "Classifier exception");
   }
 }
+
+// ============================================================================
+// CALLBACK DATE EXTRACTION
+// Extract a future callback date from the customer's words, relative to the
+// timestamp recorded in the conversation log. Returns ISO YYYY-MM-DD or null.
+// ============================================================================
+
+function parseLogReferenceDate(log: string): Date {
+  // Lines look like: "2026-05-21 17:09:16 Bot: ..."
+  const m = log.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    // Treat as Asia/Bangkok local time → UTC equivalent
+    const utcMs = Date.UTC(+y, +mo - 1, +d, +h - 7, +mi, +s);
+    const dt = new Date(utcMs);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return new Date();
+}
+
+function bangkokIsoDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return parts; // en-CA → YYYY-MM-DD
+}
+
+async function extractCallbackDate(
+  conversationLog: string | null,
+  apiKey: string | undefined,
+): Promise<string | null> {
+  if (!conversationLog || conversationLog.trim().length < 5) return null;
+  if (!apiKey) return null;
+
+  const referenceDate = parseLogReferenceDate(conversationLog);
+  const refIso = bangkokIsoDate(referenceDate);
+
+  const systemPrompt = `You extract a callback date from a Thai debt-collection call transcript.
+
+Reference (call) date in Asia/Bangkok timezone: ${refIso}
+
+Rules (apply relative to the reference date):
+- Exact date stated by the customer → return it. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 to get the Gregorian year.
+- "พรุ่งนี้" → reference date + 1 day
+- "มะรืน" / "มะรืนนี้" → reference date + 2 days
+- "อีก X วัน" → reference date + X days
+- "สัปดาห์หน้า" / "อาทิตย์หน้า" → reference date + 7 days
+- "เดือนหน้า" → reference date + 30 days
+- If multiple dates are mentioned, use the LAST date the customer agreed to.
+- If no callback date / time is mentioned, or only the bot suggested one without customer confirmation → null.
+
+Return STRICT JSON only:
+{ "date_con": "YYYY-MM-DD" | null }`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `conversation_log:\n"""${conversationLog}"""` },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("extractCallbackDate AI error:", response.status, await response.text());
+      return null;
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || "{}";
+    const parsed = JSON.parse(content);
+    const value = parsed?.date_con;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+    return null;
+  } catch (err) {
+    console.error("extractCallbackDate exception:", err);
+    return null;
+  }
+}
+
 

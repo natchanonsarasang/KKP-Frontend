@@ -1,0 +1,1 @@
+ALTER TABLE public.debtors ADD COLUMN IF NOT EXISTS date_con date;

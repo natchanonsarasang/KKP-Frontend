@@ -391,6 +391,7 @@ export type Database = {
           call_outcome: string | null
           contact_attempts: number
           created_at: string
+          date_con: string | null
           due_date: string | null
           id: string
           is_blocked: boolean
@@ -420,6 +421,7 @@ export type Database = {
           call_outcome?: string | null
           contact_attempts?: number
           created_at?: string
+          date_con?: string | null
           due_date?: string | null
           id?: string
           is_blocked?: boolean
@@ -449,6 +451,7 @@ export type Database = {
           call_outcome?: string | null
           contact_attempts?: number
           created_at?: string
+          date_con?: string | null
           due_date?: string | null
           id?: string
           is_blocked?: boolean

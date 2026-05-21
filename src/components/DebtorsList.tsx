@@ -79,6 +79,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
   getThaiDateToday,
+  formatThaiBuddhistDate,
 } from "@/lib/debtorVariables";
 import { MAIN_STATUSES, SUB_STATUSES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
 
@@ -151,6 +152,7 @@ interface Debtor {
   reject_count: number;
   other_count: number;
   variables: Record<string, string> | null;
+  date_con: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -1343,6 +1345,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("last_contact_at")}
                         </div>
                       </TableHead>
+                      <TableHead
+                        className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("date_con")}
+                      >
+                        <div className="flex items-center whitespace-nowrap">
+                          Callback Date
+                          {getSortIcon("date_con")}
+                        </div>
+                      </TableHead>
                       <TableHead className="text-xs w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1473,6 +1484,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                                 })
                                 : "-"}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatThaiBuddhistDate(debtor.date_con)}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
