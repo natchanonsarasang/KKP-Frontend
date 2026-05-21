@@ -237,7 +237,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       completed: "Completed",
       busy: "Busy",
       voicemail: "Voicemail",
-      hangup: "Hangup",
+      hangup: "Hang up",
     };
 
     return Object.entries(outcomes).map(([key, value]) => ({
