@@ -315,7 +315,7 @@ const CallDashboard = () => {
     if (!outcome) return <span className="text-muted-foreground text-xs">-</span>;
     const o = outcome.toLowerCase();
     if (o.includes("hang")) {
-      return <Badge variant="secondary" className="bg-warning/10 text-warning gap-1 font-normal">Incomplete</Badge>;
+      return <Badge variant="secondary" className="bg-warning/10 text-warning gap-1 font-normal">Hang up</Badge>;
     }
     return getStatusBadge(o);
   };
