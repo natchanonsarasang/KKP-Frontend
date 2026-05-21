@@ -2414,7 +2414,7 @@ const CallList = () => {
 
       {/* Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="fixed left-0 right-0 top-1/2 -translate-y-1/2 mx-4 max-w-lg md:mx-auto w-auto max-h-[85vh] p-0 flex flex-col gap-0 sm:rounded-lg">
+        <DialogContent className="mx-auto w-[calc(100%-2rem)] max-w-lg max-h-[85vh] p-0 flex flex-col gap-0 sm:rounded-lg">
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>Auto-Dial Settings</DialogTitle>
             <DialogDescription>Configure retry logic, limits, and business hours</DialogDescription>
