@@ -282,6 +282,14 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         query = query.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
       }
 
+      // Apply date range filter on last_contact_at
+      if (dateRange?.from) {
+        query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte("last_contact_at", endOfDay(dateRange.to).toISOString());
+      }
+
       // Apply sorting - handle variable column sorting with JSONB
       if (sortField.startsWith("var:")) {
         const varKey = sortField.replace("var:", "");
