@@ -1116,61 +1116,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-10 justify-start text-left font-normal gap-2 min-w-[240px]"
-              >
-                <CalendarIcon className="h-4 w-4 opacity-60" />
-                {dateRange?.from ? (
-                  <span className="flex-1 truncate">
-                    {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
-                  </span>
-                ) : (
-                  <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
-                )}
-                {dateRange?.from && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Clear date range"
-                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDateRange(undefined);
-                      setPage(0);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDateRange(undefined);
-                        setPage(0);
-                      }
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 bg-popover" align="start">
-              <Calendar
-                mode="range"
-                numberOfMonths={2}
-                selected={dateRange}
-                onSelect={(range) => {
-                  setDateRange(range);
-                  setPage(0);
-                }}
-                initialFocus
-                locale={th}
-                className="p-3 pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}
@@ -1217,6 +1162,62 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 justify-start text-left font-normal gap-2 min-w-[220px] text-xs"
+                >
+                  <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
+                  {dateRange?.from ? (
+                    <span className="flex-1 truncate">
+                      {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
+                    </span>
+                  ) : (
+                    <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
+                  )}
+                  {dateRange?.from && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Clear date range"
+                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDateRange(undefined);
+                        setPage(0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDateRange(undefined);
+                          setPage(0);
+                        }
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range);
+                    setPage(0);
+                  }}
+                  initialFocus
+                  locale={th}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
             <Button
               variant="default"
               size="sm"
@@ -1267,6 +1268,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
                       <TableHead className="text-xs">Latest Call Status</TableHead>
+                      <TableHead
+                        className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("date_con")}
+                      >
+                        <div className="flex items-center whitespace-nowrap">
+                          Callback Date
+                          {getSortIcon("date_con")}
+                        </div>
+                      </TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
@@ -1343,15 +1353,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("last_contact_at")}
                         </div>
                       </TableHead>
-                      <TableHead
-                        className="text-xs cursor-pointer hover:bg-muted/50 select-none"
-                        onClick={() => handleSort("date_con")}
-                      >
-                        <div className="flex items-center whitespace-nowrap">
-                          Callback Date
-                          {getSortIcon("date_con")}
-                        </div>
-                      </TableHead>
                       <TableHead className="text-xs w-24">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1402,6 +1403,13 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                               );
                             })()}
                           </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatThaiBuddhistDate(debtor.date_con)}
+                            </span>
+                          </TableCell>
+
+
 
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
@@ -1482,11 +1490,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                                 })
                                 : "-"}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatThaiBuddhistDate(debtor.date_con)}
-                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
