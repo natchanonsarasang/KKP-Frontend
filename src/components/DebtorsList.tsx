@@ -242,7 +242,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   // Server-side paginated query with sorting and filtering
   const { data: debtorsData, isLoading, isFetching } = useQuery({
-    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id],
+    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id, dateRange?.from?.toISOString() ?? null, dateRange?.to?.toISOString() ?? null],
     queryFn: async () => {
       let query = supabase
         .from("debtors")
