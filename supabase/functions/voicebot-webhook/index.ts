@@ -661,7 +661,7 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return makeResult("Acknowledged", "AI request failed");
+      return makeResult("Not Reached", "AI request failed");
     }
 
     const result = await response.json();
@@ -670,8 +670,13 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
     const normalized = String(aiName).trim().toLowerCase();
+    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
+    const aliased =
+      normalized === "acknowledged" || normalized === "acknowledge"
+        ? "planned more than 3"
+        : normalized;
     const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === normalized,
+      (c) => c.name.toLowerCase() === aliased,
     );
 
     if (match) {
@@ -683,11 +688,11 @@ Output format (STRICT JSON, no markdown, no commentary):
       };
     }
 
-    console.warn("Unmatched AI category, defaulting to Acknowledged:", aiName);
-    return makeResult("Acknowledged", `Unmatched AI category: ${aiName}`);
+    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
+    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return makeResult("Acknowledged", "Classifier exception");
+    return makeResult("Planned More Than 3", "Classifier exception");
   }
 }
 
