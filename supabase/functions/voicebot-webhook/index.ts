@@ -115,6 +115,7 @@ serve(async (req) => {
       busy: "Busy",
       rejected: "Rejected",
       voicemail: "Voicemail",
+      hanged_up: "Hangup",
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
