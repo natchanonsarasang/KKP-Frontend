@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import * as XLSX from "xlsx";
-import { getThaiDateToday } from "@/lib/debtorVariables";
+
 
 interface Template {
   id: string;
