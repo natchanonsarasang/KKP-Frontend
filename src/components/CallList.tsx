@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber } from "@/lib/formatPhone";
-import { maskPhoneNumber } from "@/lib/formatPhone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
