@@ -593,8 +593,8 @@ async function classifyCall(
   }
 
   if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, defaulting to Acknowledged");
-    return makeResult("Acknowledged", "AI key missing");
+    console.warn("LOVABLE_API_KEY not found, defaulting to Not Reached");
+    return makeResult("Not Reached", "AI key missing");
   }
 
   const categoryList = CONVERSATION_CATEGORIES.map(
