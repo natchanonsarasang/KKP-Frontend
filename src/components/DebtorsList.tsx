@@ -1,4 +1,10 @@
 import { useMemo, useState } from "react";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { th } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -166,9 +172,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [callStatusFilter, setCallStatusFilter] = useState<string>("all");
-  const [dateRange, setDateRange] = useState<"today" | "week" | "month" | "year" | "all" | "custom">("all");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
   const [addingToCallList, setAddingToCallList] = useState<string | null>(null);
@@ -239,7 +243,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   // Server-side paginated query with sorting and filtering
   const { data: debtorsData, isLoading, isFetching } = useQuery({
-    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id, dateRange, customStart, customEnd],
+    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id, dateRange?.from?.toISOString() ?? null, dateRange?.to?.toISOString() ?? null],
     queryFn: async () => {
       let query = supabase
         .from("debtors")
@@ -280,25 +284,12 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       }
 
       // Apply date range filter on last_contact_at
-      const now = new Date();
-      let fromIso: string | undefined;
-      let toIso: string | undefined;
-      if (dateRange === "today") {
-        const s = new Date(now); s.setHours(0, 0, 0, 0); fromIso = s.toISOString();
-      } else if (dateRange === "week") {
-        const s = new Date(now); s.setDate(s.getDate() - 7); fromIso = s.toISOString();
-      } else if (dateRange === "month") {
-        const s = new Date(now); s.setMonth(s.getMonth() - 1); fromIso = s.toISOString();
-      } else if (dateRange === "year") {
-        const s = new Date(now); s.setFullYear(s.getFullYear() - 1); fromIso = s.toISOString();
-      } else if (dateRange === "custom") {
-        if (customStart) fromIso = new Date(customStart).toISOString();
-        if (customEnd) {
-          const e = new Date(customEnd); e.setHours(23, 59, 59, 999); toIso = e.toISOString();
-        }
+      if (dateRange?.from) {
+        query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
       }
-      if (fromIso) query = query.gte("last_contact_at", fromIso);
-      if (toIso) query = query.lte("last_contact_at", toIso);
+      if (dateRange?.to) {
+        query = query.lte("last_contact_at", endOfDay(dateRange.to).toISOString());
+      }
 
       // Apply sorting - handle variable column sorting with JSONB
       if (sortField.startsWith("var:")) {
@@ -1121,35 +1112,61 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={dateRange} onValueChange={(v) => { setDateRange(v as typeof dateRange); setPage(0); }}>
-            <SelectTrigger className="w-[140px] h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">ทั้งหมด</SelectItem>
-              <SelectItem value="today">วันนี้</SelectItem>
-              <SelectItem value="week">7 วัน</SelectItem>
-              <SelectItem value="month">30 วัน</SelectItem>
-              <SelectItem value="year">1 ปี</SelectItem>
-              <SelectItem value="custom">กำหนดเอง</SelectItem>
-            </SelectContent>
-          </Select>
-          {dateRange === "custom" && (
-            <div className="flex gap-2">
-              <Input
-                type="date"
-                value={customStart}
-                onChange={(e) => { setCustomStart(e.target.value); setPage(0); }}
-                className="h-10 w-[150px]"
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 justify-start text-left font-normal gap-2 min-w-[240px]"
+              >
+                <CalendarIcon className="h-4 w-4 opacity-60" />
+                {dateRange?.from ? (
+                  <span className="flex-1 truncate">
+                    {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
+                  </span>
+                ) : (
+                  <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
+                )}
+                {dateRange?.from && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Clear date range"
+                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDateRange(undefined);
+                      setPage(0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDateRange(undefined);
+                        setPage(0);
+                      }
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={dateRange}
+                onSelect={(range) => {
+                  setDateRange(range);
+                  setPage(0);
+                }}
+                initialFocus
+                locale={th}
+                className="p-3 pointer-events-auto"
               />
-              <Input
-                type="date"
-                value={customEnd}
-                onChange={(e) => { setCustomEnd(e.target.value); setPage(0); }}
-                className="h-10 w-[150px]"
-              />
-            </div>
-          )}
+            </PopoverContent>
+          </Popover>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}
