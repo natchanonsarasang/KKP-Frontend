@@ -1162,6 +1162,62 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 justify-start text-left font-normal gap-2 min-w-[220px] text-xs"
+                >
+                  <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
+                  {dateRange?.from ? (
+                    <span className="flex-1 truncate">
+                      {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
+                    </span>
+                  ) : (
+                    <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
+                  )}
+                  {dateRange?.from && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Clear date range"
+                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDateRange(undefined);
+                        setPage(0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDateRange(undefined);
+                          setPage(0);
+                        }
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range);
+                    setPage(0);
+                  }}
+                  initialFocus
+                  locale={th}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
             <Button
               variant="default"
               size="sm"
