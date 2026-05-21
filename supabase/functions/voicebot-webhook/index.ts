@@ -625,11 +625,11 @@ Conversation Behaviors (use ONLY when no clear business outcome above exists):
 
 CRITICAL CLASSIFICATION RULES
 1. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior.
-   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Callback Scheduled) appear in the same call, choose the BUSINESS OUTCOME.
+   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Inconvenient (With Date)) appear in the same call, choose the BUSINESS OUTCOME.
 2. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
 3. Decide based on the FINAL state of the call, not transient mid-call events.
 4. "Promised to Pay" requires an explicit commitment from the customer — not just acknowledgement.
-5. "Callback Scheduled" requires a concrete time/date agreement. Otherwise prefer "Call Later".
+5. "Inconvenient (With Date)" requires a concrete time/date agreement. If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
 6. "Refused" requires a clear refusal — not just reluctance or "not convenient".
 7. If unsure between Acknowledged and a behavior category, prefer Acknowledged when the customer engaged with the debt info.
 
