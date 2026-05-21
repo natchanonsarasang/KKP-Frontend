@@ -95,8 +95,8 @@ serve(async (req) => {
         true_silence_sec: "0.25",
       },
     };
-
-    console.log("Payload:", JSON.stringify(callPayload, null, 2));
+    console.log(prepareVoicebotVariables(variables));
+    console.log("Payload TEST TEST:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch(CALL_API_URL, {
       method: "POST",
