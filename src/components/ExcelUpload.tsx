@@ -183,7 +183,7 @@ const ExcelUpload = () => {
             {
               body: {
                 phone_number: row.phone_number,
-                variables: { ...row, date_today: getThaiDateToday() },
+                variables: { ...row },
               },
             }
           );
