@@ -1,61 +1,35 @@
-## Fix Auto-Dial Settings Modal Scrolling
+## Goal
+Remove the global exclusion that skips `hanged_up` records in the Analytics charts so hang-up calls are counted in the outcome/status breakdowns (matching `AnalyticsStats.tsx`, which already counts them).
 
-The "Settings" (Auto-Dial Settings) modal in `src/components/CallList.tsx` (lines 2396–2605) uses `<DialogContent className="max-w-md">` with no height cap, so on shorter viewports content gets clipped with no way to scroll.
+## Scope
+Only `src/components/analytics/CallAnalyticsCharts.tsx`. No backend, no other files. The `"incomplete"` exclusion stays in place.
 
-### Change 1 — Modal wrapper (line 2397)
+## Changes
+
+**1. `OutcomeDistributionChart` (lines ~213-220)**
+Drop the `hanged` checks; keep only the `incomplete` skip:
+```ts
+if (rawStatus === "incomplete") return;
+```
+This allows hang-ups to fall through into the existing categorization (resolved as `hanged_up`/equivalent outcome).
+
+**2. `MainStatusOverview` (line ~600)**
 Replace:
-```tsx
-<DialogContent className="max-w-md">
+```ts
+if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
 ```
 with:
-```tsx
-<DialogContent className="max-w-lg w-full mx-4 max-h-[85vh] p-0 flex flex-col gap-0">
+```ts
+if (s === "incomplete" || r === "incomplete") return;
 ```
 
-This caps the modal height at 85vh, keeps width responsive, and turns the dialog into a flex column so the header/footer can stay pinned while the middle scrolls. (Radix Dialog already centers vertically via `top-50% translate-y-[-50%]`, so the modal naturally stays centered.)
+**3. `SubStatusOverview` (line ~696)**
+Same replacement as #2.
 
-### Change 2 — Sticky header (lines 2398–2403)
-Replace:
-```tsx
-<DialogHeader>
-  <DialogTitle>Auto-Dial Settings</DialogTitle>
-  <DialogDescription>
-    Configure retry logic, limits, and business hours
-  </DialogDescription>
-</DialogHeader>
-```
-with:
-```tsx
-<DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-  <DialogTitle>Auto-Dial Settings</DialogTitle>
-  <DialogDescription>
-    Configure retry logic, limits, and business hours
-  </DialogDescription>
-</DialogHeader>
-```
+## Notes
+- `AnalyticsStats.tsx` already counts `hanged_up` — no change needed there beyond optionally updating the comment, but I'll leave it untouched unless you want it cleaned up.
+- The `OutcomeDistributionChart` categorization logic does not currently have an explicit `hanged_up` branch — hang-ups will resolve via `picked_up`/status fallbacks. If you want a dedicated "Hang up" slice in that pie chart, say so and I'll add it.
 
-### Change 3 — Scrollable middle section (line 2405)
-Replace:
-```tsx
-<div className="space-y-6 py-4">
-```
-with:
-```tsx
-<div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-```
-
-This is the only scroll container; field layouts and toggle styles inside are untouched.
-
-### Change 4 — Sticky footer (line 2589)
-Replace:
-```tsx
-<div className="flex gap-2">
-```
-with:
-```tsx
-<div className="flex gap-2 px-6 py-4 border-t shrink-0 bg-background">
-```
-
-### Out of scope
-- No changes to any field row, switch, slider, or other modals.
-- No changes to `DialogContent` base styles in `src/components/ui/dialog.tsx`.
+## Verification
+- Build passes.
+- Hang-up records appear in Main Status / Outcome charts alongside other completed-call outcomes.
