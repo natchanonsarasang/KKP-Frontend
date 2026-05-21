@@ -78,6 +78,7 @@ import {
   emptyDebtorCustomerVariables,
   parseDebtAmountForColumn,
   splitThaiDate,
+  getThaiDateToday,
 } from "@/lib/debtorVariables";
 import { MAIN_STATUSES, SUB_STATUSES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
 
@@ -566,7 +567,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   // Make call mutation - directly call the debtor
   const makeCallMutation = useMutation({
     mutationFn: async (debtor: Debtor) => {
-      const debtorVars = (debtor.variables || {}) as Record<string, string>;
+      const debtorVars = {
+        ...((debtor.variables || {}) as Record<string, string>),
+        date_today: getThaiDateToday(),
+      };
 
       console.log("Calling via voicebot-make-call with variables:", debtorVars);
 

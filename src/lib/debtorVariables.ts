@@ -130,3 +130,17 @@ export function splitThaiDate(isoDate: string | null | undefined): {
 
   return { day, month, year };
 }
+
+/** Today's date formatted in Thai (Bangkok TZ, Buddhist Era), e.g. "วันจันทร์ ที่ 16 พฤษภาคม 2569". */
+export function getThaiDateToday(): string {
+  return new Intl.DateTimeFormat("th-TH", {
+    timeZone: "Asia/Bangkok",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    calendar: "buddhist",
+  })
+    .format(new Date())
+    .replace(/(\S+)\s/, "$1 ที่ ");
+}

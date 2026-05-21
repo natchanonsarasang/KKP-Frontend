@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getThaiDateToday } from "@/lib/debtorVariables";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -541,7 +542,7 @@ const TemplateSetup = () => {
                     const { error } = await supabase.functions.invoke("voicebot-make-call", {
                       body: {
                         phone_number: testCallPhone,
-                        variables: {},
+                        variables: { date_today: getThaiDateToday() },
                       },
                     });
                     if (error) throw error;
