@@ -1484,11 +1484,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatThaiBuddhistDate(debtor.date_con)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
                             <div className="flex items-center gap-1">
                               {/* Call button hidden
                               <Button
