@@ -2586,7 +2586,7 @@ const CallList = () => {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 px-6 py-4 border-t shrink-0 bg-background">
             <Button
               variant="outline"
               className="flex-1"
