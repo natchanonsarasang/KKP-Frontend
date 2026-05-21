@@ -242,6 +242,16 @@ function prepareVoicebotVariables(input: Record<string, string> | null | undefin
       vars.policy_no = toThaiDigitSpeech(raw);
     }
   }
+  vars.date_today = new Intl.DateTimeFormat("th-TH", {
+    timeZone: "Asia/Bangkok",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    calendar: "buddhist",
+  })
+    .format(new Date())
+    .replace(/(\S+)\s/, "$1 ที่ ");
   return vars;
 }
 
