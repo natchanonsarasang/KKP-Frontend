@@ -542,7 +542,7 @@ const TemplateSetup = () => {
                     const { error } = await supabase.functions.invoke("voicebot-make-call", {
                       body: {
                         phone_number: testCallPhone,
-                        variables: { date_today: getThaiDateToday() },
+                        variables: {},
                       },
                     });
                     if (error) throw error;
