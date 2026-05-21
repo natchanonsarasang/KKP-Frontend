@@ -1112,35 +1112,61 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={dateRange} onValueChange={(v) => { setDateRange(v as typeof dateRange); setPage(0); }}>
-            <SelectTrigger className="w-[140px] h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">ทั้งหมด</SelectItem>
-              <SelectItem value="today">วันนี้</SelectItem>
-              <SelectItem value="week">7 วัน</SelectItem>
-              <SelectItem value="month">30 วัน</SelectItem>
-              <SelectItem value="year">1 ปี</SelectItem>
-              <SelectItem value="custom">กำหนดเอง</SelectItem>
-            </SelectContent>
-          </Select>
-          {dateRange === "custom" && (
-            <div className="flex gap-2">
-              <Input
-                type="date"
-                value={customStart}
-                onChange={(e) => { setCustomStart(e.target.value); setPage(0); }}
-                className="h-10 w-[150px]"
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 justify-start text-left font-normal gap-2 min-w-[240px]"
+              >
+                <CalendarIcon className="h-4 w-4 opacity-60" />
+                {dateRange?.from ? (
+                  <span className="flex-1 truncate">
+                    {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
+                  </span>
+                ) : (
+                  <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
+                )}
+                {dateRange?.from && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Clear date range"
+                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDateRange(undefined);
+                      setPage(0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDateRange(undefined);
+                        setPage(0);
+                      }
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={dateRange}
+                onSelect={(range) => {
+                  setDateRange(range);
+                  setPage(0);
+                }}
+                initialFocus
+                locale={th}
+                className="p-3 pointer-events-auto"
               />
-              <Input
-                type="date"
-                value={customEnd}
-                onChange={(e) => { setCustomEnd(e.target.value); setPage(0); }}
-                className="h-10 w-[150px]"
-              />
-            </div>
-          )}
+            </PopoverContent>
+          </Popover>
           {isFetching && !isLoading && (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           )}
