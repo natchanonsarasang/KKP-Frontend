@@ -514,7 +514,7 @@ const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
 // call_list_items.ai_category and consumed by the Analytics dashboard.
 const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
   // --- Main outcomes ---
-  { id: 1,  name: "Acknowledged",          thai: "รับทราบ",                  group: "main" },
+  { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
   { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
   { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
   { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
