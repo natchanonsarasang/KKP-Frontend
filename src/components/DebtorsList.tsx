@@ -705,6 +705,22 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       toast.error("Due date is required");
       return;
     }
+    if (!templateVariables.policy_no?.trim()) {
+      toast.error("Policy number is required");
+      return;
+    }
+    if (!templateVariables.name?.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!templateVariables.outstanding_amount?.trim()) {
+      toast.error("Outstanding amount is required");
+      return;
+    }
+    if (!templateVariables.overdue_installments?.toString().trim()) {
+      toast.error("Overdue Installments is required");
+      return;
+    }
 
     if (editingDebtor) {
       updateDebtorMutation.mutate({
