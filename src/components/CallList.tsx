@@ -37,20 +37,8 @@ import {
   Volume2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -142,7 +130,7 @@ const DEFAULT_SETTINGS: AutoDialSettings = {
   delayBetweenCalls: 5, // Default to 5 seconds for testing
   concurrentCalls: 5,
   testMode: false,
-  timezoneOffset: -(new Date().getTimezoneOffset()), // Auto-detect user's timezone
+  timezoneOffset: -new Date().getTimezoneOffset(), // Auto-detect user's timezone
   interruptible: false,
 };
 
@@ -180,12 +168,20 @@ const CallList = () => {
   const stopAutoDialRef = useRef(false);
   const [filterMatchCount, setFilterMatchCount] = useState<number | undefined>(undefined);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
-  const [previewPayload, setPreviewPayload] = useState<{ phone: string; templateId: string; message: string; item: CallListItem } | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<{
+    phone: string;
+    templateId: string;
+    message: string;
+    item: CallListItem;
+  } | null>(null);
   const [nextBatchCountdown, setNextBatchCountdown] = useState<number>(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
-  const [transcriptData, setTranscriptData] = useState<{ conversationLog: string | null; audioUrl: string | null } | null>(null);
+  const [transcriptData, setTranscriptData] = useState<{
+    conversationLog: string | null;
+    audioUrl: string | null;
+  } | null>(null);
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -240,20 +236,20 @@ const CallList = () => {
     if (!currentWorkspace?.id) return;
 
     const channel = supabase
-      .channel('call-list-realtime')
+      .channel("call-list-realtime")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'call_list_items',
+          event: "*",
+          schema: "public",
+          table: "call_list_items",
           filter: `workspace_id=eq.${currentWorkspace.id}`,
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
           queryClient.invalidateQueries({ queryKey: ["active-call-session"] });
           queryClient.invalidateQueries({ queryKey: ["call-tokens"] });
-        }
+        },
       )
       .subscribe();
 
@@ -262,33 +258,38 @@ const CallList = () => {
     };
   }, [currentWorkspace?.id, queryClient]);
 
-
   // Helper to parse notes field (could be JSON with audio_url/conversation_log or legacy plain URL)
-  const parseNotesData = useCallback((notes: string | null): { audioUrl: string | null; conversationLog: string | null } => {
-    if (!notes) return { audioUrl: null, conversationLog: null };
+  const parseNotesData = useCallback(
+    (notes: string | null): { audioUrl: string | null; conversationLog: string | null } => {
+      if (!notes) return { audioUrl: null, conversationLog: null };
 
-    // Try to parse as JSON first (new format)
-    try {
-      const parsed = JSON.parse(notes);
-      return {
-        audioUrl: parsed.audio_url || null,
-        conversationLog: parsed.conversation_log || parsed.transcription || null,
-      };
-    } catch {
-      // Legacy format: notes is just the audio URL
-      if (notes.startsWith('http')) {
-        return { audioUrl: notes, conversationLog: null };
+      // Try to parse as JSON first (new format)
+      try {
+        const parsed = JSON.parse(notes);
+        return {
+          audioUrl: parsed.audio_url || null,
+          conversationLog: parsed.conversation_log || parsed.transcription || null,
+        };
+      } catch {
+        // Legacy format: notes is just the audio URL
+        if (notes.startsWith("http")) {
+          return { audioUrl: notes, conversationLog: null };
+        }
+        return { audioUrl: null, conversationLog: null };
       }
-      return { audioUrl: null, conversationLog: null };
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Handle viewing transcript
-  const handleViewTranscript = useCallback((notes: string | null) => {
-    const data = parseNotesData(notes);
-    setTranscriptData({ conversationLog: data.conversationLog, audioUrl: data.audioUrl });
-    setShowTranscriptDialog(true);
-  }, [parseNotesData]);
+  const handleViewTranscript = useCallback(
+    (notes: string | null) => {
+      const data = parseNotesData(notes);
+      setTranscriptData({ conversationLog: data.conversationLog, audioUrl: data.audioUrl });
+      setShowTranscriptDialog(true);
+    },
+    [parseNotesData],
+  );
 
   // Check if currently within business hours and days
   const isWithinBusinessHours = useCallback(() => {
@@ -313,7 +314,11 @@ const CallList = () => {
   }, [settings]);
 
   // Fetch call list items with debtor info (with pagination to bypass 1000 row limit)
-  const { data: callListItems, isLoading, refetch } = useQuery({
+  const {
+    data: callListItems,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["call-list-items", effectiveUserId, currentWorkspace?.id],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [] as CallListItem[];
@@ -344,9 +349,7 @@ const CallList = () => {
 
         if (data && data.length > 0) {
           // Defensive client-side filter in case any leak through
-          const filtered = data.filter(
-            (it: any) => it.status !== "incomplete"
-          );
+          const filtered = data.filter((it: any) => it.status !== "incomplete");
           allItems = [...allItems, ...filtered];
           page++;
           hasMore = data.length === pageSize;
@@ -368,7 +371,9 @@ const CallList = () => {
         const chunk = debtorIds.slice(i, i + chunkSize);
         const { data: debtorsChunk, error: debtorsError } = await supabase
           .from("debtors")
-          .select("id, phone_number, name, last_name, total_debt, due_date, status, contact_attempts, picked_up_count, not_picked_up_count, accept_count, reject_count, other_count, last_contact_at, variables")
+          .select(
+            "id, phone_number, name, last_name, total_debt, due_date, status, contact_attempts, picked_up_count, not_picked_up_count, accept_count, reject_count, other_count, last_contact_at, variables",
+          )
           .in("id", chunk);
 
         if (debtorsError) {
@@ -444,7 +449,8 @@ const CallList = () => {
   const { data: phoneStats } = useQuery({
     queryKey: ["call-records-stats-for-filter", currentWorkspace?.id],
     queryFn: async () => {
-      if (!currentWorkspace?.id) return {} as Record<string, { picked_up: number; not_picked_up: number; confirmed: number; declined: number }>;
+      if (!currentWorkspace?.id)
+        return {} as Record<string, { picked_up: number; not_picked_up: number; confirmed: number; declined: number }>;
 
       const { data, error } = await supabase
         .from("call_records")
@@ -454,12 +460,15 @@ const CallList = () => {
 
       if (error) throw error;
 
-      const stats: Record<string, {
-        picked_up: number;
-        not_picked_up: number;
-        confirmed: number;
-        declined: number;
-      }> = {};
+      const stats: Record<
+        string,
+        {
+          picked_up: number;
+          not_picked_up: number;
+          confirmed: number;
+          declined: number;
+        }
+      > = {};
 
       data.forEach((record) => {
         if (!stats[record.phone_number]) {
@@ -532,7 +541,7 @@ const CallList = () => {
       }
 
       const { data: pendingItems } = await pendingQuery;
-      const pendingDebtorIds = pendingItems?.map(item => item.debtor_id) || [];
+      const pendingDebtorIds = pendingItems?.map((item) => item.debtor_id) || [];
 
       let query = supabase
         .from("debtors")
@@ -548,7 +557,7 @@ const CallList = () => {
       if (error) throw error;
 
       // Filter out debtors already in pending list
-      return (data as Debtor[]).filter(d => !pendingDebtorIds.includes(d.id));
+      return (data as Debtor[]).filter((d) => !pendingDebtorIds.includes(d.id));
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
@@ -588,8 +597,7 @@ const CallList = () => {
       if (!effectiveUserId || !currentWorkspace?.id) return null;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase
-        .from("call_sessions") as any)
+      const { data, error } = await (supabase.from("call_sessions") as any)
         .select("*")
         .eq("user_id", effectiveUserId)
         .eq("workspace_id", currentWorkspace.id)
@@ -651,19 +659,17 @@ const CallList = () => {
       // Get debtors not already in pending queue
       const queuedDebtorIds = new Set(
         (callListItems || [])
-          .filter(item => ["pending", "retry_pending", "calling"].includes(item.status))
-          .map(item => item.debtor_id)
+          .filter((item) => ["pending", "retry_pending", "calling"].includes(item.status))
+          .map((item) => item.debtor_id),
       );
 
-      const debtorsToQueue = (allActiveDebtors || []).filter(d => !queuedDebtorIds.has(d.id));
+      const debtorsToQueue = (allActiveDebtors || []).filter((d) => !queuedDebtorIds.has(d.id));
 
       if (debtorsToQueue.length === 0) {
         throw new Error("No new debtors to queue");
       }
 
-      const preferredTemplate = selectedTemplateId
-        ? templates?.find((t) => t.id === selectedTemplateId)
-        : undefined;
+      const preferredTemplate = selectedTemplateId ? templates?.find((t) => t.id === selectedTemplateId) : undefined;
 
       const defaultTemplate =
         preferredTemplate ||
@@ -677,7 +683,7 @@ const CallList = () => {
 
       for (let i = 0; i < debtorsToQueue.length; i += chunkSize) {
         const chunk = debtorsToQueue.slice(i, i + chunkSize);
-        const items = chunk.map(debtor => ({
+        const items = chunk.map((debtor) => ({
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
@@ -713,12 +719,12 @@ const CallList = () => {
       // Get debtors not already in pending queue
       const queuedDebtorIds = new Set(
         (callListItems || [])
-          .filter(item => ["pending", "retry_pending", "calling"].includes(item.status))
-          .map(item => item.debtor_id)
+          .filter((item) => ["pending", "retry_pending", "calling"].includes(item.status))
+          .map((item) => item.debtor_id),
       );
 
       // Filter to only debtors with 0 calls
-      const debtorsToQueue = (allActiveDebtors || []).filter(d => {
+      const debtorsToQueue = (allActiveDebtors || []).filter((d) => {
         if (queuedDebtorIds.has(d.id)) return false;
         const stats = phoneStats?.[d.phone_number];
         const totalCalls = (stats?.picked_up ?? 0) + (stats?.not_picked_up ?? 0);
@@ -729,9 +735,7 @@ const CallList = () => {
         throw new Error("No uncalled debtors to queue");
       }
 
-      const preferredTemplate = selectedTemplateId
-        ? templates?.find((t) => t.id === selectedTemplateId)
-        : undefined;
+      const preferredTemplate = selectedTemplateId ? templates?.find((t) => t.id === selectedTemplateId) : undefined;
 
       const defaultTemplate =
         preferredTemplate ||
@@ -745,7 +749,7 @@ const CallList = () => {
 
       for (let i = 0; i < debtorsToQueue.length; i += chunkSize) {
         const chunk = debtorsToQueue.slice(i, i + chunkSize);
-        const items = chunk.map(debtor => ({
+        const items = chunk.map((debtor) => ({
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
@@ -777,7 +781,7 @@ const CallList = () => {
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
 
-      const items = selectedDebtors.map(debtorId => ({
+      const items = selectedDebtors.map((debtorId) => ({
         debtor_id: debtorId,
         user_id: targetUserId,
         workspace_id: currentWorkspace.id,
@@ -888,16 +892,15 @@ const CallList = () => {
   // Queue failed calls for retry - create NEW items so failed records stay visible
   const retryFailedMutation = useMutation({
     mutationFn: async () => {
-      const failedItems = callListItems?.filter(item =>
-        ["failed", "no_answer", "no_response"].includes(item.status)
-      ) || [];
+      const failedItems =
+        callListItems?.filter((item) => ["failed", "no_answer", "no_response"].includes(item.status)) || [];
 
       if (failedItems.length === 0) {
         throw new Error("No failed calls to retry");
       }
 
       // Create new pending items based on the failed ones
-      const newItems = failedItems.map(item => ({
+      const newItems = failedItems.map((item) => ({
         debtor_id: item.debtor_id,
         user_id: item.user_id,
         template_id: item.template_id,
@@ -906,9 +909,7 @@ const CallList = () => {
         notes: `Retry of failed call`,
       }));
 
-      const { error } = await supabase
-        .from("call_list_items")
-        .insert(newItems);
+      const { error } = await supabase.from("call_list_items").insert(newItems);
 
       if (error) throw error;
       return failedItems.length;
@@ -932,12 +933,12 @@ const CallList = () => {
       // Get debtors not already in pending queue
       const queuedDebtorIds = new Set(
         (callListItems || [])
-          .filter(item => ["pending", "retry_pending", "calling"].includes(item.status))
-          .map(item => item.debtor_id)
+          .filter((item) => ["pending", "retry_pending", "calling"].includes(item.status))
+          .map((item) => item.debtor_id),
       );
 
       // Filter debtors based on conditions
-      let filteredDebtors = (allActiveDebtors || []).filter(d => {
+      let filteredDebtors = (allActiveDebtors || []).filter((d) => {
         if (queuedDebtorIds.has(d.id)) return false;
 
         // Get debt from variables.Debt (with capital D) or fall back to total_debt
@@ -983,9 +984,7 @@ const CallList = () => {
         filteredDebtors = shuffled.slice(0, conditions.maxDebtors);
       }
 
-      const preferredTemplate = selectedTemplateId
-        ? templates?.find((t) => t.id === selectedTemplateId)
-        : undefined;
+      const preferredTemplate = selectedTemplateId ? templates?.find((t) => t.id === selectedTemplateId) : undefined;
 
       const defaultTemplate =
         preferredTemplate ||
@@ -999,7 +998,7 @@ const CallList = () => {
 
       for (let i = 0; i < filteredDebtors.length; i += chunkSize) {
         const chunk = filteredDebtors.slice(i, i + chunkSize);
-        const items = chunk.map(debtor => ({
+        const items = chunk.map((debtor) => ({
           debtor_id: debtor.id,
           user_id: targetUserId,
           workspace_id: currentWorkspace.id,
@@ -1038,12 +1037,12 @@ const CallList = () => {
       // Get debtors not already in pending queue
       const queuedDebtorIds = new Set(
         (callListItems || [])
-          .filter(item => ["pending", "retry_pending", "calling"].includes(item.status))
-          .map(item => item.debtor_id)
+          .filter((item) => ["pending", "retry_pending", "calling"].includes(item.status))
+          .map((item) => item.debtor_id),
       );
 
       // Filter debtors based on conditions
-      const filteredDebtors = (allActiveDebtors || []).filter(d => {
+      const filteredDebtors = (allActiveDebtors || []).filter((d) => {
         if (queuedDebtorIds.has(d.id)) return false;
 
         // Get debt from variables.Debt (with capital D) or fall back to total_debt
@@ -1129,136 +1128,134 @@ const CallList = () => {
   const BOTNOI_TEMPLATE_ID = "2015208747";
 
   // Build the payload for preview/call
-  const buildCallPayload = useCallback((item: CallListItem) => {
-    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
-    if (!selectedTemplate?.message || !item.debtor) return null;
+  const buildCallPayload = useCallback(
+    (item: CallListItem) => {
+      const selectedTemplate = templates?.find((t) => t.id === item.template_id) || templates?.[0];
+      if (!selectedTemplate?.message || !item.debtor) return null;
 
-    const debtor = item.debtor;
-    const debtorVars = debtor.variables || {};
+      const debtor = item.debtor;
+      const debtorVars = debtor.variables || {};
 
-    // Construct the full message by replacing placeholders with debtor variables
-    let constructedMessage = selectedTemplate.message;
+      // Construct the full message by replacing placeholders with debtor variables
+      let constructedMessage = selectedTemplate.message;
 
-    // Replace all {placeholder} with actual values from debtor variables
-    Object.entries(debtorVars).forEach(([key, value]) => {
-      const placeholder = new RegExp(`\\{${key}\\}`, 'gi');
-      let processedValue = String(value);
+      // Replace all {placeholder} with actual values from debtor variables
+      Object.entries(debtorVars).forEach(([key, value]) => {
+        const placeholder = new RegExp(`\\{${key}\\}`, "gi");
+        let processedValue = String(value);
 
-      // Convert license plate fields to Thai phonetic reading
-      if (shouldUsePhonetic(key)) {
-        processedValue = toThaiPhonetic(processedValue);
-      }
+        // Convert license plate fields to Thai phonetic reading
+        if (shouldUsePhonetic(key)) {
+          processedValue = toThaiPhonetic(processedValue);
+        }
 
-      constructedMessage = constructedMessage.replace(placeholder, processedValue);
-    });
+        constructedMessage = constructedMessage.replace(placeholder, processedValue);
+      });
 
-    // Also replace standard placeholders
-    const debtAmount = debtor.total_debt
-      ? numberToThaiText(debtor.total_debt) + "บาท"
-      : "-";
-    const formattedDueDate = debtor.due_date
-      ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-      : "-";
+      // Also replace standard placeholders
+      const debtAmount = debtor.total_debt ? numberToThaiText(debtor.total_debt) + "บาท" : "-";
+      const formattedDueDate = debtor.due_date
+        ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
+        : "-";
 
-    constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
-    constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
-    constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
+      constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
+      constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
+      constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
 
-    return {
-      phone: debtor.phone_number,
-      templateId: BOTNOI_TEMPLATE_ID,
-      message: constructedMessage,
-      item,
-    };
-  }, [templates]);
+      return {
+        phone: debtor.phone_number,
+        templateId: BOTNOI_TEMPLATE_ID,
+        message: constructedMessage,
+        item,
+      };
+    },
+    [templates],
+  );
 
   // Show preview before calling
-  const handlePreviewCall = useCallback((item: CallListItem) => {
-    const payload = buildCallPayload(item);
-    if (payload) {
-      setPreviewPayload(payload);
-      setShowPreviewDialog(true);
-    } else {
-      toast.error("Cannot build call payload - missing template or debtor data");
-    }
-  }, [buildCallPayload]);
+  const handlePreviewCall = useCallback(
+    (item: CallListItem) => {
+      const payload = buildCallPayload(item);
+      if (payload) {
+        setPreviewPayload(payload);
+        setShowPreviewDialog(true);
+      } else {
+        toast.error("Cannot build call payload - missing template or debtor data");
+      }
+    },
+    [buildCallPayload],
+  );
 
   // Make a single call
-  const makeCall = useCallback(async (item: CallListItem, isRetry: boolean = false): Promise<{ success: boolean; shouldRetry: boolean }> => {
-    const selectedTemplate = templates?.find(t => t.id === item.template_id) || templates?.[0];
-    if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
+  const makeCall = useCallback(
+    async (item: CallListItem, isRetry: boolean = false): Promise<{ success: boolean; shouldRetry: boolean }> => {
+      const selectedTemplate = templates?.find((t) => t.id === item.template_id) || templates?.[0];
+      if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
 
-    try {
-      const debtor = item.debtor;
-      const debtorVars = (debtor.variables || {}) as Record<string, string>;
+      try {
+        const debtor = item.debtor;
+        const debtorVars = (debtor.variables || {}) as Record<string, string>;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
 
-      // Update call list item to calling
-      await supabase
-        .from("call_list_items")
-        .update({ status: "calling", called_at: new Date().toISOString() })
-        .eq("id", item.id);
+        // Update call list item to calling
+        await supabase
+          .from("call_list_items")
+          .update({ status: "calling", called_at: new Date().toISOString() })
+          .eq("id", item.id);
 
-      // Create call record
-      const { data: callRecord, error: dbError } = await supabase
-        .from("call_records")
-        .insert({
-          phone_number: debtor.phone_number,
-          amount: debtor.total_debt?.toString() || "",
-          due_date: debtor.due_date || "",
-          status: "calling",
-          template_id: selectedTemplate.id,
-          user_id: user.id,
-        })
-        .select()
-        .single();
+        // Create call record
+        const { data: callRecord, error: dbError } = await supabase
+          .from("call_records")
+          .insert({
+            phone_number: debtor.phone_number,
+            amount: debtor.total_debt?.toString() || "",
+            due_date: debtor.due_date || "",
+            status: "calling",
+            template_id: selectedTemplate.id,
+            user_id: user.id,
+          })
+          .select()
+          .single();
 
-      if (dbError) throw dbError;
+        if (dbError) throw dbError;
 
-      // Link call record to call list item
-      await supabase
-        .from("call_list_items")
-        .update({ call_record_id: callRecord.id })
-        .eq("id", item.id);
+        // Link call record to call list item
+        await supabase.from("call_list_items").update({ call_record_id: callRecord.id }).eq("id", item.id);
 
-      // Make call via voicebot edge function - send variables directly
-      console.log("Sending to voicebot-make-call with variables:", debtorVars);
-      const { data: callResponse, error: callError } = await supabase.functions.invoke(
-        "voicebot-make-call",
-        {
+        // Make call via voicebot edge function - send variables directly
+        console.log("Sending to voicebot-make-call with variables:", debtorVars);
+        const { data: callResponse, error: callError } = await supabase.functions.invoke("voicebot-make-call", {
           body: {
             phone_number: debtor.phone_number,
             variables: debtorVars,
             interruptible: settings.interruptible ? "True" : "False",
           },
-        }
-      );
+        });
 
-      if (callError) {
+        if (callError) {
+          await supabase
+            .from("call_records")
+            .update({ status: "failed", result_data: { error: callError.message } })
+            .eq("id", callRecord.id);
+          await supabase.from("call_list_items").update({ status: "failed" }).eq("id", item.id);
+          return { success: false, shouldRetry: true };
+        }
+
+        // Update call record with Botnoi ID
         await supabase
           .from("call_records")
-          .update({ status: "failed", result_data: { error: callError.message } })
+          .update({
+            botnoi_call_id: callResponse?.outbound_id || null,
+            status: "pending",
+          })
           .eq("id", callRecord.id);
-        await supabase
-          .from("call_list_items")
-          .update({ status: "failed" })
-          .eq("id", item.id);
-        return { success: false, shouldRetry: true };
-      }
 
-      // Update call record with Botnoi ID
-      await supabase
-        .from("call_records")
-        .update({
-          botnoi_call_id: callResponse?.outbound_id || null,
-          status: "pending",
-        })
-        .eq("id", callRecord.id);
-
-      // Token deduction disabled for testing
-      /*
+        // Token deduction disabled for testing
+        /*
       const { data: tokenData } = await supabase
         .from("call_tokens")
         .select("tokens")
@@ -1274,64 +1271,60 @@ const CallList = () => {
       }
       */
 
-      // Update debtor contact attempts
-      await supabase
-        .from("debtors")
-        .update({
-          contact_attempts: (debtor.contact_attempts || 0) + 1,
-          last_contact_at: new Date().toISOString(),
-        })
-        .eq("id", debtor.id);
+        // Update debtor contact attempts
+        await supabase
+          .from("debtors")
+          .update({
+            contact_attempts: (debtor.contact_attempts || 0) + 1,
+            last_contact_at: new Date().toISOString(),
+          })
+          .eq("id", debtor.id);
 
-      // Wait for call to complete
-      const maxWaitTime = 5 * 60 * 1000;
-      const pollInterval = 3000;
-      const startTime = Date.now();
+        // Wait for call to complete
+        const maxWaitTime = 5 * 60 * 1000;
+        const pollInterval = 3000;
+        const startTime = Date.now();
 
-      while (Date.now() - startTime < maxWaitTime) {
-        if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
+        while (Date.now() - startTime < maxWaitTime) {
+          if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
 
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
-        const { data: updatedRecord } = await supabase
-          .from("call_records")
-          .select("status")
-          .eq("id", callRecord.id)
-          .single();
+          const { data: updatedRecord } = await supabase
+            .from("call_records")
+            .select("status")
+            .eq("id", callRecord.id)
+            .single();
 
-        if (updatedRecord) {
-          const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
-          if (finalStatuses.includes(updatedRecord.status || "")) {
-            const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
-            // Update call list item with final status
-            await supabase
-              .from("call_list_items")
-              .update({
-                status: updatedRecord.status,
-                call_outcome: updatedRecord.status,
-                picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
-              })
-              .eq("id", item.id);
-            return { success: true, shouldRetry };
+          if (updatedRecord) {
+            const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
+            if (finalStatuses.includes(updatedRecord.status || "")) {
+              const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
+              // Update call list item with final status
+              await supabase
+                .from("call_list_items")
+                .update({
+                  status: updatedRecord.status,
+                  call_outcome: updatedRecord.status,
+                  picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
+                })
+                .eq("id", item.id);
+              return { success: true, shouldRetry };
+            }
           }
         }
-      }
 
-      // Timeout
-      await supabase
-        .from("call_list_items")
-        .update({ status: "completed" })
-        .eq("id", item.id);
-      return { success: true, shouldRetry: false };
-    } catch (error) {
-      console.error("Error making call:", error);
-      await supabase
-        .from("call_list_items")
-        .update({ status: "failed" })
-        .eq("id", item.id);
-      return { success: false, shouldRetry: true };
-    }
-  }, [templates]);
+        // Timeout
+        await supabase.from("call_list_items").update({ status: "completed" }).eq("id", item.id);
+        return { success: true, shouldRetry: false };
+      } catch (error) {
+        console.error("Error making call:", error);
+        await supabase.from("call_list_items").update({ status: "failed" }).eq("id", item.id);
+        return { success: false, shouldRetry: true };
+      }
+    },
+    [templates],
+  );
 
   // Start calling using backend session (persists even if page closed)
   const startCallingSession = useCallback(async () => {
@@ -1346,9 +1339,9 @@ const CallList = () => {
       return;
     }
 
-    const pendingItems = callListItems?.filter(item =>
-      (item.status === "pending" || item.status === "retry_pending") && item.debtor
-    ) || [];
+    const pendingItems =
+      callListItems?.filter((item) => (item.status === "pending" || item.status === "retry_pending") && item.debtor) ||
+      [];
 
     if (pendingItems.length === 0) {
       toast.error("No pending calls in the list");
@@ -1367,8 +1360,7 @@ const CallList = () => {
     try {
       // Create a call session in the database
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: session, error: sessionError } = await (supabase
-        .from("call_sessions") as any)
+      const { data: session, error: sessionError } = await (supabase.from("call_sessions") as any)
         .insert({
           user_id: effectiveUserId,
           workspace_id: currentWorkspace.id,
@@ -1388,13 +1380,23 @@ const CallList = () => {
 
       if (invokeError) throw invokeError;
 
-      toast.success(`Started calling ${pendingItems.length} debtors. You can close this page - calls will continue in the background.`);
+      toast.success(
+        `Started calling ${pendingItems.length} debtors. You can close this page - calls will continue in the background.`,
+      );
       refetchSession();
     } catch (error) {
       console.error("Error starting call session:", error);
       toast.error("Failed to start call session");
     }
-  }, [callListItems, settings, effectiveUserId, currentWorkspace?.id, userTokens, isWithinBusinessHours, refetchSession]);
+  }, [
+    callListItems,
+    settings,
+    effectiveUserId,
+    currentWorkspace?.id,
+    userTokens,
+    isWithinBusinessHours,
+    refetchSession,
+  ]);
 
   // Pause the active session
   const pauseCallingSession = useCallback(async () => {
@@ -1477,10 +1479,12 @@ const CallList = () => {
     );
   };
 
-  const pendingCount = callListItems?.filter(item => item.status === "pending" || item.status === "retry_pending").length || 0;
-  const callingCount = callListItems?.filter(item => item.status === "calling").length || 0;
-  const processedCount = callListItems?.filter(item => item.status === "completed" || item.status === "failed").length || 0;
-  
+  const pendingCount =
+    callListItems?.filter((item) => item.status === "pending" || item.status === "retry_pending").length || 0;
+  const callingCount = callListItems?.filter((item) => item.status === "calling").length || 0;
+  const processedCount =
+    callListItems?.filter((item) => item.status === "completed" || item.status === "failed").length || 0;
+
   // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
   // GLOBAL EXCLUSION: drop "incomplete" rows before any computation (hanged_up IS counted)
   const visibleCallListItems = (callListItems || []).filter((item) => {
@@ -1489,13 +1493,13 @@ const CallList = () => {
     return s !== "incomplete" && r !== "incomplete";
   });
 
-  const completedCallsStats = visibleCallListItems.filter((item) =>
-    item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending")
+  const completedCallsStats = visibleCallListItems.filter(
+    (item) => item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending"),
   );
 
   const pickedUpCount = completedCallsStats.filter((item) => item.picked_up).length;
 
-  const categorizedStats = completedCallsStats.map(item => {
+  const categorizedStats = completedCallsStats.map((item) => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
     const resultDataStatus = (item as any).call_record?.result_data?.status;
     const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
@@ -1519,28 +1523,31 @@ const CallList = () => {
     return { ...item, resolved };
   });
 
-  const noAnswerCount = categorizedStats.filter(i => i.resolved === "no_answer").length;
-  const busyCount = categorizedStats.filter(i => i.resolved === "busy").length;
-  const failedCount = categorizedStats.filter(i => i.resolved === "failed").length;
-  const rejectedCount = categorizedStats.filter(i => i.resolved === "rejected").length;
-  const voicemailCount = categorizedStats.filter(i => i.resolved === "voicemail").length;
-  const hangupCount = categorizedStats.filter(i => i.resolved === "hanged_up").length;
+  const noAnswerCount = categorizedStats.filter((i) => i.resolved === "no_answer").length;
+  const busyCount = categorizedStats.filter((i) => i.resolved === "busy").length;
+  const failedCount = categorizedStats.filter((i) => i.resolved === "failed").length;
+  const rejectedCount = categorizedStats.filter((i) => i.resolved === "rejected").length;
+  const voicemailCount = categorizedStats.filter((i) => i.resolved === "voicemail").length;
+  const hangupCount = categorizedStats.filter((i) => i.resolved === "hanged_up").length;
 
   const incompleteCount = noAnswerCount + busyCount + failedCount + rejectedCount + voicemailCount + hangupCount;
 
-  const pickupRate = completedCallsStats.length > 0
-    ? Math.round((pickedUpCount / completedCallsStats.length) * 100)
-    : 0;
+  const pickupRate =
+    completedCallsStats.length > 0 ? Math.round((pickedUpCount / completedCallsStats.length) * 100) : 0;
 
-  const activeSessionConcurrentCalls = ((activeSession as CallSession & { settings?: Partial<AutoDialSettings> | null } | null)?.settings?.concurrentCalls) ?? settings.concurrentCalls;
-  const filteredItems = (callListItems || []).filter(item => {
+  const activeSessionConcurrentCalls =
+    (activeSession as (CallSession & { settings?: Partial<AutoDialSettings> | null }) | null)?.settings
+      ?.concurrentCalls ?? settings.concurrentCalls;
+  const filteredItems = (callListItems || []).filter((item) => {
     switch (activeTab) {
       case "pending":
         return item.status === "pending" || item.status === "retry_pending";
       case "calling":
         return item.status === "calling";
       case "completed":
-        return ["completed", "success", "confirmed", "declined", "no_answer", "failed", "no_response"].includes(item.status);
+        return ["completed", "success", "confirmed", "declined", "no_answer", "failed", "no_response"].includes(
+          item.status,
+        );
       default:
         return false;
     }
@@ -1549,7 +1556,7 @@ const CallList = () => {
   // Sort handler
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
       setSortDirection("desc");
@@ -1561,9 +1568,7 @@ const CallList = () => {
     if (sortField !== field) {
       return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc"
-      ? <ArrowUp className="w-3 h-3 ml-1" />
-      : <ArrowDown className="w-3 h-3 ml-1" />;
+    return sortDirection === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
   // Sorted and filtered items
@@ -1601,9 +1606,7 @@ const CallList = () => {
     if (aVal === null || bVal === null) return 0;
 
     if (typeof aVal === "string" && typeof bVal === "string") {
-      return sortDirection === "asc"
-        ? aVal.localeCompare(bVal)
-        : bVal.localeCompare(aVal);
+      return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     }
 
     if (typeof aVal === "number" && typeof bVal === "number") {
@@ -1615,8 +1618,18 @@ const CallList = () => {
 
   // Export completed calls to Excel
   const handleExportCompletedCalls = useCallback(() => {
-    const completedItems = (callListItems || []).filter(item =>
-      ["confirmed", "declined", "completed", "failed", "no_answer", "busy", "cancelled", "invalid_number", "timeout"].includes(item.status)
+    const completedItems = (callListItems || []).filter((item) =>
+      [
+        "confirmed",
+        "declined",
+        "completed",
+        "failed",
+        "no_answer",
+        "busy",
+        "cancelled",
+        "invalid_number",
+        "timeout",
+      ].includes(item.status),
     );
 
     if (completedItems.length === 0) {
@@ -1629,10 +1642,10 @@ const CallList = () => {
       return {
         "#": index + 1,
         "Phone Number": item.debtor?.phone_number || "Unknown",
-        "Name": item.debtor?.name || "-",
-        "Status": item.status,
+        Name: item.debtor?.name || "-",
+        Status: item.status,
         "Picked Up": item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
-        "Outcome": item.call_outcome || "-",
+        Outcome: item.call_outcome || "-",
         "Called At": item.called_at ? new Date(item.called_at).toLocaleString() : "-",
         "Created At": new Date(item.created_at).toLocaleString(),
         "Conversation Log": notesData.conversationLog || "-",
@@ -1655,27 +1668,25 @@ const CallList = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Completed Calls");
 
     // Auto-size columns
-    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-      wch: Math.max(key.length, 15)
+    const colWidths = Object.keys(exportData[0] || {}).map((key) => ({
+      wch: Math.max(key.length, 15),
     }));
     worksheet["!cols"] = colWidths;
 
-    const fileName = `completed_calls_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `completed_calls_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
     toast.success(`Exported ${completedItems.length} completed calls`);
   }, [callListItems, parseNotesData]);
 
-
-
   const queuedDebtorIds = new Set(
     (callListItems || [])
-      .filter(item => ["pending", "retry_pending", "calling"].includes(item.status))
-      .map(item => item.debtor_id)
+      .filter((item) => ["pending", "retry_pending", "calling"].includes(item.status))
+      .map((item) => item.debtor_id),
   );
-  const queueAllCount = (allActiveDebtors || []).filter(d => !queuedDebtorIds.has(d.id)).length;
+  const queueAllCount = (allActiveDebtors || []).filter((d) => !queuedDebtorIds.has(d.id)).length;
 
   // Count uncalled debtors (those with 0 calls)
-  const uncalledCount = (allActiveDebtors || []).filter(d => {
+  const uncalledCount = (allActiveDebtors || []).filter((d) => {
     if (queuedDebtorIds.has(d.id)) return false;
     const stats = phoneStats?.[d.phone_number];
     const totalCalls = (stats?.picked_up ?? 0) + (stats?.not_picked_up ?? 0);
@@ -1683,16 +1694,14 @@ const CallList = () => {
   }).length;
 
   const toggleDebtorSelection = (id: string) => {
-    setSelectedDebtors(prev =>
-      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
-    );
+    setSelectedDebtors((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
 
   const selectAllDebtors = () => {
     if (selectedDebtors.length === availableDebtors?.length) {
       setSelectedDebtors([]);
     } else {
-      setSelectedDebtors(availableDebtors?.map(d => d.id) || []);
+      setSelectedDebtors(availableDebtors?.map((d) => d.id) || []);
     }
   };
 
@@ -1704,9 +1713,7 @@ const CallList = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Call List</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Queue debtors for automated calling with retry logic
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Queue debtors for automated calling with retry logic</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowSettingsDialog(true)}>
@@ -1755,7 +1762,6 @@ const CallList = () => {
         </Card>
       </div>
 
-
       {/* Business Hours Warning */}
       {settings.businessHoursOnly && !isWithinBusinessHours() && (
         <Card className="border-warning/50 bg-warning/10">
@@ -1764,7 +1770,8 @@ const CallList = () => {
             <div>
               <p className="font-medium text-warning">Outside Business Hours</p>
               <p className="text-sm text-muted-foreground">
-                Calls are only allowed {settings.businessDays.map(d => DAY_NAMES[d]).join(", ")} between {settings.businessHoursStart} - {settings.businessHoursEnd}
+                Calls are only allowed {settings.businessDays.map((d) => DAY_NAMES[d]).join(", ")} between{" "}
+                {settings.businessHoursStart} - {settings.businessHoursEnd}
               </p>
             </div>
           </CardContent>
@@ -1773,12 +1780,14 @@ const CallList = () => {
 
       {/* Active Session Banner */}
       {activeSession && (
-        <Card className={`border-primary/50 ${activeSession.status === "paused" ? "bg-warning/10" : settings.testMode ? "bg-warning/20 border-warning" : "bg-primary/10"}`}>
+        <Card
+          className={`border-primary/50 ${activeSession.status === "paused" ? "bg-warning/10" : settings.testMode ? "bg-warning/20 border-warning" : "bg-primary/10"}`}
+        >
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {activeSession.status === "running" ? (
-                  (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? (
+                  activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls ? (
                     <CheckCircle className="w-5 h-5 text-success" />
                   ) : (
                     <Loader2 className="w-5 h-5 text-primary animate-spin" />
@@ -1790,10 +1799,13 @@ const CallList = () => {
                 )}
                 <div>
                   <p className="font-medium flex items-center gap-2">
-                    {activeSession.status === "running" ? (
-                      (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? "Session Completed" : "Calls in Progress"
-                    ) : activeSession.status === "stopping" ? "Stopping..." :
-                      "Paused"}
+                    {activeSession.status === "running"
+                      ? activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls
+                        ? "Session Completed"
+                        : "Calls in Progress"
+                      : activeSession.status === "stopping"
+                        ? "Stopping..."
+                        : "Paused"}
                     {settings.testMode && (
                       <Badge variant="outline" className="bg-warning/20 text-warning border-warning text-xs">
                         🧪 TEST MODE
@@ -1801,11 +1813,12 @@ const CallList = () => {
                     )}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {activeSession.error_message || (
-                      (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) 
-                        ? "All planned calls have been processed." 
-                        : (settings.testMode ? "Simulating calls - no real calls being made" : "Processing calls in background...")
-                    )}
+                    {activeSession.error_message ||
+                      (activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls
+                        ? "All planned calls have been processed."
+                        : settings.testMode
+                          ? "Simulating calls - no real calls being made"
+                          : "Processing calls in background...")}
                   </p>
                 </div>
               </div>
@@ -1824,7 +1837,7 @@ const CallList = () => {
                 )}
                 {activeSession.status === "running" && (
                   <>
-                    {(activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls) ? (
+                    {activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls ? (
                       <Button size="sm" variant="outline" onClick={stopCalling}>
                         <CheckCircle className="w-4 h-4 mr-2" />
                         Finish Session
@@ -1858,9 +1871,12 @@ const CallList = () => {
                 <div
                   className="h-full bg-primary transition-all duration-500"
                   style={{
-                    width: `${activeSession.total_calls > 0
-                      ? ((activeSession.completed_calls + activeSession.failed_calls) / activeSession.total_calls) * 100
-                      : 0}%`
+                    width: `${
+                      activeSession.total_calls > 0
+                        ? ((activeSession.completed_calls + activeSession.failed_calls) / activeSession.total_calls) *
+                          100
+                        : 0
+                    }%`,
                   }}
                 />
               </div>
@@ -1871,12 +1887,8 @@ const CallList = () => {
               {activeSession.status === "running" && callingCount > 0 && (
                 <div className="flex items-center gap-1.5 bg-primary/20 px-3 py-1.5 rounded-md border border-primary/30">
                   <Phone className="w-4 h-4 text-primary animate-pulse" />
-                  <span className="font-bold text-primary tabular-nums">
-                    {callingCount} calling
-                  </span>
-                  <span className="text-muted-foreground">
-                    / {activeSessionConcurrentCalls} max
-                  </span>
+                  <span className="font-bold text-primary tabular-nums">{callingCount} calling</span>
+                  <span className="text-muted-foreground">/ {activeSessionConcurrentCalls} max</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
@@ -1922,11 +1934,7 @@ const CallList = () => {
                 <Button
                   variant="secondary"
                   onClick={() => queueAllDebtorsMutation.mutate()}
-                  disabled={
-                    queueAllDebtorsMutation.isPending ||
-                    isLoadingAllActiveDebtors ||
-                    queueAllCount === 0
-                  }
+                  disabled={queueAllDebtorsMutation.isPending || isLoadingAllActiveDebtors || queueAllCount === 0}
                 >
                   {queueAllDebtorsMutation.isPending || isLoadingAllActiveDebtors ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1939,11 +1947,7 @@ const CallList = () => {
                 <Button
                   variant="secondary"
                   onClick={() => queueUncalledDebtorsMutation.mutate()}
-                  disabled={
-                    queueUncalledDebtorsMutation.isPending ||
-                    isLoadingAllActiveDebtors ||
-                    uncalledCount === 0
-                  }
+                  disabled={queueUncalledDebtorsMutation.isPending || isLoadingAllActiveDebtors || uncalledCount === 0}
                 >
                   {queueUncalledDebtorsMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2022,12 +2026,7 @@ const CallList = () => {
             <CardTitle className="text-base">Call Queue</CardTitle>
             <div className="flex items-center gap-2">
               {activeTab === "completed" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportCompletedCalls}
-                  className="h-8 text-xs"
-                >
+                <Button variant="outline" size="sm" onClick={handleExportCompletedCalls} className="h-8 text-xs">
                   <Download className="w-3.5 h-3.5 mr-1.5" />
                   Export Excel
                 </Button>
@@ -2035,19 +2034,21 @@ const CallList = () => {
               <div className="flex gap-1 bg-muted p-1 rounded-lg">
                 <button
                   onClick={() => setActiveTab("pending")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "pending"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    activeTab === "pending"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
                   Pending ({pendingCount})
                 </button>
                 <button
                   onClick={() => setActiveTab("calling")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "calling"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    activeTab === "calling"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
                   <span className="flex items-center gap-1.5">
                     {callingCount > 0 && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -2056,10 +2057,11 @@ const CallList = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab("completed")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "completed"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    activeTab === "completed"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
                   Completed ({processedCount})
                 </button>
@@ -2142,8 +2144,18 @@ const CallList = () => {
 
                     // Determine picked up display
                     const getPickedUpDisplay = () => {
-                      if (item.picked_up === true) return <Badge variant="outline" className="bg-success/10 text-success border-success/20">Yes</Badge>;
-                      if (item.picked_up === false) return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">No</Badge>;
+                      if (item.picked_up === true)
+                        return (
+                          <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                            Yes
+                          </Badge>
+                        );
+                      if (item.picked_up === false)
+                        return (
+                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                            No
+                          </Badge>
+                        );
                       return <span className="text-muted-foreground">-</span>;
                     };
 
@@ -2152,19 +2164,29 @@ const CallList = () => {
                       if (!item.call_outcome) return <span className="text-muted-foreground">-</span>;
                       const outcome = item.call_outcome.toLowerCase();
                       if (outcome.includes("ยืนยัน") || outcome.includes("confirm")) {
-                        return <Badge variant="outline" className="bg-success/10 text-success border-success/20">{item.call_outcome}</Badge>;
+                        return (
+                          <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                            {item.call_outcome}
+                          </Badge>
+                        );
                       }
                       if (outcome.includes("ปฏิเสธ") || outcome.includes("decline") || outcome.includes("reject")) {
-                        return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">{item.call_outcome}</Badge>;
+                        return (
+                          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                            {item.call_outcome}
+                          </Badge>
+                        );
                       }
-                      return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">{item.call_outcome}</Badge>;
+                      return (
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                          {item.call_outcome}
+                        </Badge>
+                      );
                     };
 
                     return (
                       <TableRow key={item.id} className={isCurrentlyCalling ? "bg-primary/5 animate-pulse" : ""}>
-                        <TableCell className="text-sm text-muted-foreground font-mono">
-                          {index + 1}
-                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground font-mono">{index + 1}</TableCell>
                         <TableCell className="font-mono text-sm">
                           <div className="flex items-center gap-2">
                             {isCurrentlyCalling && <Phone className="w-3.5 h-3.5 text-primary animate-bounce" />}
@@ -2177,13 +2199,12 @@ const CallList = () => {
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                            : "-"
-                          }
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "-"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(item.created_at).toLocaleString("th-TH", {
@@ -2195,7 +2216,12 @@ const CallList = () => {
                         </TableCell>
                         <TableCell className="flex gap-1">
                           {/* Show view transcript for completed calls, preview for pending */}
-                          {(item.status === "success" || item.status === "confirmed" || item.status === "declined" || item.status === "no_response" || item.status === "no_answer" || item.status === "failed") ? (
+                          {item.status === "success" ||
+                          item.status === "confirmed" ||
+                          item.status === "declined" ||
+                          item.status === "no_response" ||
+                          item.status === "no_answer" ||
+                          item.status === "failed" ? (
                             (() => {
                               const { conversationLog } = parseNotesData(item.notes);
                               return conversationLog ? (
@@ -2270,19 +2296,14 @@ const CallList = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Add to Call List</DialogTitle>
-            <DialogDescription>
-              Select debtors to add to the call queue
-            </DialogDescription>
+            <DialogDescription>Select debtors to add to the call queue</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
             {/* Template Selection */}
             <div className="space-y-1.5">
               <Label className="text-sm">Template</Label>
-              <Select
-                value={selectedTemplateId}
-                onValueChange={setSelectedTemplateId}
-              >
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select template" />
                 </SelectTrigger>
@@ -2299,11 +2320,7 @@ const CallList = () => {
             {/* Schedule Time (Optional) */}
             <div className="space-y-1.5">
               <Label className="text-sm">Schedule (Optional)</Label>
-              <Input
-                type="datetime-local"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-              />
+              <Input type="datetime-local" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
             </div>
 
             {/* Debtor Selection */}
@@ -2344,9 +2361,12 @@ const CallList = () => {
                           <TableCell className="text-sm">{debtor.name || "-"}</TableCell>
                           <TableCell className="text-sm">
                             {debtor.total_debt
-                              ? new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", minimumFractionDigits: 0 }).format(debtor.total_debt)
-                              : "-"
-                            }
+                              ? new Intl.NumberFormat("th-TH", {
+                                  style: "currency",
+                                  currency: "THB",
+                                  minimumFractionDigits: 0,
+                                }).format(debtor.total_debt)
+                              : "-"}
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="text-xs">
@@ -2394,12 +2414,10 @@ const CallList = () => {
 
       {/* Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[85vh] p-0 flex flex-col gap-0 sm:rounded-lg">
+        <DialogContent className="mx-auto w-[calc(100%-2rem)] max-w-lg max-h-[85vh] p-0 flex flex-col gap-0 sm:rounded-lg">
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>Auto-Dial Settings</DialogTitle>
-            <DialogDescription>
-              Configure retry logic, limits, and business hours
-            </DialogDescription>
+            <DialogDescription>Configure retry logic, limits, and business hours</DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
@@ -2411,13 +2429,11 @@ const CallList = () => {
                     <Zap className="w-4 h-4 text-warning" />
                     Test Mode
                   </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Simulate calls without hitting real phone numbers
-                  </p>
+                  <p className="text-xs text-muted-foreground">Simulate calls without hitting real phone numbers</p>
                 </div>
                 <Switch
                   checked={settings.testMode}
-                  onCheckedChange={(checked) => setSettings(s => ({ ...s, testMode: checked }))}
+                  onCheckedChange={(checked) => setSettings((s) => ({ ...s, testMode: checked }))}
                 />
               </div>
               {settings.testMode && (
@@ -2434,13 +2450,11 @@ const CallList = () => {
                   <Volume2 className="w-4 h-4 text-primary" />
                   Interruptible
                 </Label>
-                <p className="text-xs text-muted-foreground">
-                  Allow the bot to be interrupted by the user speaking
-                </p>
+                <p className="text-xs text-muted-foreground">Allow the bot to be interrupted by the user speaking</p>
               </div>
               <Switch
                 checked={settings.interruptible}
-                onCheckedChange={(checked) => setSettings(s => ({ ...s, interruptible: checked }))}
+                onCheckedChange={(checked) => setSettings((s) => ({ ...s, interruptible: checked }))}
               />
             </div>
 
@@ -2452,7 +2466,7 @@ const CallList = () => {
                 min={0}
                 max={5}
                 value={settings.maxRetries}
-                onChange={(e) => setSettings(s => ({ ...s, maxRetries: parseInt(e.target.value) || 0 }))}
+                onChange={(e) => setSettings((s) => ({ ...s, maxRetries: parseInt(e.target.value) || 0 }))}
               />
               <p className="text-xs text-muted-foreground">
                 How many times to retry failed/no-answer calls (0 = no retry)
@@ -2467,11 +2481,9 @@ const CallList = () => {
                 min={1}
                 max={10000}
                 value={settings.dailyLimit}
-                onChange={(e) => setSettings(s => ({ ...s, dailyLimit: parseInt(e.target.value) || 100 }))}
+                onChange={(e) => setSettings((s) => ({ ...s, dailyLimit: parseInt(e.target.value) || 100 }))}
               />
-              <p className="text-xs text-muted-foreground">
-                Maximum calls per day ({todayCallCount || 0} made today)
-              </p>
+              <p className="text-xs text-muted-foreground">Maximum calls per day ({todayCallCount || 0} made today)</p>
             </div>
 
             {/* Delay Between Calls */}
@@ -2481,15 +2493,15 @@ const CallList = () => {
                 type="number"
                 min={1}
                 max={60}
-                value={settings.delayBetweenCalls === 0 ? '' : settings.delayBetweenCalls}
+                value={settings.delayBetweenCalls === 0 ? "" : settings.delayBetweenCalls}
                 onChange={(e) => {
-                  const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                  setSettings(s => ({ ...s, delayBetweenCalls: isNaN(val) ? 0 : val }));
+                  const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+                  setSettings((s) => ({ ...s, delayBetweenCalls: isNaN(val) ? 0 : val }));
                 }}
                 onBlur={(e) => {
                   const val = parseInt(e.target.value);
                   if (isNaN(val) || val < 1) {
-                    setSettings(s => ({ ...s, delayBetweenCalls: 3 }));
+                    setSettings((s) => ({ ...s, delayBetweenCalls: 3 }));
                   }
                 }}
               />
@@ -2503,17 +2515,17 @@ const CallList = () => {
                 type="number"
                 min={1}
                 max={10}
-                value={settings.concurrentCalls === 0 ? '' : settings.concurrentCalls}
+                value={settings.concurrentCalls === 0 ? "" : settings.concurrentCalls}
                 onChange={(e) => {
-                  const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                  setSettings(s => ({ ...s, concurrentCalls: isNaN(val) ? 0 : val }));
+                  const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+                  setSettings((s) => ({ ...s, concurrentCalls: isNaN(val) ? 0 : val }));
                 }}
                 onBlur={(e) => {
                   const val = parseInt(e.target.value);
                   if (isNaN(val) || val < 1) {
-                    setSettings(s => ({ ...s, concurrentCalls: 5 }));
+                    setSettings((s) => ({ ...s, concurrentCalls: 5 }));
                   } else if (val > 10) {
-                    setSettings(s => ({ ...s, concurrentCalls: 10 }));
+                    setSettings((s) => ({ ...s, concurrentCalls: 10 }));
                   }
                 }}
               />
@@ -2529,7 +2541,7 @@ const CallList = () => {
                 </div>
                 <Switch
                   checked={settings.businessHoursOnly}
-                  onCheckedChange={(checked) => setSettings(s => ({ ...s, businessHoursOnly: checked }))}
+                  onCheckedChange={(checked) => setSettings((s) => ({ ...s, businessHoursOnly: checked }))}
                 />
               </div>
 
@@ -2544,17 +2556,18 @@ const CallList = () => {
                           key={day}
                           type="button"
                           onClick={() => {
-                            setSettings(s => ({
+                            setSettings((s) => ({
                               ...s,
                               businessDays: s.businessDays.includes(index)
-                                ? s.businessDays.filter(d => d !== index)
-                                : [...s.businessDays, index].sort()
+                                ? s.businessDays.filter((d) => d !== index)
+                                : [...s.businessDays, index].sort(),
                             }));
                           }}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${settings.businessDays.includes(index)
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-                            }`}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                            settings.businessDays.includes(index)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                          }`}
                         >
                           {day}
                         </button>
@@ -2569,7 +2582,7 @@ const CallList = () => {
                       <Input
                         type="time"
                         value={settings.businessHoursStart}
-                        onChange={(e) => setSettings(s => ({ ...s, businessHoursStart: e.target.value }))}
+                        onChange={(e) => setSettings((s) => ({ ...s, businessHoursStart: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-1">
@@ -2577,7 +2590,7 @@ const CallList = () => {
                       <Input
                         type="time"
                         value={settings.businessHoursEnd}
-                        onChange={(e) => setSettings(s => ({ ...s, businessHoursEnd: e.target.value }))}
+                        onChange={(e) => setSettings((s) => ({ ...s, businessHoursEnd: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -2587,17 +2600,10 @@ const CallList = () => {
           </div>
 
           <div className="flex gap-2 px-6 py-4 border-t shrink-0 bg-background">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setSettings(DEFAULT_SETTINGS)}
-            >
+            <Button variant="outline" className="flex-1" onClick={() => setSettings(DEFAULT_SETTINGS)}>
               Reset to Default
             </Button>
-            <Button
-              className="flex-1"
-              onClick={() => setShowSettingsDialog(false)}
-            >
+            <Button className="flex-1" onClick={() => setShowSettingsDialog(false)}>
               Done
             </Button>
           </div>
@@ -2609,9 +2615,7 @@ const CallList = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Botnoi Call Payload Preview</DialogTitle>
-            <DialogDescription>
-              This is the exact payload that will be sent to Botnoi API
-            </DialogDescription>
+            <DialogDescription>This is the exact payload that will be sent to Botnoi API</DialogDescription>
           </DialogHeader>
           {previewPayload && (
             <div className="space-y-4">
@@ -2635,20 +2639,20 @@ const CallList = () => {
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="font-semibold text-sm mb-2">Raw JSON Payload to Botnoi:</h4>
                 <pre className="text-xs bg-background border rounded p-3 overflow-x-auto">
-                  {JSON.stringify({
-                    "Tel. Number": previewPayload.phone,
-                    "template_id": previewPayload.templateId,
-                    "Appointment Date": previewPayload.message
-                  }, null, 2)}
+                  {JSON.stringify(
+                    {
+                      "Tel. Number": previewPayload.phone,
+                      template_id: previewPayload.templateId,
+                      "Appointment Date": previewPayload.message,
+                    },
+                    null,
+                    2,
+                  )}
                 </pre>
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowPreviewDialog(false)}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => setShowPreviewDialog(false)}>
                   Close
                 </Button>
                 <Button
@@ -2675,9 +2679,7 @@ const CallList = () => {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Smart Queue</DialogTitle>
-            <DialogDescription>
-              Filter debtors by conditions and queue them for calling
-            </DialogDescription>
+            <DialogDescription>Filter debtors by conditions and queue them for calling</DialogDescription>
           </DialogHeader>
           <DebtorFilterPanel
             onCalculateCount={handleCalculateFilterCount}
@@ -2700,9 +2702,7 @@ const CallList = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Call Recording</DialogTitle>
-            <DialogDescription>
-              Conversation transcript from the call
-            </DialogDescription>
+            <DialogDescription>Conversation transcript from the call</DialogDescription>
           </DialogHeader>
           {transcriptData && (
             <div className="space-y-4">
@@ -2712,28 +2712,28 @@ const CallList = () => {
                   {transcriptData.conversationLog ? (
                     (() => {
                       // Parse conversation log: "YYYY-MM-DD HH:MM:SS Bot/User: message"
-                      const lines = transcriptData.conversationLog.split('\n').filter(line => line.trim());
+                      const lines = transcriptData.conversationLog.split("\n").filter((line) => line.trim());
                       return lines.map((line, idx) => {
                         const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(Bot|User):\s*(.*)$/i);
                         if (!match) return null;
 
                         const [, timestamp, role, message] = match;
-                        const isBot = role.toLowerCase() === 'bot';
-                        const time = timestamp.split(' ')[1]; // Just HH:MM:SS
+                        const isBot = role.toLowerCase() === "bot";
+                        const time = timestamp.split(" ")[1]; // Just HH:MM:SS
 
                         return (
-                          <div
-                            key={idx}
-                            className={`flex ${isBot ? 'justify-start' : 'justify-end'}`}
-                          >
+                          <div key={idx} className={`flex ${isBot ? "justify-start" : "justify-end"}`}>
                             <div
-                              className={`max-w-[85%] rounded-2xl px-4 py-2 ${isBot
-                                ? 'bg-muted text-foreground rounded-bl-sm'
-                                : 'bg-primary text-primary-foreground rounded-br-sm'
-                                }`}
+                              className={`max-w-[85%] rounded-2xl px-4 py-2 ${
+                                isBot
+                                  ? "bg-muted text-foreground rounded-bl-sm"
+                                  : "bg-primary text-primary-foreground rounded-br-sm"
+                              }`}
                             >
                               <p className="text-sm">{message}</p>
-                              <p className={`text-[10px] mt-1 ${isBot ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
+                              <p
+                                className={`text-[10px] mt-1 ${isBot ? "text-muted-foreground" : "text-primary-foreground/70"}`}
+                              >
                                 {time}
                               </p>
                             </div>
@@ -2742,7 +2742,9 @@ const CallList = () => {
                       });
                     })()
                   ) : (
-                    <p className="text-sm text-muted-foreground italic text-center py-8">No conversation log available</p>
+                    <p className="text-sm text-muted-foreground italic text-center py-8">
+                      No conversation log available
+                    </p>
                   )}
                 </div>
               </div>
@@ -2753,11 +2755,7 @@ const CallList = () => {
                     <Volume2 className="w-4 h-4" />
                     Audio Recording
                   </Label>
-                  <audio
-                    controls
-                    className="w-full"
-                    src={transcriptData.audioUrl}
-                  >
+                  <audio controls className="w-full" src={transcriptData.audioUrl}>
                     Your browser does not support the audio element.
                   </audio>
                   <Button
@@ -2771,9 +2769,9 @@ const CallList = () => {
                         if (!res.ok) throw new Error("Download failed");
                         const blob = await res.blob();
                         const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
+                        const a = document.createElement("a");
                         a.href = blobUrl;
-                        a.download = 'call_audio.mp3';
+                        a.download = "call_audio.mp3";
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
@@ -2790,11 +2788,7 @@ const CallList = () => {
                 </div>
               )}
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowTranscriptDialog(false)}
-              >
+              <Button variant="outline" className="w-full" onClick={() => setShowTranscriptDialog(false)}>
                 Close
               </Button>
             </div>
