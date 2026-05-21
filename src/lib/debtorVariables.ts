@@ -144,3 +144,19 @@ export function getThaiDateToday(): string {
     .format(new Date())
     .replace(/(\S+)\s/, "$1 ที่ ");
 }
+
+/** Format ISO date (YYYY-MM-DD) as Thai Buddhist date, e.g. "วันจันทร์ที่ 13 เมษายน 2568". */
+export function formatThaiBuddhistDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(`${iso}T00:00:00+07:00`);
+  if (isNaN(d.getTime())) return "-";
+  return new Intl.DateTimeFormat("th-TH-u-ca-buddhist", {
+    timeZone: "Asia/Bangkok",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+    .format(d)
+    .replace(/(\S+)\s/, "$1ที่ ");
+}
