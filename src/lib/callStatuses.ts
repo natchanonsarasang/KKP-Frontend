@@ -40,12 +40,21 @@ export interface StatusDef {
 // ---------------------------------------------------------------------
 export const MAIN_STATUSES: StatusDef[] = [
   {
-    key: "acknowledged",
-    label: "Acknowledged",
-    thai: "รับทราบ",
+    key: "planned_more_than_3",
+    label: "Planned (>3 days)",
+    thai: "วางแผนชำระเกิน 3 วัน",
     color: "#10b981",
-    tone: "done",
-    match: (c) => c.includes("acknowledge") || c.includes("normal flow") || c.includes("แจ้งข้อมูลครบกำหนด") || c.includes("รับทราบ"),
+    tone: "soft-callback",
+    match: (c) =>
+      c.includes("planned more than 3") ||
+      c.includes("planned_more_than_3") ||
+      c.includes("plan more than 3") ||
+      c.includes("วางแผนชำระเกิน") ||
+      // Legacy "Acknowledged" records collapse here for backward compatibility.
+      c.includes("acknowledge") ||
+      c.includes("normal flow") ||
+      c.includes("แจ้งข้อมูลครบกำหนด") ||
+      c.includes("รับทราบ"),
   },
   {
     key: "promised",

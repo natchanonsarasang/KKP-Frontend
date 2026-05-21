@@ -514,7 +514,7 @@ const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
 // call_list_items.ai_category and consumed by the Analytics dashboard.
 const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
   // --- Main outcomes ---
-  { id: 1,  name: "Acknowledged",          thai: "รับทราบ",                  group: "main" },
+  { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
   { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
   { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
   { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
@@ -593,8 +593,8 @@ async function classifyCall(
   }
 
   if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, defaulting to Acknowledged");
-    return makeResult("Acknowledged", "AI key missing");
+    console.warn("LOVABLE_API_KEY not found, defaulting to Not Reached");
+    return makeResult("Not Reached", "AI key missing");
   }
 
   const categoryList = CONVERSATION_CATEGORIES.map(
@@ -608,8 +608,8 @@ ${categoryList}
 CATEGORY DEFINITIONS
 
 Main Outcomes (business result of the call — ALWAYS PREFER THESE):
-- Acknowledged           → Customer acknowledges/understands the debt info but does NOT explicitly promise payment, refuse, or request restructuring. Normal informational flow.
-- Promised to Pay        → Customer explicitly confirms they will pay, or gives a specific payment date/time/amount.
+- Planned More Than 3     → Customer indicates a payment plan / will pay, but the agreed date is MORE THAN 3 days from the call date (e.g. "อาทิตย์หน้า", "เกิน 3 วัน", "เดือนหน้า", "อีก 5 วัน", or any specific date > 3 days away). Also use for vague acknowledgement of the debt with no clear near-term commitment.
+- Promised to Pay        → Customer explicitly confirms payment WITHIN 3 days from the call date (today, tomorrow, "พรุ่งนี้", "มะรืน", "อีก 2 วัน", or any specific date ≤ 3 days away).
 - Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
 - Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
 - Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
@@ -632,10 +632,10 @@ CRITICAL CLASSIFICATION RULES
    If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Inconvenient (With Date)) appear in the same call, choose the BUSINESS OUTCOME.
 2. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
 3. Decide based on the FINAL state of the call, not transient mid-call events.
-4. "Promised to Pay" requires an explicit commitment from the customer — not just acknowledgement.
-5. "Inconvenient (With Date)" requires a concrete time/date agreement. If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
+4. For any payment commitment, you MUST decide between "Promised to Pay" (≤ 3 days from the call date) and "Planned More Than 3" (> 3 days). Compute the gap relative to the call/reference date in the transcript. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+5. "Inconvenient (With Date)" requires a concrete time/date agreement for a CALLBACK (not a payment). If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
 6. "Refused" requires a clear refusal — not just reluctance or "not convenient".
-7. If unsure between Acknowledged and a behavior category, prefer Acknowledged when the customer engaged with the debt info.
+7. If unsure between "Planned More Than 3" and a behavior category, prefer "Planned More Than 3" when the customer engaged with the debt info.
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
@@ -661,7 +661,7 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return makeResult("Acknowledged", "AI request failed");
+      return makeResult("Not Reached", "AI request failed");
     }
 
     const result = await response.json();
@@ -670,8 +670,13 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
     const normalized = String(aiName).trim().toLowerCase();
+    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
+    const aliased =
+      normalized === "acknowledged" || normalized === "acknowledge"
+        ? "planned more than 3"
+        : normalized;
     const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === normalized,
+      (c) => c.name.toLowerCase() === aliased,
     );
 
     if (match) {
@@ -683,11 +688,11 @@ Output format (STRICT JSON, no markdown, no commentary):
       };
     }
 
-    console.warn("Unmatched AI category, defaulting to Acknowledged:", aiName);
-    return makeResult("Acknowledged", `Unmatched AI category: ${aiName}`);
+    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
+    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return makeResult("Acknowledged", "Classifier exception");
+    return makeResult("Planned More Than 3", "Classifier exception");
   }
 }
 
