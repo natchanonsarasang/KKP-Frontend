@@ -607,7 +607,8 @@ Main Outcomes (business result of the call — ALWAYS PREFER THESE):
 - Acknowledged           → Customer acknowledges/understands the debt info but does NOT explicitly promise payment, refuse, or request restructuring. Normal informational flow.
 - Promised to Pay        → Customer explicitly confirms they will pay, or gives a specific payment date/time/amount.
 - Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
-- Callback Scheduled     → A specific callback time/date is agreed (customer or bot proposes and the other agrees). Different from a vague "call me sometime".
+- Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
+- Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
 - Already Paid           → Customer states the payment has already been completed/settled.
 - Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
 - Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
