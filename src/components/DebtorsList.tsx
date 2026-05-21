@@ -1267,6 +1267,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
                       <TableHead className="text-xs">Latest Call Status</TableHead>
+                      <TableHead
+                        className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("date_con")}
+                      >
+                        <div className="flex items-center whitespace-nowrap">
+                          Callback Date
+                          {getSortIcon("date_con")}
+                        </div>
+                      </TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
