@@ -19,13 +19,13 @@ import { MAIN_STATUSES, SUB_STATUSES, resolveMainStatus, resolveSubStatus } from
 
 // Tailwind class palettes for the Main Status cards (mapped by status key).
 const MAIN_STATUS_CARD_CLASSES: Record<string, { bg: string; border: string; text: string }> = {
-  acknowledged:        { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
-  promised:            { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-700" },
-  restructure:         { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-700" },
-  callback_scheduled:  { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-700" },
-  already_paid:        { bg: "bg-teal-50",    border: "border-teal-200",    text: "text-teal-700" },
-  not_reached:         { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700" },
-  refused:             { bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-700" },
+  acknowledged: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  promised: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  restructure: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
+  callback_scheduled: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  already_paid: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
+  not_reached: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700" },
+  refused: { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-700" },
 };
 
 interface CallRecord {
@@ -110,12 +110,7 @@ export const HourlyPickupChart = ({ callListItems }: { callListItems: CallListIt
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 10 }}
-                interval={2}
-                className="text-muted-foreground"
-              />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={2} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
               <Tooltip
                 contentStyle={{
@@ -221,6 +216,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
       else if (rawOutcome === "failed") outcome = "failed";
+      else if (rawOutcome === "hangup") outcome = "hangup";
       else if (item.picked_up === false) outcome = "no_answer";
       else if (rawStatus === "no answer") outcome = "no_answer";
       else if (rawStatus === "busy") outcome = "busy";
@@ -240,6 +236,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       completed: "Completed",
       busy: "Busy",
       voicemail: "Voicemail",
+      hangup: "Hangup",
     };
 
     return Object.entries(outcomes).map(([key, value]) => ({
@@ -470,8 +467,18 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
 
 export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const chartColors = [
-    "#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4",
-    "#ec4899", "#f97316", "#14b8a6", "#3b82f6", "#a855f7", "#71717a"
+    "#6366f1",
+    "#22c55e",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4",
+    "#ec4899",
+    "#f97316",
+    "#14b8a6",
+    "#3b82f6",
+    "#a855f7",
+    "#71717a",
   ];
   const categoryData = useMemo(() => {
     // Thai categories as primary display labels
@@ -495,31 +502,33 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       "Already Paid": "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)",
       "Normal Flow": "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)",
       "Wrong Person": "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)",
-      "Transfer": "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
+      Transfer: "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
       "Call Later": "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)",
       "Barge-in": "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)",
       "Background Noise": "เสียงแทรก/เสียงรบกวน (Background Noise)",
       "Out of Topic": "ลูกค้าพูดเรื่องอื่น (Out of Topic)",
-      "Silence": "ลูกค้าเงียบ (Silence)",
+      Silence: "ลูกค้าเงียบ (Silence)",
       "Dropped Call": "สายหลุดระหว่างสนทนา (Dropped Call)",
       "Repeat Request": "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)",
     };
 
     callListItems.forEach((item) => {
       if (!item.ai_category) return;
-      
+
       const rawCategory = item.ai_category;
-      
+
       // 1. Try direct mapping from English if AI returned only English
       let mappedCategory = englishToThai[rawCategory] || null;
 
       // 2. If not found, try to find match among our Thai(English) keys
       if (!mappedCategory) {
-        mappedCategory = Object.keys(categories).find(cat => 
-          rawCategory === cat || 
-          rawCategory.includes(cat.split(" (")[0]) ||
-          (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0]))
-        ) || null;
+        mappedCategory =
+          Object.keys(categories).find(
+            (cat) =>
+              rawCategory === cat ||
+              rawCategory.includes(cat.split(" (")[0]) ||
+              (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0])),
+          ) || null;
       }
 
       if (mappedCategory) {
@@ -529,9 +538,8 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       }
     });
 
-    return Object.entries(categories)
-      .map(([name, value]) => ({ name, value }));
-      // Removed sort to lock the order as defined above
+    return Object.entries(categories).map(([name, value]) => ({ name, value }));
+    // Removed sort to lock the order as defined above
   }, [callListItems]);
 
   return (
@@ -542,11 +550,7 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       <CardContent>
         <div className="h-[500px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={categoryData}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 220, bottom: 0 }}
-            >
+            <BarChart data={categoryData} layout="vertical" margin={{ top: 10, right: 30, left: 220, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} hide />
               <YAxis
@@ -564,13 +568,7 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
                   fontSize: "12px",
                 }}
               />
-              <Bar
-                dataKey="value"
-                name="Calls"
-                radius={[0, 4, 4, 0]}
-                barSize={20}
-                fill="#6366f1"
-              />
+              <Bar dataKey="value" name="Calls" radius={[0, 4, 4, 0]} barSize={20} fill="#6366f1" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -631,7 +629,15 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={2} dataKey="value">
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
                     {pieData.map((d, i) => (
                       <Cell key={i} fill={d.color} />
                     ))}
@@ -643,7 +649,10 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
                       borderRadius: "8px",
                       fontSize: "12px",
                     }}
-                    formatter={(v: number, n: string) => [`${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`, n]}
+                    formatter={(v: number, n: string) => [
+                      `${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`,
+                      n,
+                    ]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -652,10 +661,7 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
 
           <div className="grid grid-cols-2 gap-2.5">
             {data.map((s) => (
-              <div
-                key={s.key}
-                className={`${s.bg} ${s.border} border rounded-lg p-3 transition-all hover:shadow-sm`}
-              >
+              <div key={s.key} className={`${s.bg} ${s.border} border rounded-lg p-3 transition-all hover:shadow-sm`}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
                   <span className={`text-[11px] font-semibold ${s.text} uppercase tracking-wide truncate`}>
