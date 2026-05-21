@@ -171,6 +171,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [callStatusFilter, setCallStatusFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
   const [addingToCallList, setAddingToCallList] = useState<string | null>(null);
