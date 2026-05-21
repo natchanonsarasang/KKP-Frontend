@@ -2394,15 +2394,15 @@ const CallList = () => {
 
       {/* Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-lg w-full mx-4 max-h-[85vh] p-0 flex flex-col gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>Auto-Dial Settings</DialogTitle>
             <DialogDescription>
               Configure retry logic, limits, and business hours
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
             {/* Test Mode Toggle */}
             <div className="rounded-lg border-2 border-dashed border-warning/50 bg-warning/5 p-4 space-y-2">
               <div className="flex items-center justify-between">
