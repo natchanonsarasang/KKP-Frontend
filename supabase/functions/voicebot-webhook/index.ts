@@ -513,7 +513,8 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 1,  name: "Acknowledged",          thai: "รับทราบ",                  group: "main" },
   { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
   { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
-  { id: 4,  name: "Callback Scheduled",    thai: "นัดติดต่อใหม่",              group: "main" },
+  { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
+  { id: 16, name: "Inconvenient (Without Date)", thai: "ไม่สะดวก (ไม่มีนัดหมาย)",    group: "main" },
   { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
   { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
   { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
@@ -606,7 +607,8 @@ Main Outcomes (business result of the call — ALWAYS PREFER THESE):
 - Acknowledged           → Customer acknowledges/understands the debt info but does NOT explicitly promise payment, refuse, or request restructuring. Normal informational flow.
 - Promised to Pay        → Customer explicitly confirms they will pay, or gives a specific payment date/time/amount.
 - Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
-- Callback Scheduled     → A specific callback time/date is agreed (customer or bot proposes and the other agrees). Different from a vague "call me sometime".
+- Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
+- Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
 - Already Paid           → Customer states the payment has already been completed/settled.
 - Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
 - Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
@@ -623,11 +625,11 @@ Conversation Behaviors (use ONLY when no clear business outcome above exists):
 
 CRITICAL CLASSIFICATION RULES
 1. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior.
-   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Callback Scheduled) appear in the same call, choose the BUSINESS OUTCOME.
+   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Inconvenient (With Date)) appear in the same call, choose the BUSINESS OUTCOME.
 2. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
 3. Decide based on the FINAL state of the call, not transient mid-call events.
 4. "Promised to Pay" requires an explicit commitment from the customer — not just acknowledgement.
-5. "Callback Scheduled" requires a concrete time/date agreement. Otherwise prefer "Call Later".
+5. "Inconvenient (With Date)" requires a concrete time/date agreement. If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
 6. "Refused" requires a clear refusal — not just reluctance or "not convenient".
 7. If unsure between Acknowledged and a behavior category, prefer Acknowledged when the customer engaged with the debt info.
 
