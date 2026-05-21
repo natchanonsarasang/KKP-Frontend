@@ -285,12 +285,12 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         query = query.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
       }
 
-      // Apply date range filter on last_contact_at
+      // Apply date range filter on callback date (date_con)
       if (dateRange?.from) {
-        query = query.gte("last_contact_at", startOfDay(dateRange.from).toISOString());
+        query = query.gte("date_con", format(startOfDay(dateRange.from), "yyyy-MM-dd"));
       }
       if (dateRange?.to || dateRange?.from) {
-        query = query.lte("last_contact_at", endOfDay(dateRange.to ?? dateRange.from!).toISOString());
+        query = query.lte("date_con", format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd"));
       }
 
       // Apply sorting - handle variable column sorting with JSONB
