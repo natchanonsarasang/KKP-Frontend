@@ -952,6 +952,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
                     </Label>
                     <Input
+                      type={key === "overdue_installments" ? "number" : "text"}
+                      min={key === "overdue_installments" ? 0 : undefined}
+                      step={key === "overdue_installments" ? 1 : undefined}
                       value={templateVariables[key] ?? ""}
                       onChange={(e) =>
                         setTemplateVariables((prev) => ({

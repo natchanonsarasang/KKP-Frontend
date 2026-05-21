@@ -110,6 +110,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
         case "paid_date": return "30";
         case "paid_month": return "เมษายน";
         case "paid_year": return "2569";
+        case "overdue_installments": return "2";
         default: return "ตัวอย่าง";
       }
     });

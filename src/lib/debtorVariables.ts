@@ -9,6 +9,7 @@ export const DEBTOR_CUSTOMER_VARIABLE_KEYS = [
   "paid_date",
   "paid_month",
   "paid_year",
+  "overdue_installments",
 ] as const;
 
 export type DebtorCustomerVariableKey =
@@ -27,6 +28,7 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   paid_date: "Paid date",
   paid_month: "Paid month",
   paid_year: "Paid year",
+  overdue_installments: "Overdue Installments",
 };
 
 /** Text fields in `variables`. */
