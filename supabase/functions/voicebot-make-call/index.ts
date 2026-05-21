@@ -68,7 +68,6 @@ function prepareVoicebotVariables(input: unknown): Record<string, unknown> {
     .format(new Date())
     .replace(/(\S+)\s/, "$1 ที่ ");
   vars.date_today = date_today;
-  console.log(vars);
   return vars;
 }
 
