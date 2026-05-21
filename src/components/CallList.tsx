@@ -1196,7 +1196,6 @@ const CallList = () => {
         const debtor = item.debtor;
         const debtorVars = {
           ...((debtor.variables || {}) as Record<string, string>),
-          date_today: getThaiDateToday(),
         };
 
         const {
