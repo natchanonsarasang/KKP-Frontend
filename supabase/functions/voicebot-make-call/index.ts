@@ -96,7 +96,7 @@ serve(async (req) => {
       },
     };
 
-    console.log("Payload:", JSON.stringify(callPayload, null, 2));
+    console.log("Payload Test The File:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch(CALL_API_URL, {
       method: "POST",
