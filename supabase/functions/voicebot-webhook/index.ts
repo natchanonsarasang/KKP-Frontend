@@ -100,6 +100,26 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
+    // If timeout/no-answer happened AFTER the bot already asked about callback
+    // availability (day/time/convenience), reclassify as "Not Convenient" instead.
+    if (mappedStatus === "no_answer" && conversationLog) {
+      const botParts = conversationLog.split(/Bot:|Assistant:/i).slice(1);
+      const lastBotMsg = (botParts[botParts.length - 1] || "").toLowerCase();
+      const allBotText = botParts.join(" ").toLowerCase();
+      const callbackKeywords = [
+        "convenient", "callback", "call back", "call you back",
+        "what day", "what time", "which day", "which time",
+        "when would", "when can", "when is", "available",
+        "สะดวก", "นัด", "วันไหน", "เวลาไหน", "ติดต่อใหม่", "โทรกลับ",
+      ];
+      const askedAboutCallback =
+        callbackKeywords.some((k) => lastBotMsg.includes(k)) ||
+        callbackKeywords.some((k) => allBotText.includes(k));
+      if (askedAboutCallback) {
+        mappedStatus = "not_convenient";
+      }
+    }
+
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
     const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
     let finalStatus: string = pickedUp ? "success" : "failed";
