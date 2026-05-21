@@ -705,6 +705,22 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       toast.error("Due date is required");
       return;
     }
+    if (!templateVariables.policy_no?.trim()) {
+      toast.error("Policy number is required");
+      return;
+    }
+    if (!templateVariables.name?.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!templateVariables.outstanding_amount?.trim()) {
+      toast.error("Outstanding amount is required");
+      return;
+    }
+    if (!templateVariables.overdue_installments?.toString().trim()) {
+      toast.error("Overdue Installments is required");
+      return;
+    }
 
     if (editingDebtor) {
       updateDebtorMutation.mutate({
@@ -946,26 +962,31 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
                 {DEBTOR_CUSTOMER_VARIABLE_KEYS.filter(key => 
                   !["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(key)
-                ).map((key) => (
-                  <div key={key} className="space-y-1.5">
-                    <Label className="text-sm">
-                      {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
-                    </Label>
-                    <Input
-                      type={key === "overdue_installments" ? "number" : "text"}
-                      min={key === "overdue_installments" ? 0 : undefined}
-                      step={key === "overdue_installments" ? 1 : undefined}
-                      value={templateVariables[key] ?? ""}
-                      onChange={(e) =>
-                        setTemplateVariables((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
-                      }
-                      placeholder={key}
-                    />
-                  </div>
-                ))}
+                ).map((key) => {
+                  const isRequired = ["policy_no", "name", "outstanding_amount", "overdue_installments"].includes(key);
+                  return (
+                    <div key={key} className="space-y-1.5">
+                      <Label className="text-sm">
+                        {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
+                        {isRequired && <span className="text-destructive ml-0.5">*</span>}
+                      </Label>
+                      <Input
+                        type={key === "overdue_installments" ? "number" : "text"}
+                        min={key === "overdue_installments" ? 0 : undefined}
+                        step={key === "overdue_installments" ? 1 : undefined}
+                        required={isRequired}
+                        value={templateVariables[key] ?? ""}
+                        onChange={(e) =>
+                          setTemplateVariables((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        placeholder={key}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
