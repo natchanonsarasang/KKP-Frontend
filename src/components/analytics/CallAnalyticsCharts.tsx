@@ -212,11 +212,12 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
 
       if (rawOutcome.includes("confirmed")) outcome = "confirmed";
       else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) outcome = "rejected";
+      else if (rawOutcome.includes("hang")) outcome = "hangup";
       else if (rawOutcome === "no answer") outcome = "no_answer";
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
       else if (rawOutcome === "failed") outcome = "failed";
-      else if (rawOutcome === "hangup") outcome = "hangup";
+      else if (rawStatus.includes("hang")) outcome = "hangup";
       else if (item.picked_up === false) outcome = "no_answer";
       else if (rawStatus === "no answer") outcome = "no_answer";
       else if (rawStatus === "busy") outcome = "busy";
@@ -236,7 +237,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       completed: "Completed",
       busy: "Busy",
       voicemail: "Voicemail",
-      hangup: "Hangup",
+      hangup: "Hang up",
     };
 
     return Object.entries(outcomes).map(([key, value]) => ({
