@@ -2177,6 +2177,13 @@ const CallList = () => {
                           </Badge>
                         );
                       }
+                      if (outcome.includes("hang") || outcome.includes("hanged")) {
+                        return (
+                          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                            Incomplete
+                          </Badge>
+                        );
+                      }
                       return (
                         <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
                           {item.call_outcome}
