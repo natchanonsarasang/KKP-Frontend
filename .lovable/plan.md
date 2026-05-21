@@ -1,35 +1,21 @@
 ## Goal
-Remove the global exclusion that skips `hanged_up` records in the Analytics charts so hang-up calls are counted in the outcome/status breakdowns (matching `AnalyticsStats.tsx`, which already counts them).
-
-## Scope
-Only `src/components/analytics/CallAnalyticsCharts.tsx`. No backend, no other files. The `"incomplete"` exclusion stays in place.
+Add a new `overdue_installments` field (number input) to the debtor variables system. It appears in the Add/Edit form as a numeric input, in the downloadable Excel template, and is recognized during Excel import — all stored inside `debtors.variables` (no DB schema change).
 
 ## Changes
 
-**1. `OutcomeDistributionChart` (lines ~213-220)**
-Drop the `hanged` checks; keep only the `incomplete` skip:
-```ts
-if (rawStatus === "incomplete") return;
-```
-This allows hang-ups to fall through into the existing categorization (resolved as `hanged_up`/equivalent outcome).
+### 1. `src/lib/debtorVariables.ts`
+- Append `"overdue_installments"` to `DEBTOR_CUSTOMER_VARIABLE_KEYS`.
+- Add `overdue_installments: "Overdue Installments"` to `DEBTOR_CUSTOMER_VARIABLE_LABELS`.
 
-**2. `MainStatusOverview` (line ~600)**
-Replace:
-```ts
-if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
-```
-with:
-```ts
-if (s === "incomplete" || r === "incomplete") return;
-```
+This cascades into the import validator and template-header generator automatically, since both iterate over `DEBTOR_CUSTOMER_VARIABLE_KEYS`.
 
-**3. `SubStatusOverview` (line ~696)**
-Same replacement as #2.
+### 2. `src/components/DebtorsList.tsx` — Add/Edit Debtor dialog
+The existing dynamic loop renders all generic keys as `<Input>` (text). To make `overdue_installments` a number input without disturbing the layout, render it with `type="number"`, `min="0"`, `step="1"` inside the same loop (small conditional on `key === "overdue_installments"`). The value is still stored as a string in `templateVariables` and persisted into `variables` JSON exactly like the other fields — keeping submit/payload logic untouched.
 
-## Notes
-- `AnalyticsStats.tsx` already counts `hanged_up` — no change needed there beyond optionally updating the comment, but I'll leave it untouched unless you want it cleaned up.
-- The `OutcomeDistributionChart` categorization logic does not currently have an explicit `hanged_up` branch — hang-ups will resolve via `picked_up`/status fallbacks. If you want a dedicated "Hang up" slice in that pie chart, say so and I'll add it.
+### 3. `src/components/DebtorExcelUpload.tsx`
+- Add a sample value for the new column in `downloadTemplate()`'s switch (e.g. `case "overdue_installments": return "2";`) so the downloaded template shows a realistic numeric example.
+- Import parsing already handles arbitrary string values per key, so no extra validation branch needed; numeric content from the cell is captured as-is.
 
-## Verification
-- Build passes.
-- Hang-up records appear in Main Status / Outcome charts alongside other completed-call outcomes.
+## Out of scope
+- No DB migration — value lives in existing `variables` JSONB.
+- No changes to voicebot call payload, templates, or unrelated form fields/layout.
