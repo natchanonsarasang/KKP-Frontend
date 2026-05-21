@@ -210,14 +210,8 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       const resultDataStatus = item.call_record?.result_data?.status;
       const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
 
-      // GLOBAL EXCLUSION: skip "hanged_up"/"incomplete" entirely
-      if (
-        rawOutcome.includes("hanged") ||
-        rawStatus.includes("hanged") ||
-        rawStatus === "incomplete"
-      ) {
-        return;
-      }
+      // Skip "incomplete" records (hanged_up IS counted)
+      if (rawStatus === "incomplete") return;
 
       let outcome = "pending";
 
@@ -597,7 +591,7 @@ export const MainStatusOverview = ({ callListItems }: { callListItems: CallListI
       const s = (item.status || "").toLowerCase();
       const r = (item.call_record?.result_data?.status || "").toLowerCase();
       const o = (item.call_outcome || "").toLowerCase();
-      if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
+      if (s === "incomplete" || r === "incomplete") return;
 
       const matched = resolveMainStatus(item.ai_category, {
         picked_up: item.picked_up,
@@ -693,7 +687,7 @@ export const SubStatusOverview = ({ callListItems }: { callListItems: CallListIt
       const s = (item.status || "").toLowerCase();
       const r = (item.call_record?.result_data?.status || "").toLowerCase();
       const o = (item.call_outcome || "").toLowerCase();
-      if (s === "hanged_up" || s === "incomplete" || r === "hanged_up" || r === "incomplete" || o.includes("hanged")) return;
+      if (s === "incomplete" || r === "incomplete") return;
 
       const matched = resolveSubStatus(item.ai_category);
       if (matched) counts[matched.key]++;
