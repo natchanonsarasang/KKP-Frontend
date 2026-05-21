@@ -1402,6 +1402,13 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                               );
                             })()}
                           </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatThaiBuddhistDate(debtor.date_con)}
+                            </span>
+                          </TableCell>
+
+
 
                           {variableColumns.map((varKey) => {
                             const value = debtor.variables?.[varKey];
