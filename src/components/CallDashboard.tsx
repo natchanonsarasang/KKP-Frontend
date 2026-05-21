@@ -313,7 +313,11 @@ const CallDashboard = () => {
   const getOutcomeBadge = (outcome: string | null, pickedUp: boolean | null) => {
     if (!outcome && pickedUp === false) return getStatusBadge("no_answer");
     if (!outcome) return <span className="text-muted-foreground text-xs">-</span>;
-    return getStatusBadge(outcome.toLowerCase());
+    const o = outcome.toLowerCase();
+    if (o.includes("hang")) {
+      return <Badge variant="secondary" className="bg-warning/10 text-warning gap-1 font-normal">Incomplete</Badge>;
+    }
+    return getStatusBadge(o);
   };
 
   const exportToExcel = () => {
