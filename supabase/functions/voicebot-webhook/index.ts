@@ -426,8 +426,12 @@ serve(async (req) => {
           updateData.last_response = "unknown";
         }
 
+        // Extract callback date from conversation log (LLM-backed)
+        const dateCon = await extractCallbackDate(conversationLog, LOVABLE_API_KEY);
+        updateData.date_con = dateCon;
+
         await supabase.from("debtors").update(updateData).eq("id", debtor.id);
-        console.log("Debtor stats updated");
+        console.log("Debtor stats updated", { date_con: dateCon });
       }
     }
 
