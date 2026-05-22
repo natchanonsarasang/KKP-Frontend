@@ -114,6 +114,57 @@ const CallDashboard = () => {
     to: new Date(),
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const dateRangeLabel = useMemo(() => {
+    if (dateRange === "all") return "ทั้งหมด";
+    if (customRange?.from) {
+      const from = format(customRange.from, "d MMM yyyy", { locale: th });
+      const to = customRange.to ? format(customRange.to, "d MMM yyyy", { locale: th }) : from;
+      return from === to ? from : `${from} - ${to}`;
+    }
+    return "";
+  }, [dateRange, customRange]);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      // Allow charts to layout
+      await new Promise((r) => setTimeout(r, 400));
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: exportRef.current.scrollWidth,
+      });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL("image/png");
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      const stamp = format(new Date(), "yyyy-MM-dd");
+      pdf.save(`analytics-${stamp}.pdf`);
+      toast.success("ส่งออก PDF เรียบร้อย");
+    } catch (err) {
+      console.error("PDF export failed", err);
+      toast.error("ส่งออก PDF ไม่สำเร็จ");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleDateRangeChange = (v: string) => {
     const range = v as DateRangeType;
