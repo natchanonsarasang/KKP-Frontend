@@ -1,23 +1,40 @@
-## Changes to `src/components/DebtorsList.tsx`
+## Goal
 
-### 1. Move "Callback Date" column
+Prevent the classifier from labeling calls as **"Planned More Than 3"** when the customer's stated timeframe is actually within 3 days (e.g. "อีก 3 วัน", "3 วัน", "ภายใน 3 วัน", "ไม่เกิน 3 วัน").
 
-Move the column to appear immediately after "Latest Call Status".
+## Change
 
-- **Header**: move the `<TableHead>` for Callback Date (lines 1346–1354) to right after the "Latest Call Status" head (line 1269).
-- **Body**: move the matching `<TableCell>` for `formatThaiBuddhistDate(debtor.date_con)` (lines 1486–1490) to right after the Latest Call Status cell so column order stays aligned.
+In `supabase/functions/voicebot-webhook/index.ts`, update the `systemPrompt` inside `classifyCall` (around lines 642–653) to make the ≤3-day vs >3-day boundary explicit and unambiguous.
 
-Resulting order: `# → Contact → Latest Call Status → Callback Date → [variable columns] → Status → Picked → No Pick → Accept → Reject → Other → Calls → Last Contact → Action`.
+### Edits to rule **3. PAYMENT CLASSIFICATION (ONLY AFTER DISCLOSURE)**
 
-### 2. Relocate date range calendar filter
+Refine the bullets so the boundary is strictly enforced:
 
-- Remove the `<Popover>` date range picker block from the top search/filter bar (lines 1119–1173).
-- Insert the same picker into the "Debtor List" card header (around line 1197), placed between the `All Call Statuses` Select and the `Send to Call List` button.
+- **"Promised to Pay"** → commitment is **within ≤ 3 days** from the call date (inclusive of exactly 3 days).
+- **"Planned More Than 3"** → commitment is **strictly > 3 days** from the call date (i.e. 4 days or more).
 
-Final header control order: `All Call Statuses → Calendar filter → Send to Call List → Select All`.
+Add an explicit sub-rule:
 
-State, filter logic, and `dateRange` behavior are unchanged — only the JSX location moves.
+> **3-DAY BOUNDARY RULE (STRICT):**
+> Any of these Thai phrasings MUST be treated as **≤ 3 days** and therefore classified as **"Promised to Pay"** (assuming debt details were disclosed and a commitment was made). They MUST NEVER be classified as "Planned More Than 3":
+> - "อีก 3 วัน"
+> - "3 วัน"
+> - "ภายใน 3 วัน"
+> - "ไม่เกิน 3 วัน"
+> - any equivalent phrasing meaning "within / no more than / up to 3 days"
+>
+> Only choose **"Planned More Than 3"** when the customer explicitly commits to a date that is **4 or more days** after the call date (e.g. "อีก 5 วัน", "อาทิตย์หน้า", "สิ้นเดือน", a specific date > 3 days out).
 
-### Out of scope
+### Edits to rule **4. CLASSIFICATION LOGIC SUMMARY**
 
-No business logic, query, or styling-system changes beyond minor sizing tweaks (e.g. `h-8` to match the other header controls) so the calendar button fits the compact header row.
+Update the second bullet for clarity:
+
+- IF (Debt details disclosed AND payment committed) → **"Promised to Pay"** (≤ 3 days, inclusive) or **"Planned More Than 3"** (> 3 days, i.e. ≥ 4 days).
+
+## Files
+
+- `supabase/functions/voicebot-webhook/index.ts` — prompt text only, no logic changes.
+
+## Out of scope
+
+No DB, UI, or status-taxonomy changes. `src/lib/callStatuses.ts` is unchanged.
