@@ -77,6 +77,9 @@ interface Debtor {
   name: string | null;
   last_name: string | null;
   phone_number: string;
+  total_debt: number | null;
+  due_date: string | null;
+  variables: Record<string, string> | null;
 }
 
 interface Template {
@@ -221,7 +224,7 @@ const CallDashboard = () => {
       if (!currentWorkspace?.id) return [];
       const { data, error } = await supabase
         .from("debtors")
-        .select("id, name, last_name, phone_number")
+        .select("id, name, last_name, phone_number, total_debt, due_date, variables")
         .eq("workspace_id", currentWorkspace.id);
       if (error) throw error;
       return data as Debtor[];
@@ -262,9 +265,22 @@ const CallDashboard = () => {
     return callRecords.map((record) => {
       const debtor = debtorByPhone.get(record.phone_number);
       const cli = cliByRecordId.get(record.id);
+      const vars = debtor?.variables || {};
+      const debtorName =
+        vars.name ||
+        (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
+      const amountVal =
+        vars.amount ||
+        vars.outstanding_amount ||
+        (debtor?.total_debt != null ? String(debtor.total_debt) : "") ||
+        record.amount ||
+        "";
+      const dueDateVal = vars.due_date || debtor?.due_date || record.due_date || "";
       return {
         ...record,
-        debtor_name: debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "",
+        debtor_name: debtorName,
+        amount: amountVal,
+        due_date: dueDateVal,
         picked_up: cli?.picked_up ?? null,
         call_outcome: cli?.call_outcome ?? null,
       };
@@ -504,7 +520,14 @@ const CallDashboard = () => {
                           <TableRow key={record.id}>
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
                             <TableCell className="text-sm">{record.debtor_name || "-"}</TableCell>
-                            <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
+                            <TableCell className="text-sm">{(() => {
+                              const n = Number(record.amount);
+                              return record.amount
+                                ? Number.isFinite(n)
+                                  ? `฿${new Intl.NumberFormat("th-TH").format(n)}`
+                                  : `฿${record.amount}`
+                                : "-";
+                            })()}</TableCell>
                             <TableCell>
                               {record.picked_up === true ? (
                                 <Badge variant="secondary" className="bg-success/10 text-success text-xs">ใช่</Badge>
