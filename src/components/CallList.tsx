@@ -1698,6 +1698,8 @@ const CallList = () => {
         aiStatus = def ? def.label : resolveLatestStatusLabel(cat);
       }
 
+      const { audioUrl, conversationLog } = parseNotesData(item.notes ?? null);
+
       return {
         เบอร์โทร: debtor?.phone_number || "-",
         ชื่อ: vars.name || debtor?.name || "-",
@@ -1708,6 +1710,8 @@ const CallList = () => {
         สถานะ: item.status,
         "AI Status": aiStatus,
         เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
+        conversationlog: conversationLog || "-",
+        audio_url: audioUrl || "-",
       };
     });
 
@@ -2284,7 +2288,7 @@ const CallList = () => {
                                   backgroundColor: `${def.color}1a`,
                                 }}
                               >
-                                {def.thai || def.label}
+                                {def.label}
                               </Badge>
                             );
                           })()}
