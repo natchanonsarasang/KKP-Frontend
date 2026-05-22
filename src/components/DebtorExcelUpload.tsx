@@ -76,15 +76,24 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
       
       if (!data || !data.variables) return null;
 
-      // Extract column keys (excluding message_template)
+      // Extract column keys, excluding internal helper fields that the Add Debtor
+      // form does not expose (kept in sync with DEBTOR_CUSTOMER_VARIABLE_KEYS).
+      const INTERNAL_KEYS = new Set([
+        "message_template",
+        "due_date_iso",
+        "paid_date_iso",
+        "total_debt",
+      ]);
       const variables = data.variables as Record<string, string>;
-      const columns = Object.keys(variables).filter(
-        (k) => k !== "message_template"
-      );
+      const existing = Object.keys(variables).filter((k) => !INTERNAL_KEYS.has(k));
 
-      return columns.length > 0
-        ? columns
-        : [...DEBTOR_CUSTOMER_VARIABLE_KEYS];
+      // Always anchor to the canonical Add Debtor field list so the template
+      // columns match the form exactly. Append any extra workspace-specific
+      // variables that aren't part of the canonical list.
+      const canonical = [...DEBTOR_CUSTOMER_VARIABLE_KEYS] as string[];
+      const extras = existing.filter((k) => !canonical.includes(k));
+      return [...canonical, ...extras];
+
     },
     enabled: !!currentWorkspace?.id && open,
   });
