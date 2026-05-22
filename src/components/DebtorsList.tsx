@@ -332,13 +332,16 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           : []
       )
     );
+    const isHidden = (k: string) =>
+      PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number]) ||
+      HIDDEN_VARIABLE_KEYS.includes(k as typeof HIDDEN_VARIABLE_KEYS[number]);
     const ordered: string[] = [];
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-      if (allKeys.has(k) && !PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number])) ordered.push(k);
+      if (allKeys.has(k) && !isHidden(k)) ordered.push(k);
     }
     const rest = [...allKeys]
       .filter((k) => !DEBTOR_CUSTOMER_VARIABLE_KEYS.includes(k as (typeof DEBTOR_CUSTOMER_VARIABLE_KEYS)[number]))
-      .filter((k) => !PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number]))
+      .filter((k) => !isHidden(k))
       .sort();
     return [...ordered, ...rest];
   }, [debtors]);
