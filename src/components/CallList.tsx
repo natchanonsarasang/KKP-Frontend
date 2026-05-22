@@ -2190,16 +2190,34 @@ const CallList = () => {
 
                     return (
                       <TableRow key={item.id} className={isCurrentlyCalling ? "bg-primary/5 animate-pulse" : ""}>
-                        <TableCell className="text-sm text-muted-foreground font-mono">{index + 1}</TableCell>
                         <TableCell className="font-mono text-sm">
                           <div className="flex items-center gap-2">
                             {isCurrentlyCalling && <Phone className="w-3.5 h-3.5 text-primary animate-bounce" />}
                             <span>{debtor ? maskPhoneNumber(debtor.phone_number) : "-"}</span>
                           </div>
                         </TableCell>
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell className="text-sm">
+                          {debtor?.variables?.name || debtor?.name || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const vars = debtor?.variables || {};
+                            const raw = vars.amount || vars.outstanding_amount;
+                            const amount = raw != null && raw !== ""
+                              ? Number(String(raw).replace(/,/g, ""))
+                              : debtor?.total_debt;
+                            return amount && Number.isFinite(amount)
+                              ? new Intl.NumberFormat("th-TH", {
+                                  style: "currency",
+                                  currency: "THB",
+                                  maximumFractionDigits: 0,
+                                }).format(amount)
+                              : "-";
+                          })()}
+                        </TableCell>
                         <TableCell>{getPickedUpDisplay()}</TableCell>
                         <TableCell>{getOutcomeDisplay()}</TableCell>
+                        <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
@@ -2209,14 +2227,6 @@ const CallList = () => {
                                 minute: "2-digit",
                               })
                             : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(item.created_at).toLocaleString("th-TH", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
                         </TableCell>
                         <TableCell className="flex gap-1">
                           {/* Show view transcript for completed calls, preview for pending */}
