@@ -41,13 +41,7 @@ import {
 import * as XLSX from "xlsx";
 import DebtorExcelUpload from "./DebtorExcelUpload";
 import InlineTemplateEditor from "./InlineTemplateEditor";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,11 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toThaiPhonetic, shouldUsePhonetic, spellThaiName, isNameField } from "@/lib/thaiPhonetic";
@@ -82,26 +72,35 @@ import {
   splitThaiDate,
   formatThaiBuddhistDate,
 } from "@/lib/debtorVariables";
-import { MAIN_STATUSES, SUB_STATUSES, ALL_STATUSES, resolveLatestStatusLabel, resolveLatestStatusTone, resolveMainStatus, resolveSubStatus, type CallStatusTone } from "@/lib/callStatuses";
+import {
+  MAIN_STATUSES,
+  SUB_STATUSES,
+  ALL_STATUSES,
+  resolveLatestStatusLabel,
+  resolveLatestStatusTone,
+  resolveMainStatus,
+  resolveSubStatus,
+  type CallStatusTone,
+} from "@/lib/callStatuses";
 
 const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
-  callback:        "bg-warning/15 text-warning border-warning/40",
-  transfer:        "bg-warning/15 text-warning border-warning/40",
+  callback: "bg-warning/15 text-warning border-warning/40",
+  transfer: "bg-warning/15 text-warning border-warning/40",
   "soft-callback": "bg-warning/10 text-warning border-warning/25",
-  done:            "bg-success/15 text-success border-success/30",
-  skip:            "bg-destructive/10 text-destructive border-destructive/30",
-  other:           "bg-muted text-muted-foreground border-border",
-  none:            "",
+  done: "bg-success/15 text-success border-success/30",
+  skip: "bg-destructive/10 text-destructive border-destructive/30",
+  other: "bg-muted text-muted-foreground border-border",
+  none: "",
 };
 
 function buildVariablesToSave(
   tv: Record<string, string>,
   preserveTemplateFrom?: Record<string, unknown> | null,
   dueDateIso?: string,
-  paidDateIso?: string
+  paidDateIso?: string,
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  
+
   const dueParts = splitThaiDate(dueDateIso);
   const paidParts = splitThaiDate(paidDateIso);
 
@@ -164,7 +163,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "bg-muted text-muted-foreground" },
 };
 
-
 interface DebtorsListProps {
   onNextStep?: () => void;
 }
@@ -187,9 +185,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     due_date: "",
     paid_date: "",
   });
-  const [templateVariables, setTemplateVariables] = useState<
-    Record<string, string>
-  >(() => emptyDebtorCustomerVariables());
+  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>(() =>
+    emptyDebtorCustomerVariables(),
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -247,12 +245,27 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   }, [callStatusFilter, latestStatusByDebtor]);
 
   // Server-side paginated query with sorting and filtering
-  const { data: debtorsData, isLoading, isFetching } = useQuery({
-    queryKey: ["debtors", searchQuery, statusFilter, callStatusFilter, filteredDebtorIds, sortField, sortDirection, page, effectiveUserId, currentWorkspace?.id, dateRange?.from?.toISOString() ?? null, dateRange?.to?.toISOString() ?? null],
+  const {
+    data: debtorsData,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: [
+      "debtors",
+      searchQuery,
+      statusFilter,
+      callStatusFilter,
+      filteredDebtorIds,
+      sortField,
+      sortDirection,
+      page,
+      effectiveUserId,
+      currentWorkspace?.id,
+      dateRange?.from?.toISOString() ?? null,
+      dateRange?.to?.toISOString() ?? null,
+    ],
     queryFn: async () => {
-      let query = supabase
-        .from("debtors")
-        .select("*", { count: "exact" });
+      let query = supabase.from("debtors").select("*", { count: "exact" });
 
       // Filter by workspace
       if (currentWorkspace?.id) {
@@ -329,15 +342,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const variableColumns = useMemo(() => {
     if (!debtors?.length) return [];
     const allKeys = new Set(
-      debtors.flatMap((d) =>
-        d.variables
-          ? Object.keys(d.variables).filter((k) => k !== "message_template")
-          : []
-      )
+      debtors.flatMap((d) => (d.variables ? Object.keys(d.variables).filter((k) => k !== "message_template") : [])),
     );
     const isHidden = (k: string) =>
-      PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number]) ||
-      HIDDEN_VARIABLE_KEYS.includes(k as typeof HIDDEN_VARIABLE_KEYS[number]);
+      PINNED_VARIABLE_KEYS.includes(k as (typeof PINNED_VARIABLE_KEYS)[number]) ||
+      HIDDEN_VARIABLE_KEYS.includes(k as (typeof HIDDEN_VARIABLE_KEYS)[number]);
     const ordered: string[] = [];
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
       if (allKeys.has(k) && !isHidden(k)) ordered.push(k);
@@ -355,9 +364,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     const str = String(value);
     const isNumeric = !isNaN(Number(str.replace(/,/g, "")));
     const isYearField = varKey.toLowerCase().includes("year");
-    let display = isNumeric && !isYearField
-      ? Number(str.replace(/,/g, "")).toLocaleString("th-TH")
-      : str;
+    let display = isNumeric && !isYearField ? Number(str.replace(/,/g, "")).toLocaleString("th-TH") : str;
     if (isLicensePlateField(varKey)) display = maskLicensePlate(str);
     return display;
   };
@@ -379,36 +386,42 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   // Extract placeholders from template messages
   const extractPlaceholdersFromTemplate = (template: NonNullable<typeof templates>[number] | undefined) => {
     if (!template) return [];
-    const allText = [template.message, template.confirm_message, template.decline_message, template.fallback_message].join(" ");
+    const allText = [
+      template.message,
+      template.confirm_message,
+      template.decline_message,
+      template.fallback_message,
+    ].join(" ");
     const matches = allText.match(/\{([^}]+)\}/g) || [];
-    const placeholders = [...new Set(matches.map(m => m.slice(1, -1)))];
+    const placeholders = [...new Set(matches.map((m) => m.slice(1, -1)))];
     // Filter out org_name as it comes from template itself
-    return placeholders.filter(p => !p.toLowerCase().includes('org'));
+    return placeholders.filter((p) => !p.toLowerCase().includes("org"));
   };
 
   // Get current template placeholders
-  const currentTemplate = templates?.find(t => t.id === selectedTemplateId) || templates?.[0];
+  const currentTemplate = templates?.find((t) => t.id === selectedTemplateId) || templates?.[0];
   const templatePlaceholders = currentTemplate ? extractPlaceholdersFromTemplate(currentTemplate) : [];
 
   // Fetch call stats from raw call_records (like a CDP)
   const { data: callStats } = useQuery({
     queryKey: ["call-stats-by-phone"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("call_records")
-        .select("phone_number, status");
+      const { data, error } = await supabase.from("call_records").select("phone_number, status");
 
       if (error) throw error;
 
       // Calculate stats per phone number from raw data
-      const stats: Record<string, {
-        total: number;
-        confirmed: number;
-        declined: number;
-        no_response: number;
-        picked_up: number;
-        not_picked_up: number;
-      }> = {};
+      const stats: Record<
+        string,
+        {
+          total: number;
+          confirmed: number;
+          declined: number;
+          no_response: number;
+          picked_up: number;
+          not_picked_up: number;
+        }
+      > = {};
 
       data.forEach((record) => {
         if (!stats[record.phone_number]) {
@@ -451,12 +464,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
 
-      const variablesData = buildVariablesToSave(
-        data.variables,
-        null,
-        data.formData.due_date,
-        data.formData.paid_date
-      );
+      const variablesData = buildVariablesToSave(data.variables, null, data.formData.due_date, data.formData.paid_date);
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
       const { error } = await supabase.from("debtors").insert({
@@ -500,7 +508,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         data.variables,
         existingVariables,
         data.formData.due_date,
-        data.formData.paid_date
+        data.formData.paid_date,
       );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
@@ -642,13 +650,13 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (!targetUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
 
-      const debtorsToAdd = debtors?.filter(d => selectedDebtors.has(d.id)) || [];
+      const debtorsToAdd = debtors?.filter((d) => selectedDebtors.has(d.id)) || [];
       if (debtorsToAdd.length === 0) throw new Error("No debtors selected");
 
       // Get default template
-      const defaultTemplate = templates?.find(t => !t.is_system_default) || templates?.[0];
+      const defaultTemplate = templates?.find((t) => !t.is_system_default) || templates?.[0];
 
-      const items = debtorsToAdd.map(debtor => ({
+      const items = debtorsToAdd.map((debtor) => ({
         debtor_id: debtor.id,
         user_id: targetUserId,
         workspace_id: currentWorkspace.id,
@@ -679,18 +687,18 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const toggleSelectAll = () => {
     if (!debtors) return;
 
-    const selectableDebtors = debtors.filter(d => d.status !== "paid");
-    const allSelected = selectableDebtors.every(d => selectedDebtors.has(d.id));
+    const selectableDebtors = debtors.filter((d) => d.status !== "paid");
+    const allSelected = selectableDebtors.every((d) => selectedDebtors.has(d.id));
 
     if (allSelected) {
       // Deselect all
       const newSelected = new Set(selectedDebtors);
-      selectableDebtors.forEach(d => newSelected.delete(d.id));
+      selectableDebtors.forEach((d) => newSelected.delete(d.id));
       setSelectedDebtors(newSelected);
     } else {
       // Select all
       const newSelected = new Set(selectedDebtors);
-      selectableDebtors.forEach(d => newSelected.add(d.id));
+      selectableDebtors.forEach((d) => newSelected.add(d.id));
       setSelectedDebtors(newSelected);
     }
   };
@@ -705,7 +713,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     }
     setSelectedDebtors(newSelected);
   };
-
 
   const resetForm = () => {
     setFormData({
@@ -726,7 +733,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       status: debtor.status,
       notes: debtor.notes || "",
       due_date: debtor.due_date ? debtor.due_date.slice(0, 10) : "",
-      paid_date: debtor.variables?.paid_date_iso || "", 
+      paid_date: debtor.variables?.paid_date_iso || "",
     });
     const next = emptyDebtorCustomerVariables();
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
@@ -787,9 +794,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
-    return sortDirection === "asc"
-      ? <ArrowUp className="w-3 h-3 ml-1" />
-      : <ArrowDown className="w-3 h-3 ml-1" />;
+    return sortDirection === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
   // Reset page when filters change
@@ -813,9 +818,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     queryKey: ["debtors-stats", effectiveUserId, currentWorkspace?.id],
     queryFn: async () => {
       // Get total count
-      let totalQuery = supabase
-        .from("debtors")
-        .select("*", { count: "exact", head: true });
+      let totalQuery = supabase.from("debtors").select("*", { count: "exact", head: true });
       if (currentWorkspace?.id) {
         totalQuery = totalQuery.eq("workspace_id", currentWorkspace.id);
       }
@@ -826,10 +829,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (totalError) throw totalError;
 
       // Get active count
-      let activeQuery = supabase
-        .from("debtors")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "active");
+      let activeQuery = supabase.from("debtors").select("*", { count: "exact", head: true }).eq("status", "active");
       if (currentWorkspace?.id) {
         activeQuery = activeQuery.eq("workspace_id", currentWorkspace.id);
       }
@@ -840,10 +840,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (activeError) throw activeError;
 
       // Get paid count
-      let paidQuery = supabase
-        .from("debtors")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "paid");
+      let paidQuery = supabase.from("debtors").select("*", { count: "exact", head: true }).eq("status", "paid");
       if (currentWorkspace?.id) {
         paidQuery = paidQuery.eq("workspace_id", currentWorkspace.id);
       }
@@ -860,17 +857,14 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       let hasMore = true;
 
       while (hasMore) {
-        let debtQuery = supabase
-          .from("debtors")
-          .select("variables");
+        let debtQuery = supabase.from("debtors").select("variables");
         if (currentWorkspace?.id) {
           debtQuery = debtQuery.eq("workspace_id", currentWorkspace.id);
         }
         if (effectiveUserId) {
           debtQuery = debtQuery.eq("user_id", effectiveUserId);
         }
-        const { data: debtData, error: debtError } = await debtQuery
-          .range(page * pageSize, (page + 1) * pageSize - 1);
+        const { data: debtData, error: debtError } = await debtQuery.range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (debtError) {
           console.error("Error fetching debt sum:", debtError);
@@ -887,13 +881,13 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       }
 
       // Sum Debt values from variables
-      const totalDebt = allDebtData.reduce((sum, d) => {
-        const vars = d.variables as Record<string, unknown> | null;
-        const debtValue =
-          vars?.Debt || vars?.debt || vars?.total_debt || 0;
-        const numericValue = Number(String(debtValue).replace(/,/g, '')) || 0;
-        return sum + numericValue;
-      }, 0) || 0;
+      const totalDebt =
+        allDebtData.reduce((sum, d) => {
+          const vars = d.variables as Record<string, unknown> | null;
+          const debtValue = vars?.Debt || vars?.debt || vars?.total_debt || 0;
+          const numericValue = Number(String(debtValue).replace(/,/g, "")) || 0;
+          return sum + numericValue;
+        }, 0) || 0;
 
       return {
         total: totalCount || 0,
@@ -976,7 +970,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         iso
           ? new Date(iso).toLocaleDateString("th-TH", {
               day: "numeric",
-              month: "short",
+              month: "long", // full month name
               hour: "2-digit",
               minute: "2-digit",
             })
@@ -1025,7 +1019,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     }
   };
 
-
   return (
     <div className="space-y-6">
       {/* Excel Upload Dialog */}
@@ -1064,23 +1057,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <div>
                 <Label className="text-sm">Customer data</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Variables sent to bot:{" "}
-                  <code className="text-xs bg-muted px-1 rounded">
-                    {"{policy_no}"}
-                  </code>
-                  ,{" "}
-                  <code className="text-xs bg-muted px-1 rounded">
-                    {"{name}"}
-                  </code>
-                  ,{" "}
-                  <code className="text-xs bg-muted px-1 rounded">
-                    {"{outstanding_amount}"}
-                  </code>
-                  ,{" "}
-                  <code className="text-xs bg-muted px-1 rounded">
-                    {"{due_date}"}
-                  </code>
-                  , etc.
+                  Variables sent to bot: <code className="text-xs bg-muted px-1 rounded">{"{policy_no}"}</code>,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">{"{name}"}</code>,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">{"{outstanding_amount}"}</code>,{" "}
+                  <code className="text-xs bg-muted px-1 rounded">{"{due_date}"}</code>, etc.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1113,8 +1093,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                   />
                 </div>
 
-                {DEBTOR_CUSTOMER_VARIABLE_KEYS.filter(key => 
-                  !["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(key)
+                {DEBTOR_CUSTOMER_VARIABLE_KEYS.filter(
+                  (key) => !["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(key),
                 ).map((key) => {
                   const isRequired = ["policy_no", "name", "outstanding_amount", "overdue_installments"].includes(key);
                   return (
@@ -1142,7 +1122,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 })}
               </div>
             </div>
-
 
             <div className="space-y-1.5">
               <Label className="text-sm">Notes</Label>
@@ -1183,21 +1162,22 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         </DialogContent>
       </Dialog>
 
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Debtors</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track and manage debt collection contacts
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Track and manage debt collection contacts</p>
         </div>
         <div className="flex gap-2">
           {totalCount > 0 && (
             <Button
               variant="outline"
               onClick={() => {
-                if (window.confirm(`Are you sure you want to delete all ${totalCount} debtors? This action cannot be undone.`)) {
+                if (
+                  window.confirm(
+                    `Are you sure you want to delete all ${totalCount} debtors? This action cannot be undone.`,
+                  )
+                ) {
                   clearAllDebtorsMutation.mutate();
                 }
               }}
@@ -1216,16 +1196,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Import Excel
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            disabled={isExporting || totalCount === 0}
-          >
-            {isExporting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 mr-2" />
-            )}
+          <Button variant="outline" onClick={handleExportExcel} disabled={isExporting || totalCount === 0}>
+            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
             {isExporting ? "Exporting..." : "Export Excel"}
           </Button>
           <Button onClick={() => setShowAddDialog(true)}>
@@ -1234,8 +1206,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           </Button>
         </div>
       </div>
-
-
 
       {/* Filters & Auto-Dial */}
       <div className="flex flex-col gap-3">
@@ -1262,12 +1232,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               <SelectItem value="defaulted">Defaulted</SelectItem>
             </SelectContent>
           </Select>
-          {isFetching && !isLoading && (
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          )}
-          <div className="text-sm text-muted-foreground ml-auto">
-            {totalCount.toLocaleString()} results
-          </div>
+          {isFetching && !isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+          <div className="text-sm text-muted-foreground ml-auto">{totalCount.toLocaleString()} results</div>
         </div>
 
         {/* Send to Call List Controls - Selection Count Only */}
@@ -1295,15 +1261,23 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                 <SelectItem value="never">Never Called</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
                 <SelectGroup>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Main Status</SelectLabel>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Main Status
+                  </SelectLabel>
                   {MAIN_STATUSES.map((s) => (
-                    <SelectItem key={`main-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                    <SelectItem key={`main-${s.key}`} value={s.label}>
+                      {s.label}
+                    </SelectItem>
                   ))}
                 </SelectGroup>
                 <SelectGroup>
-                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Sub Status</SelectLabel>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Sub Status
+                  </SelectLabel>
                   {SUB_STATUSES.map((s) => (
-                    <SelectItem key={`sub-${s.key}`} value={s.label}>{s.label}</SelectItem>
+                    <SelectItem key={`sub-${s.key}`} value={s.label}>
+                      {s.label}
+                    </SelectItem>
                   ))}
                 </SelectGroup>
               </SelectContent>
@@ -1318,7 +1292,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                   <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
                   {dateRange?.from ? (
                     <span className="flex-1 truncate">
-                      {format(dateRange.from, "d MMM yyyy", { locale: th })} - {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
+                      {format(dateRange.from, "d MMM yyyy", { locale: th })} -{" "}
+                      {format(dateRange.to ?? dateRange.from, "d MMM yyyy", { locale: th })}
                     </span>
                   ) : (
                     <span className="flex-1 text-muted-foreground">เลือกช่วงวันที่</span>
@@ -1378,7 +1353,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               )}
               Send to Call List
             </Button>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -1386,7 +1361,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
               disabled={!debtors || debtors.length === 0}
               className="h-8 text-xs"
             >
-              {debtors && debtors.filter(d => d.status !== "paid").every(d => selectedDebtors.has(d.id))
+              {debtors && debtors.filter((d) => d.status !== "paid").every((d) => selectedDebtors.has(d.id))
                 ? "Deselect"
                 : "Select All"}
             </Button>
@@ -1405,8 +1380,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
-                          checked={debtors && debtors.filter(d => d.status !== "paid").length > 0 &&
-                            debtors.filter(d => d.status !== "paid").every(d => selectedDebtors.has(d.id))}
+                          checked={
+                            debtors &&
+                            debtors.filter((d) => d.status !== "paid").length > 0 &&
+                            debtors.filter((d) => d.status !== "paid").every((d) => selectedDebtors.has(d.id))
+                          }
                           onCheckedChange={toggleSelectAll}
                           disabled={sendToCallListMutation.isPending}
                         />
@@ -1507,156 +1485,158 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[...debtors].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((debtor, index) => {
-                      const phoneStats = callStats?.[debtor.phone_number];
-                      const isAdding = addingToCallList === debtor.id;
-                      const isSelected = selectedDebtors.has(debtor.id);
-                      const rowNumber = index + 1;
+                    {[...debtors]
+                      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                      .map((debtor, index) => {
+                        const phoneStats = callStats?.[debtor.phone_number];
+                        const isAdding = addingToCallList === debtor.id;
+                        const isSelected = selectedDebtors.has(debtor.id);
+                        const rowNumber = index + 1;
 
-                      return (
-                        <TableRow
-                          key={debtor.id}
-                          className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`}
-                        >
-                          <TableCell>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleDebtorSelection(debtor.id)}
-                              disabled={sendToCallListMutation.isPending || debtor.status === "paid"}
-                            />
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground font-mono">
-                            {rowNumber}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatVariableValue("name", debtor.variables?.name)}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {(() => {
-                              const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
-                              const label = resolveLatestStatusLabel(raw);
-                              const tone = resolveLatestStatusTone(raw);
-                              if (tone === "none") {
-                                return <span className="text-sm text-muted-foreground">–</span>;
+                        return (
+                          <TableRow
+                            key={debtor.id}
+                            className={`${isSelected ? "bg-muted/30" : ""} ${(debtor as any).is_blocked ? "opacity-50" : ""}`}
+                          >
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleDebtorSelection(debtor.id)}
+                                disabled={sendToCallListMutation.isPending || debtor.status === "paid"}
+                              />
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground font-mono">{rowNumber}</TableCell>
+                            <TableCell>
+                              <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatVariableValue("name", debtor.variables?.name)}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {(() => {
+                                const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
+                                const label = resolveLatestStatusLabel(raw);
+                                const tone = resolveLatestStatusTone(raw);
+                                if (tone === "none") {
+                                  return <span className="text-sm text-muted-foreground">–</span>;
+                                }
+                                const isHighPriority = tone === "callback" || tone === "transfer";
+                                return (
+                                  <Badge variant="outline" className={`gap-1.5 font-medium ${STATUS_TONE_CLASS[tone]}`}>
+                                    {isHighPriority && (
+                                      <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+                                    )}
+                                    {label}
+                                  </Badge>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {formatThaiBuddhistDate(debtor.date_con)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatVariableValue("policy_no", debtor.variables?.policy_no)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatVariableValue("overdue_installments", debtor.variables?.overdue_installments)}
+                            </TableCell>
+
+                            {variableColumns.map((varKey) => {
+                              const value = debtor.variables?.[varKey];
+                              // Format numbers with commas for Debt, Installment, or any numeric-looking values
+                              const isNumeric = value && !isNaN(Number(String(value).replace(/,/g, "")));
+                              const isYearField = varKey.toLowerCase().includes("year");
+
+                              let displayValue = value
+                                ? isNumeric && !isYearField
+                                  ? Number(String(value).replace(/,/g, "")).toLocaleString("th-TH")
+                                  : String(value)
+                                : "-";
+
+                              // Mask license plate fields
+                              if (value && isLicensePlateField(varKey)) {
+                                displayValue = maskLicensePlate(String(value));
                               }
-                              const isHighPriority = tone === "callback" || tone === "transfer";
+
                               return (
-                                <Badge
-                                  variant="outline"
-                                  className={`gap-1.5 font-medium ${STATUS_TONE_CLASS[tone]}`}
-                                >
-                                  {isHighPriority && (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
-                                  )}
-                                  {label}
-                                </Badge>
+                                <TableCell key={varKey} className="text-sm">
+                                  {displayValue}
+                                </TableCell>
                               );
-                            })()}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatThaiBuddhistDate(debtor.date_con)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatVariableValue("policy_no", debtor.variables?.policy_no)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatVariableValue("overdue_installments", debtor.variables?.overdue_installments)}
-                          </TableCell>
-
-
-
-
-                          {variableColumns.map((varKey) => {
-                            const value = debtor.variables?.[varKey];
-                            // Format numbers with commas for Debt, Installment, or any numeric-looking values
-                            const isNumeric = value && !isNaN(Number(String(value).replace(/,/g, '')));
-                            const isYearField = varKey.toLowerCase().includes("year");
-                            
-                            let displayValue = value
-                              ? (isNumeric && !isYearField
-                                ? Number(String(value).replace(/,/g, '')).toLocaleString('th-TH')
-                                : String(value))
-                              : "-";
-
-                            // Mask license plate fields
-                            if (value && isLicensePlateField(varKey)) {
-                              displayValue = maskLicensePlate(String(value));
-                            }
-
-                            return (
-                              <TableCell key={varKey} className="text-sm">
-                                {displayValue}
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={`${statusConfig[debtor.status]?.color} font-normal`}
-                            >
-                              {statusConfig[debtor.status]?.label || debtor.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.picked_up || 0) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-                              {phoneStats?.picked_up || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.not_picked_up || 0) > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                              {phoneStats?.not_picked_up || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.confirmed || 0) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-                              {phoneStats?.confirmed || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.declined || 0) > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                              {phoneStats?.declined || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.no_response || 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
-                              {phoneStats?.no_response || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <PhoneCall className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="text-sm">{phoneStats?.total || 0}</span>
-                              {phoneStats && phoneStats.confirmed > 0 && (
-                                <span className="text-xs text-success">
-                                  ({phoneStats.confirmed} ✓)
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              {debtor.last_contact_at
-                                ? new Date(debtor.last_contact_at).toLocaleDateString("th-TH", {
-                                  day: "numeric",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                                : "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {/* Call button hidden
+                            })}
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={`${statusConfig[debtor.status]?.color} font-normal`}
+                              >
+                                {statusConfig[debtor.status]?.label || debtor.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-sm font-medium ${(phoneStats?.picked_up || 0) > 0 ? "text-success" : "text-muted-foreground"}`}
+                              >
+                                {phoneStats?.picked_up || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-sm font-medium ${(phoneStats?.not_picked_up || 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                              >
+                                {phoneStats?.not_picked_up || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-sm font-medium ${(phoneStats?.confirmed || 0) > 0 ? "text-success" : "text-muted-foreground"}`}
+                              >
+                                {phoneStats?.confirmed || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-sm font-medium ${(phoneStats?.declined || 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                              >
+                                {phoneStats?.declined || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-sm font-medium ${(phoneStats?.no_response || 0) > 0 ? "text-warning" : "text-muted-foreground"}`}
+                              >
+                                {phoneStats?.no_response || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <PhoneCall className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-sm">{phoneStats?.total || 0}</span>
+                                {phoneStats && phoneStats.confirmed > 0 && (
+                                  <span className="text-xs text-success">({phoneStats.confirmed} ✓)</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                {debtor.last_contact_at
+                                  ? new Date(debtor.last_contact_at).toLocaleDateString("th-TH", {
+                                      day: "numeric",
+                                      month: "short",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {/* Call button hidden
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1672,43 +1652,53 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                                 Call
                               </Button>
                               */}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="bg-popover">
-                                  <DropdownMenuItem onClick={() => handleEdit(debtor)}>
-                                    <Pencil className="w-4 h-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={async () => {
-                                      const newBlocked = !(debtor as any).is_blocked;
-                                      const { error } = await supabase.from("debtors").update({ is_blocked: newBlocked } as any).eq("id", debtor.id);
-                                      if (error) { toast.error("Failed to update block status"); return; }
-                                      queryClient.invalidateQueries({ queryKey: ["debtors"] });
-                                      toast.success(newBlocked ? "Blocked - จะไม่โทรหาลูกค้านี้" : "Unblocked - สามารถโทรได้อีกครั้ง");
-                                    }}
-                                  >
-                                    {(debtor as any).is_blocked ? "🔓 Unblock" : "🚫 Block (ห้ามโทร)"}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => deleteDebtorMutation.mutate(debtor.id)}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-popover">
+                                    <DropdownMenuItem onClick={() => handleEdit(debtor)}>
+                                      <Pencil className="w-4 h-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={async () => {
+                                        const newBlocked = !(debtor as any).is_blocked;
+                                        const { error } = await supabase
+                                          .from("debtors")
+                                          .update({ is_blocked: newBlocked } as any)
+                                          .eq("id", debtor.id);
+                                        if (error) {
+                                          toast.error("Failed to update block status");
+                                          return;
+                                        }
+                                        queryClient.invalidateQueries({ queryKey: ["debtors"] });
+                                        toast.success(
+                                          newBlocked
+                                            ? "Blocked - จะไม่โทรหาลูกค้านี้"
+                                            : "Unblocked - สามารถโทรได้อีกครั้ง",
+                                        );
+                                      }}
+                                    >
+                                      {(debtor as any).is_blocked ? "🔓 Unblock" : "🚫 Block (ห้ามโทร)"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => deleteDebtorMutation.mutate(debtor.id)}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               </div>
