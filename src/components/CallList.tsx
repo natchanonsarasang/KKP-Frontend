@@ -1695,7 +1695,7 @@ const CallList = () => {
       let aiStatus = "-";
       if (cat) {
         const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
-        aiStatus = def ? (def.thai || def.label) : resolveLatestStatusLabel(cat);
+        aiStatus = def ? def.label : resolveLatestStatusLabel(cat);
       }
 
       return {
