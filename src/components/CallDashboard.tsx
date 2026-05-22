@@ -77,6 +77,9 @@ interface Debtor {
   name: string | null;
   last_name: string | null;
   phone_number: string;
+  total_debt: number | null;
+  due_date: string | null;
+  variables: Record<string, string> | null;
 }
 
 interface Template {
