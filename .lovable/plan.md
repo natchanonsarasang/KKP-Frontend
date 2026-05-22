@@ -1,43 +1,32 @@
-## Add Export Excel button to DebtorsList
+## Problem
 
-Add an **Export Excel** button placed immediately after the existing **Import Excel** button in the DebtorsList header. Clicking it exports all debtor rows matching the current filters (across all pages) as a `.xlsx` file with UTF-8 BOM for proper Thai text rendering.
+In `src/components/DebtorsList.tsx`, the Export Excel rows show `Picked = 0`, `No Pick = 0`, `Calls = 0` because they read from the `callStats` React-Query cache (line 994–996). That cache:
 
-### UI change
-- File: `src/components/DebtorsList.tsx` (header actions, around line 1104)
-- Add `<Button variant="outline">` with a `Download` icon labeled **Export Excel**, inserted directly after the Import Excel button.
-- Disable while exporting; show a spinner + "Exporting..." label during the fetch.
+- can be `undefined` if the export runs before the query resolves,
+- is keyed by `phone_number` and silently returns `0` when a phone isn't present,
+- is refetched on a 5s interval so it can be momentarily empty.
 
-### Data fetching (all filtered rows, all pages)
-On click, run a paged Supabase query that mirrors the existing list query in `debtorsData` but **ignores the current page** and pulls every matching row:
+## Fix
 
-- Reuse the same filter logic already in the file: workspace/user scope, `searchQuery`, `statusFilter`, `callStatusFilter` (with `calledIds` from `latestStatusByDebtor`), and the active sort.
-- Loop in batches of 1000 using `.range(from, to)` until fewer than 1000 rows return (same pattern used in `statsData` around lines 856-880).
-- Also fetch `callStats` and `latestStatusByDebtor` for the full result set — `latestStatusByDebtor` is already a workspace-wide map, and `callStats` is keyed by phone number, so existing in-memory maps can be reused; only `debtors` itself needs paged fetching.
+Compute Picked / No Pick / Calls **inside `handleExportExcel`**, directly from `call_records`, scoped to the phone numbers actually being exported. No reliance on the cached query.
 
-### Columns (in order)
-1. **Contact** — `phone_number` (raw, unmasked for export)
-2. **Name** — `variables.name`
-3. **Latest Call Status** — English label from `resolveLatestStatusLabel(latestStatusByDebtor.get(debtor.id))`
-4. **Callback Date** — `formatThaiBuddhistDate(debtor.date_con)`
-5. **Policy Number** — `variables.policy_no`
-6. **Outstanding Amount** — `variables.outstanding_amount`
-7. **Overdue Installments** — `variables.overdue_installments`
-8. **Due Date** — `[due_date, due_month, due_year]` joined by space, empties skipped
-9. **Picked** — `picked_up_count`
-10. **No Pick** — `not_picked_up_count`
-11. **Calls** — `contact_attempts`
-12. **Last Contact** — formatted from `last_contact_at` (Thai locale, same as table cell)
+### Steps (single file: `src/components/DebtorsList.tsx`, `handleExportExcel`)
 
-Empty values rendered as `"-"`.
+1. After fetching `all` debtors, collect unique `phones = [...new Set(all.map(d => d.phone_number).filter(Boolean))]`.
+2. Query `call_records` in chunks of 500 phones at a time using `.in('phone_number', slice).select('phone_number, status')`, paginated with `.range()` of 1000 rows to defeat the Supabase default cap.
+3. Reduce into `exportStats: Record<phone, { total, picked_up, not_picked_up }>` using the same status mapping the on-screen `callStats` uses:
+   - `confirmed | declined | no_response | completed` → `picked_up++`
+   - `no_answer | failed` → `not_picked_up++`
+   - every record → `total++`
+4. In the row mapper, replace the three `callStats?.[d.phone_number]?.*` lookups with `exportStats[d.phone_number]?.*`.
 
-### File generation
-- Use the already-imported `xlsx` package (no new deps).
-- Build sheet via `XLSX.utils.json_to_sheet(rows)`, append to a new workbook as `"Debtors"`.
-- Serialize with `XLSX.write(wb, { bookType: 'xlsx', type: 'array' })`.
-- Wrap output in a `Blob` whose first chunk is the UTF-8 BOM (`\uFEFF`) so downstream tools detect UTF-8 and render Thai characters correctly.
-- Trigger download via temporary anchor; filename: `debtors-YYYY-MM-DD.xlsx`.
-- `toast.success("Exported N debtors")` on completion, `toast.error(...)` on failure.
+### Why this works
 
-### Scope
-- Frontend/presentation only. No schema, RLS, or edge-function changes.
-- No new packages.
+- The export becomes self-contained: it always sees fresh, complete stats for exactly the exported set.
+- `.in('phone_number', …)` keeps the payload small even with 5k debtors (one batched fetch per ~500 phones).
+- No schema change, no new RPC, no impact on the on-screen table.
+
+## Out of scope
+
+- Reworking the on-screen `callStats` query.
+- Backfilling the stored `picked_up_count` / `not_picked_up_count` counters on `debtors`.

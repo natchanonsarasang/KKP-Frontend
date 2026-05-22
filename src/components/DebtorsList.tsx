@@ -966,6 +966,50 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         return;
       }
 
+      // Compute call stats directly from call_records for the exported set,
+      // independent of the cached callStats query (which can be empty/stale).
+      const phones = Array.from(
+        new Set(all.map((d: any) => d.phone_number).filter(Boolean))
+      ) as string[];
+      const exportStats: Record<
+        string,
+        { total: number; picked_up: number; not_picked_up: number }
+      > = {};
+      const phoneBatch = 500;
+      for (let i = 0; i < phones.length; i += phoneBatch) {
+        const slice = phones.slice(i, i + phoneBatch);
+        let recFrom = 0;
+        while (true) {
+          const { data: recs, error: recErr } = await supabase
+            .from("call_records")
+            .select("phone_number, status")
+            .in("phone_number", slice)
+            .range(recFrom, recFrom + 999);
+          if (recErr) throw recErr;
+          const chunk = recs ?? [];
+          chunk.forEach((r: any) => {
+            const s = (exportStats[r.phone_number] ||= {
+              total: 0,
+              picked_up: 0,
+              not_picked_up: 0,
+            });
+            s.total++;
+            if (
+              r.status === "confirmed" ||
+              r.status === "declined" ||
+              r.status === "no_response" ||
+              r.status === "completed"
+            ) {
+              s.picked_up++;
+            } else if (r.status === "no_answer" || r.status === "failed") {
+              s.not_picked_up++;
+            }
+          });
+          if (chunk.length < 1000) break;
+          recFrom += 1000;
+        }
+      }
+
       const fmtLastContact = (iso: string | null | undefined) =>
         iso
           ? new Date(iso).toLocaleDateString("th-TH", {
@@ -982,6 +1026,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         const rawStatus = latestStatusByDebtor?.get(d.id) ?? null;
         const statusLabel = rawStatus ? resolveLatestStatusLabel(rawStatus) : "-";
         const dueParts = [v.due_date, v.due_month, v.due_year].filter((p) => p && String(p).trim());
+        const s = exportStats[d.phone_number];
         return {
           Contact: d.phone_number || "-",
           Name: v.name || "-",
@@ -991,9 +1036,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           "Outstanding Amount": v.outstanding_amount || "-",
           "Overdue Installments": v.overdue_installments || "-",
           "Due Date": dueParts.length > 0 ? dueParts.join(" ") : "-",
-          Picked: callStats?.[d.phone_number]?.picked_up ?? 0,
-          "No Pick": callStats?.[d.phone_number]?.not_picked_up ?? 0,
-          Calls: callStats?.[d.phone_number]?.total ?? 0,
+          Picked: s?.picked_up ?? 0,
+          "No Pick": s?.not_picked_up ?? 0,
+          Calls: s?.total ?? 0,
           "Last Contact": fmtLastContact(d.last_contact_at),
         };
       });
