@@ -320,6 +320,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   // Variable columns: standard customer keys first, then any legacy keys
+  // Pinned keys are rendered as dedicated fixed columns and excluded here.
+  const PINNED_VARIABLE_KEYS = ["name", "policy_no", "outstanding_amount", "overdue_installments"] as const;
   const variableColumns = useMemo(() => {
     if (!debtors?.length) return [];
     const allKeys = new Set(
@@ -331,13 +333,27 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     );
     const ordered: string[] = [];
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-      if (allKeys.has(k)) ordered.push(k);
+      if (allKeys.has(k) && !PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number])) ordered.push(k);
     }
     const rest = [...allKeys]
       .filter((k) => !DEBTOR_CUSTOMER_VARIABLE_KEYS.includes(k as (typeof DEBTOR_CUSTOMER_VARIABLE_KEYS)[number]))
+      .filter((k) => !PINNED_VARIABLE_KEYS.includes(k as typeof PINNED_VARIABLE_KEYS[number]))
       .sort();
     return [...ordered, ...rest];
   }, [debtors]);
+
+  // Format a variable value for display (numeric formatting + license-plate mask)
+  const formatVariableValue = (varKey: string, value: unknown): string => {
+    if (value === null || value === undefined || value === "") return "-";
+    const str = String(value);
+    const isNumeric = !isNaN(Number(str.replace(/,/g, "")));
+    const isYearField = varKey.toLowerCase().includes("year");
+    let display = isNumeric && !isYearField
+      ? Number(str.replace(/,/g, "")).toLocaleString("th-TH")
+      : str;
+    if (isLicensePlateField(varKey)) display = maskLicensePlate(str);
+    return display;
+  };
 
   const { data: templates } = useQuery({
     queryKey: ["templates-full"],
@@ -1277,6 +1293,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("date_con")}
                         </div>
                       </TableHead>
+                      <TableHead className="text-xs">Name</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Policy Number</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Outstanding Amount</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Overdue Installment</TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
@@ -1408,6 +1428,19 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                               {formatThaiBuddhistDate(debtor.date_con)}
                             </span>
                           </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("name", debtor.variables?.name)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("policy_no", debtor.variables?.policy_no)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("overdue_installments", debtor.variables?.overdue_installments)}
+                          </TableCell>
+
 
 
 
