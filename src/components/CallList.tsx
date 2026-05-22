@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,7 @@ interface CallListItem {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  ai_category?: string | null;
   debtor?: Debtor;
 }
 
@@ -2152,6 +2154,7 @@ const CallList = () => {
                         {getSortIcon("status")}
                       </span>
                     </TableHead>
+                    <TableHead className="text-xs">AI Status</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("called_at")}
@@ -2248,6 +2251,33 @@ const CallList = () => {
                         <TableCell>{getPickedUpDisplay()}</TableCell>
                         <TableCell>{getOutcomeDisplay()}</TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const cat = item.ai_category;
+                            if (!cat) return <span className="text-muted-foreground">-</span>;
+                            const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
+                            const label = resolveLatestStatusLabel(cat);
+                            if (!def) {
+                              return (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                  {label}
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  color: def.color,
+                                  borderColor: `${def.color}66`,
+                                  backgroundColor: `${def.color}1a`,
+                                }}
+                              >
+                                {def.thai || def.label}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
