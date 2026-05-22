@@ -1428,6 +1428,19 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                               {formatThaiBuddhistDate(debtor.date_con)}
                             </span>
                           </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("name", debtor.variables?.name)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("policy_no", debtor.variables?.policy_no)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("overdue_installments", debtor.variables?.overdue_installments)}
+                          </TableCell>
+
 
 
 
