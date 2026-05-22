@@ -1708,7 +1708,7 @@ const CallList = () => {
         รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
         ผลการโทร: item.call_outcome || "-",
         สถานะ: item.status,
-        "AI Status": aiStatus,
+        "Call Status": aiStatus,
         เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
         conversationlog: conversationLog || "-",
         audio_url: audioUrl || "-",
@@ -2169,7 +2169,7 @@ const CallList = () => {
                         {getSortIcon("status")}
                       </span>
                     </TableHead>
-                    <TableHead className="text-xs">AI Status</TableHead>
+                    <TableHead className="text-xs">Call Status</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("called_at")}
