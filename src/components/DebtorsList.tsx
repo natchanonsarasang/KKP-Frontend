@@ -1580,7 +1580,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             </TableCell>
                             <TableCell>
                               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {formatThaiBuddhistDate(debtor.date_con)}
+                                {formatThaiBuddhistDateShort(debtor.date_con)}
                               </span>
                             </TableCell>
                             <TableCell className="text-sm">
