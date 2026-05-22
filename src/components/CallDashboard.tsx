@@ -531,6 +531,15 @@ const CallDashboard = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf || isLoading}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            {isExportingPdf ? "กำลังส่งออก..." : "Export PDF"}
+          </Button>
         </div>
       </div>
 
