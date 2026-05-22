@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import {
   PhoneCall, CheckCircle, XCircle, Clock, AlertCircle,
-  PhoneOff, RefreshCw, Copy, Search, Download,
+  PhoneOff, RefreshCw, Copy, Search, Download, FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
