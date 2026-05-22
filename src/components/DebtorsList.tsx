@@ -1293,6 +1293,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("date_con")}
                         </div>
                       </TableHead>
+                      <TableHead className="text-xs">Name</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Policy Number</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Outstanding Amount</TableHead>
+                      <TableHead className="text-xs whitespace-nowrap">Overdue Installment</TableHead>
                       {variableColumns.map((varKey) => (
                         <TableHead
                           key={varKey}
