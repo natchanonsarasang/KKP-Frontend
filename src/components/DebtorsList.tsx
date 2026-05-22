@@ -71,6 +71,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
   formatThaiBuddhistDate,
+  formatThaiBuddhistDateShort,
 } from "@/lib/debtorVariables";
 import {
   MAIN_STATUSES,
