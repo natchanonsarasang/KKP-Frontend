@@ -785,40 +785,40 @@ const CallDashboard = () => {
             </p>
           </div>
 
-          <div className="page-break-avoid">
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[80px]">
             <AnalyticsStats callListItems={callListItems || []} />
           </div>
-          <div className="page-break-avoid">
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[120px]">
             <MainStatusOverview callListItems={callListItems || []} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="page-break-avoid">
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <SubStatusOverview callListItems={callListItems || []} />
             </div>
-            <div className="page-break-avoid">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <OutcomeDistributionChart callListItems={callListItems || []} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="page-break-avoid">
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
             </div>
-            <div className="page-break-avoid">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <BestTimeInsights callListItems={callListItems || []} />
             </div>
           </div>
 
-          <div className="page-break-avoid">
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[300px]">
             <TrendChart callListItems={callListItems || []} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="page-break-avoid">
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <HourlyPickupChart callListItems={callListItems || []} />
             </div>
-            <div className="page-break-avoid">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
               <DayOfWeekChart callListItems={callListItems || []} />
             </div>
           </div>
