@@ -1642,29 +1642,22 @@ const CallList = () => {
       return;
     }
 
-    const exportData = completedItems.map((item, index) => {
-      const notesData = parseNotesData(item.notes);
+    const exportData = completedItems.map((item) => {
+      const debtor = item.debtor;
+      const vars = debtor?.variables || {};
+      const rawAmount = vars.amount || vars.outstanding_amount;
+      const amount = rawAmount != null && rawAmount !== ""
+        ? Number(String(rawAmount).replace(/,/g, ""))
+        : debtor?.total_debt;
       return {
-        "#": index + 1,
-        "Phone Number": item.debtor?.phone_number || "Unknown",
-        Name: item.debtor?.name || "-",
-        Status: item.status,
-        "Picked Up": item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
-        Outcome: item.call_outcome || "-",
-        "Called At": item.called_at ? new Date(item.called_at).toLocaleString() : "-",
-        "Created At": new Date(item.created_at).toLocaleString(),
-        "Conversation Log": notesData.conversationLog || "-",
-        "Full Data (JSON)": JSON.stringify({
-          id: item.id,
-          debtor_id: item.debtor_id,
-          status: item.status,
-          picked_up: item.picked_up,
-          call_outcome: item.call_outcome,
-          called_at: item.called_at,
-          created_at: item.created_at,
-          notes: item.notes,
-          debtor: item.debtor,
-        }),
+        เบอร์โทร: debtor?.phone_number || "-",
+        ชื่อ: vars.name || debtor?.name || "-",
+        วันครบกำหนด: vars.due_date || debtor?.due_date || "-",
+        จำนวนเงิน: amount && Number.isFinite(amount) ? amount : "-",
+        สถานะ: item.status,
+        รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
+        ผลการโทร: item.call_outcome || "-",
+        วันที่โทร: item.called_at ? new Date(item.called_at).toLocaleString() : "-",
       };
     });
 
@@ -2084,31 +2077,23 @@ const CallList = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs w-12">#</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("phone")}
                     >
                       <span className="flex items-center">
-                        Phone
+                        เบอร์โทร
                         {getSortIcon("phone")}
                       </span>
                     </TableHead>
-                    <TableHead
-                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("status")}
-                    >
-                      <span className="flex items-center">
-                        Status
-                        {getSortIcon("status")}
-                      </span>
-                    </TableHead>
+                    <TableHead className="text-xs">ชื่อ</TableHead>
+                    <TableHead className="text-xs">ยอด</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("picked_up")}
                     >
                       <span className="flex items-center">
-                        Picked Up
+                        รับสาย
                         {getSortIcon("picked_up")}
                       </span>
                     </TableHead>
@@ -2117,8 +2102,17 @@ const CallList = () => {
                       onClick={() => handleSort("call_outcome")}
                     >
                       <span className="flex items-center">
-                        Outcome
+                        ผลการโทร
                         {getSortIcon("call_outcome")}
+                      </span>
+                    </TableHead>
+                    <TableHead
+                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      <span className="flex items-center">
+                        สถานะ
+                        {getSortIcon("status")}
                       </span>
                     </TableHead>
                     <TableHead
@@ -2126,17 +2120,8 @@ const CallList = () => {
                       onClick={() => handleSort("called_at")}
                     >
                       <span className="flex items-center">
-                        Called At
+                        เวลา
                         {getSortIcon("called_at")}
-                      </span>
-                    </TableHead>
-                    <TableHead
-                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("created_at")}
-                    >
-                      <span className="flex items-center">
-                        Created
-                        {getSortIcon("created_at")}
                       </span>
                     </TableHead>
                     <TableHead className="text-xs w-10"></TableHead>
@@ -2198,16 +2183,34 @@ const CallList = () => {
 
                     return (
                       <TableRow key={item.id} className={isCurrentlyCalling ? "bg-primary/5 animate-pulse" : ""}>
-                        <TableCell className="text-sm text-muted-foreground font-mono">{index + 1}</TableCell>
                         <TableCell className="font-mono text-sm">
                           <div className="flex items-center gap-2">
                             {isCurrentlyCalling && <Phone className="w-3.5 h-3.5 text-primary animate-bounce" />}
                             <span>{debtor ? maskPhoneNumber(debtor.phone_number) : "-"}</span>
                           </div>
                         </TableCell>
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell className="text-sm">
+                          {debtor?.variables?.name || debtor?.name || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const vars = debtor?.variables || {};
+                            const raw = vars.amount || vars.outstanding_amount;
+                            const amount = raw != null && raw !== ""
+                              ? Number(String(raw).replace(/,/g, ""))
+                              : debtor?.total_debt;
+                            return amount && Number.isFinite(amount)
+                              ? new Intl.NumberFormat("th-TH", {
+                                  style: "currency",
+                                  currency: "THB",
+                                  maximumFractionDigits: 0,
+                                }).format(amount)
+                              : "-";
+                          })()}
+                        </TableCell>
                         <TableCell>{getPickedUpDisplay()}</TableCell>
                         <TableCell>{getOutcomeDisplay()}</TableCell>
+                        <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
@@ -2217,14 +2220,6 @@ const CallList = () => {
                                 minute: "2-digit",
                               })
                             : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(item.created_at).toLocaleString("th-TH", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
                         </TableCell>
                         <TableCell className="flex gap-1">
                           {/* Show view transcript for completed calls, preview for pending */}
