@@ -628,19 +628,35 @@ Conversation Behaviors (use ONLY when no clear business outcome above exists):
 - Out of Topic     → Customer kept talking about unrelated topics with no resolution.
 
 CRITICAL CLASSIFICATION RULES
-1. CONTEXT & FLOW CHECK (HIGHEST PRIORITY):
-   a. Verification Requirement: Inspect the conversation log to determine whether the Bot has already provided the "Debt Details" to the customer (e.g. license plate number, installment number, outstanding amount, due date). Treat these concrete debt facts as the trigger that unlocks payment-commitment classifications.
-   b. Inconvenient Handling: If the Bot has NOT yet provided the debt details and the customer offers a date/time (e.g. "พรุ่งนี้", "tomorrow", "อาทิตย์หน้า", "next week"), this is a CALLBACK request — classify as "Inconvenient (With Date)". Do NOT classify it as "Promised to Pay" or "Planned More Than 3".
-   c. Payment Promise Validation: ONLY if the Bot has already disclosed the debt details AND the customer then agrees to a payment date may you choose "Promised to Pay" (≤ 3 days) or "Planned More Than 3" (> 3 days).
-2. PRIORITY OVERHAUL: When the customer's intent is rescheduling or asking for a follow-up call, "Inconvenient (With Date)" and "Inconvenient (Without Date)" take the HIGHEST priority over any payment-commitment status.
-3. KEYWORD RESTRICTION: Do NOT use date keywords like "tomorrow", "next week", "พรุ่งนี้", or "อาทิตย์หน้า" alone to trigger a payment status. A payment status requires explicit confirmation tied to the specific debt amount the Bot disclosed.
-4. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior — but only after the Context & Flow Check above is satisfied. If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a qualifying business outcome appear in the same call, choose the BUSINESS OUTCOME.
-5. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
-6. Decide based on the FINAL state of the call, not transient mid-call events.
-7. For any qualifying payment commitment (per rule 1c), decide between "Promised to Pay" (≤ 3 days from the call date) and "Planned More Than 3" (> 3 days). Compute the gap relative to the call/reference date in the transcript. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
-8. "Inconvenient (With Date)" requires a concrete time/date agreement for a CALLBACK (not a payment). If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
-9. "Refused" requires a clear refusal — not just reluctance or "not convenient".
-10. If unsure between "Planned More Than 3" and a behavior category, prefer "Planned More Than 3" only when the debt details were disclosed and the customer engaged with them.
+
+1. MANDATORY DEBT DISCLOSURE CHECK (HIGHEST PRIORITY):
+   Before classifying as ANY payment outcome ("Promised to Pay" or "Planned More Than 3"), you MUST verify in the conversation_log that the Bot has already DISCLOSED the "Debt Details" to the customer (e.g. license plate, installment number, outstanding balance, due date).
+   - If the Bot has NOT yet disclosed these details, it is IMPOSSIBLE for the interaction to be a payment outcome. You MUST NOT choose "Promised to Pay" or "Planned More Than 3" under any circumstance.
+
+2. HANDLING "NOT CONVENIENT" & CALLBACK REQUESTS:
+   If the customer indicates they are "not convenient" (ไม่สะดวก), "busy" (ไม่ว่าง), or asks for a callback / to reschedule / to postpone:
+   - If the customer specifies a date/time (e.g. "พรุ่งนี้"/"tomorrow", "อาทิตย์หน้า"/"next week", "เดือนหน้า"/"next month", a specific clock time or date) → classify STRICTLY as "Inconvenient (With Date)".
+   - If no specific date/time is mentioned → classify as "Inconvenient (Without Date)".
+   - STRICT RULE: As long as the debt details have NOT been disclosed, ANY customer request to reschedule or postpone the conversation MUST be classified as "Inconvenient" (With or Without Date), EVEN IF they mention future dates like "tomorrow" or "next week". Never interpret such date mentions as a payment commitment.
+
+3. PAYMENT CLASSIFICATION (ONLY AFTER DISCLOSURE):
+   "Promised to Pay" and "Planned More Than 3" are permitted ONLY if BOTH conditions are true:
+   (a) The Bot has disclosed the debt details in the conversation_log, AND
+   (b) The customer then provides a clear payment commitment tied to that disclosed debt.
+   Then decide:
+   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date.
+   - "Planned More Than 3" → commitment is > 3 days from the call date.
+   If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+
+4. CLASSIFICATION LOGIC SUMMARY:
+   - IF (Debt details NOT disclosed) → MUST be "Inconvenient (With Date)" or "Inconvenient (Without Date)" (regardless of any time/date mentioned), or another non-payment category if more appropriate (e.g. Wrong Person, Refused, Not Reached).
+   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days) or "Planned More Than 3" (> 3 days).
+
+5. ADDITIONAL GUIDELINES:
+   - Conversation Behavior categories should ONLY be chosen when no clear business outcome above applies.
+   - Decide based on the FINAL state of the call, not transient mid-call events.
+   - "Refused" requires a clear refusal — not mere reluctance or "not convenient".
+
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
