@@ -139,6 +139,9 @@ const CallDashboard = () => {
         backgroundColor: "#ffffff",
         useCORS: true,
         windowWidth: container.scrollWidth,
+        windowHeight: container.scrollHeight,
+        width: container.scrollWidth,
+        height: container.scrollHeight,
       });
 
       const pdf = new jsPDF("p", "mm", "a4");
@@ -772,7 +775,7 @@ const CallDashboard = () => {
           pointerEvents: "none",
         }}
       >
-        <div ref={exportRef} className="bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
+        <div ref={exportRef} className="pdf-export bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
           <div className="flex items-start justify-between border-b pb-4">
             <div>
               <h2 className="text-2xl font-bold">Analytics Report</h2>
