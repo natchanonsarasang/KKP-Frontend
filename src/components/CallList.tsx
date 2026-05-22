@@ -2169,7 +2169,7 @@ const CallList = () => {
                         {getSortIcon("status")}
                       </span>
                     </TableHead>
-                    <TableHead className="text-xs">AI Status</TableHead>
+                    <TableHead className="text-xs">Call Status</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("called_at")}
