@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import {
   PhoneCall, CheckCircle, XCircle, Clock, AlertCircle,
-  PhoneOff, RefreshCw, Copy, Search, Download,
+  PhoneOff, RefreshCw, Copy, Search, Download, FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -112,6 +114,57 @@ const CallDashboard = () => {
     to: new Date(),
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const dateRangeLabel = useMemo(() => {
+    if (dateRange === "all") return "ทั้งหมด";
+    if (customRange?.from) {
+      const from = format(customRange.from, "d MMM yyyy", { locale: th });
+      const to = customRange.to ? format(customRange.to, "d MMM yyyy", { locale: th }) : from;
+      return from === to ? from : `${from} - ${to}`;
+    }
+    return "";
+  }, [dateRange, customRange]);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      // Allow charts to layout
+      await new Promise((r) => setTimeout(r, 400));
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: exportRef.current.scrollWidth,
+      });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const imgData = canvas.toDataURL("image/png");
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      const stamp = format(new Date(), "yyyy-MM-dd");
+      pdf.save(`analytics-${stamp}.pdf`);
+      toast.success("ส่งออก PDF เรียบร้อย");
+    } catch (err) {
+      console.error("PDF export failed", err);
+      toast.error("ส่งออก PDF ไม่สำเร็จ");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleDateRangeChange = (v: string) => {
     const range = v as DateRangeType;
@@ -478,6 +531,15 @@ const CallDashboard = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf || isLoading}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            {isExportingPdf ? "กำลังส่งออก..." : "Export PDF"}
+          </Button>
         </div>
       </div>
 
@@ -643,6 +705,53 @@ const CallDashboard = () => {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Hidden container used only for PDF export. Always mounted so charts size correctly. */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: "-100000px",
+          top: 0,
+          width: "1100px",
+          background: "#ffffff",
+          pointerEvents: "none",
+        }}
+      >
+        <div ref={exportRef} className="bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
+          <div className="flex items-start justify-between border-b pb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Analytics Report</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                ช่วงเวลา: {dateRangeLabel || "-"}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              สร้างเมื่อ {format(new Date(), "d MMM yyyy HH:mm", { locale: th })}
+            </p>
+          </div>
+
+          <AnalyticsStats callListItems={callListItems || []} />
+          <MainStatusOverview callListItems={callListItems || []} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <SubStatusOverview callListItems={callListItems || []} />
+            <OutcomeDistributionChart callListItems={callListItems || []} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
+            <BestTimeInsights callListItems={callListItems || []} />
+          </div>
+
+          <TrendChart callListItems={callListItems || []} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <HourlyPickupChart callListItems={callListItems || []} />
+            <DayOfWeekChart callListItems={callListItems || []} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
