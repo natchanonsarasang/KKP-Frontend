@@ -1642,9 +1642,46 @@ const CallList = () => {
       return;
     }
 
+    const thaiMonths: Record<string, string> = {
+      "มกราคม": "01", "กุมภาพันธ์": "02", "มีนาคม": "03", "เมษายน": "04",
+      "พฤษภาคม": "05", "มิถุนายน": "06", "กรกฎาคม": "07", "สิงหาคม": "08",
+      "กันยายน": "09", "ตุลาคม": "10", "พฤศจิกายน": "11", "ธันวาคม": "12",
+    };
+    const engMonths: Record<string, string> = {
+      january: "01", february: "02", march: "03", april: "04", may: "05",
+      june: "06", july: "07", august: "08", september: "09", october: "10",
+      november: "11", december: "12",
+      jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07",
+      aug: "08", sep: "09", sept: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const normalizeMonth = (m: string): string => {
+      const s = String(m || "").trim();
+      if (!s) return "";
+      if (/^\d{1,2}$/.test(s)) return s.padStart(2, "0");
+      if (thaiMonths[s]) return thaiMonths[s];
+      return engMonths[s.toLowerCase()] || "";
+    };
+    const formatDueDate = (vars: Record<string, string>, isoFallback: string | null | undefined): string => {
+      const dayRaw = String(vars.due_date || "").trim();
+      const monthRaw = String(vars.due_month || "").trim();
+      const yearRaw = String(vars.due_year || "").trim();
+      if (dayRaw && monthRaw && yearRaw) {
+        const dd = /^\d{1,2}$/.test(dayRaw) ? dayRaw.padStart(2, "0") : dayRaw;
+        const mm = normalizeMonth(monthRaw);
+        if (mm) return `${dd}/${mm}/${yearRaw}`;
+      }
+      const iso = String(isoFallback || "").trim();
+      if (iso && /^\d{4}-\d{2}-\d{2}/.test(iso)) {
+        const [y, m, d] = iso.slice(0, 10).split("-");
+        const buddhistYear = String(parseInt(y, 10) + 543);
+        return `${d}/${m}/${buddhistYear}`;
+      }
+      return "-";
+    };
+
     const exportData = completedItems.map((item) => {
       const debtor = item.debtor;
-      const vars = debtor?.variables || {};
+      const vars = (debtor?.variables || {}) as Record<string, string>;
       const rawAmount = vars.amount || vars.outstanding_amount;
       const amount = rawAmount != null && rawAmount !== ""
         ? Number(String(rawAmount).replace(/,/g, ""))
@@ -1652,7 +1689,7 @@ const CallList = () => {
       return {
         เบอร์โทร: debtor?.phone_number || "-",
         ชื่อ: vars.name || debtor?.name || "-",
-        วันครบกำหนด: vars.due_date || debtor?.due_date || "-",
+        วันครบกำหนด: formatDueDate(vars, debtor?.due_date),
         จำนวนเงิน: amount && Number.isFinite(amount) ? amount : "-",
         สถานะ: item.status,
         รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
