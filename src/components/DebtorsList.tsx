@@ -991,9 +991,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           "Outstanding Amount": v.outstanding_amount || "-",
           "Overdue Installments": v.overdue_installments || "-",
           "Due Date": dueParts.length > 0 ? dueParts.join(" ") : "-",
-          Picked: d.picked_up_count ?? 0,
-          "No Pick": d.not_picked_up_count ?? 0,
-          Calls: d.contact_attempts ?? 0,
+          Picked: callStats?.[d.phone_number]?.picked_up ?? 0,
+          "No Pick": callStats?.[d.phone_number]?.not_picked_up ?? 0,
+          Calls: callStats?.[d.phone_number]?.total ?? 0,
           "Last Contact": fmtLastContact(d.last_contact_at),
         };
       });
