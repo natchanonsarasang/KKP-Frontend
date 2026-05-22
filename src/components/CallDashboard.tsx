@@ -705,6 +705,53 @@ const CallDashboard = () => {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Hidden container used only for PDF export. Always mounted so charts size correctly. */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: "-100000px",
+          top: 0,
+          width: "1100px",
+          background: "#ffffff",
+          pointerEvents: "none",
+        }}
+      >
+        <div ref={exportRef} className="bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
+          <div className="flex items-start justify-between border-b pb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Analytics Report</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                ช่วงเวลา: {dateRangeLabel || "-"}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              สร้างเมื่อ {format(new Date(), "d MMM yyyy HH:mm", { locale: th })}
+            </p>
+          </div>
+
+          <AnalyticsStats callListItems={callListItems || []} />
+          <MainStatusOverview callListItems={callListItems || []} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <SubStatusOverview callListItems={callListItems || []} />
+            <OutcomeDistributionChart callListItems={callListItems || []} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
+            <BestTimeInsights callListItems={callListItems || []} />
+          </div>
+
+          <TrendChart callListItems={callListItems || []} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <HourlyPickupChart callListItems={callListItems || []} />
+            <DayOfWeekChart callListItems={callListItems || []} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
