@@ -2084,31 +2084,23 @@ const CallList = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs w-12">#</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("phone")}
                     >
                       <span className="flex items-center">
-                        Phone
+                        เบอร์โทร
                         {getSortIcon("phone")}
                       </span>
                     </TableHead>
-                    <TableHead
-                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("status")}
-                    >
-                      <span className="flex items-center">
-                        Status
-                        {getSortIcon("status")}
-                      </span>
-                    </TableHead>
+                    <TableHead className="text-xs">ชื่อ</TableHead>
+                    <TableHead className="text-xs">ยอด</TableHead>
                     <TableHead
                       className="text-xs cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("picked_up")}
                     >
                       <span className="flex items-center">
-                        Picked Up
+                        รับสาย
                         {getSortIcon("picked_up")}
                       </span>
                     </TableHead>
@@ -2117,8 +2109,17 @@ const CallList = () => {
                       onClick={() => handleSort("call_outcome")}
                     >
                       <span className="flex items-center">
-                        Outcome
+                        ผลการโทร
                         {getSortIcon("call_outcome")}
+                      </span>
+                    </TableHead>
+                    <TableHead
+                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      <span className="flex items-center">
+                        สถานะ
+                        {getSortIcon("status")}
                       </span>
                     </TableHead>
                     <TableHead
@@ -2126,17 +2127,8 @@ const CallList = () => {
                       onClick={() => handleSort("called_at")}
                     >
                       <span className="flex items-center">
-                        Called At
+                        เวลา
                         {getSortIcon("called_at")}
-                      </span>
-                    </TableHead>
-                    <TableHead
-                      className="text-xs cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("created_at")}
-                    >
-                      <span className="flex items-center">
-                        Created
-                        {getSortIcon("created_at")}
                       </span>
                     </TableHead>
                     <TableHead className="text-xs w-10"></TableHead>
