@@ -915,6 +915,121 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     }).format(amount);
   };
 
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      // Fetch ALL filtered rows across pages (mirrors debtorsData query, no .range)
+      const buildBaseQuery = () => {
+        let q = supabase.from("debtors").select("*");
+        if (currentWorkspace?.id) q = q.eq("workspace_id", currentWorkspace.id);
+        if (effectiveUserId) q = q.eq("user_id", effectiveUserId);
+        if (statusFilter !== "all") q = q.eq("status", statusFilter);
+        if (callStatusFilter === "never") {
+          const calledIds = Array.from(latestStatusByDebtor?.keys() ?? []);
+          if (calledIds.length > 0) {
+            q = q.not("id", "in", `(${calledIds.map((i) => `"${i}"`).join(",")})`);
+          }
+        } else if (callStatusFilter !== "all") {
+          const ids = filteredDebtorIds ?? [];
+          if (ids.length === 0) return null;
+          q = q.in("id", ids);
+        }
+        if (searchQuery) {
+          q = q.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
+        }
+        if (dateRange?.from) {
+          q = q.gte("date_con", format(startOfDay(dateRange.from), "yyyy-MM-dd"));
+        }
+        if (dateRange?.to || dateRange?.from) {
+          q = q.lte("date_con", format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd"));
+        }
+        if (sortField.startsWith("var:")) {
+          const varKey = sortField.replace("var:", "");
+          q = q.order(`variables->${varKey}`, { ascending: sortDirection === "asc", nullsFirst: false });
+        } else {
+          q = q.order(sortField, { ascending: sortDirection === "asc", nullsFirst: false });
+        }
+        return q;
+      };
+
+      const all: any[] = [];
+      const batchSize = 1000;
+      let from = 0;
+      while (true) {
+        const base = buildBaseQuery();
+        if (!base) break;
+        const { data, error } = await base.range(from, from + batchSize - 1);
+        if (error) throw error;
+        const chunk = data ?? [];
+        all.push(...chunk);
+        if (chunk.length < batchSize) break;
+        from += batchSize;
+      }
+
+      if (all.length === 0) {
+        toast.info("No debtors to export");
+        return;
+      }
+
+      const fmtLastContact = (iso: string | null | undefined) =>
+        iso
+          ? new Date(iso).toLocaleDateString("th-TH", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-";
+
+      const rows = all.map((d: any) => {
+        const v = (d.variables ?? {}) as Record<string, string>;
+        const rawStatus = latestStatusByDebtor?.get(d.id) ?? null;
+        const statusLabel = rawStatus ? resolveLatestStatusLabel(rawStatus) : "-";
+        const dueParts = [v.due_date, v.due_month, v.due_year].filter((p) => p && String(p).trim());
+        return {
+          Contact: d.phone_number || "-",
+          Name: v.name || "-",
+          "Latest Call Status": statusLabel || "-",
+          "Callback Date": d.date_con ? formatThaiBuddhistDate(d.date_con) : "-",
+          "Policy Number": v.policy_no || "-",
+          "Outstanding Amount": v.outstanding_amount || "-",
+          "Overdue Installments": v.overdue_installments || "-",
+          "Due Date": dueParts.length > 0 ? dueParts.join(" ") : "-",
+          Picked: d.picked_up_count ?? 0,
+          "No Pick": d.not_picked_up_count ?? 0,
+          Calls: d.contact_attempts ?? 0,
+          "Last Contact": fmtLastContact(d.last_contact_at),
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Debtors");
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      // UTF-8 BOM prefix for Thai text support
+      const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `debtors-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${rows.length} debtors`);
+    } catch (err: any) {
+      console.error("Export error:", err);
+      toast.error(err?.message || "Failed to export debtors");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       {/* Excel Upload Dialog */}
