@@ -147,3 +147,8 @@
     text-wrap: balance;
   }
 }
+
+.page-break-avoid {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
