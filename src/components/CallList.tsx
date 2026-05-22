@@ -2284,7 +2284,7 @@ const CallList = () => {
                                   backgroundColor: `${def.color}1a`,
                                 }}
                               >
-                                {def.thai || def.label}
+                                {def.label}
                               </Badge>
                             );
                           })()}
