@@ -1405,6 +1405,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           <TableCell>
                             <div className="font-mono text-sm">{maskPhoneNumber(debtor.phone_number)}</div>
                           </TableCell>
+                          <TableCell className="text-sm">
+                            {formatVariableValue("name", debtor.variables?.name)}
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {(() => {
                               const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
@@ -1431,9 +1434,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               {formatThaiBuddhistDate(debtor.date_con)}
                             </span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatVariableValue("name", debtor.variables?.name)}
                           </TableCell>
                           <TableCell className="text-sm">
                             {formatVariableValue("policy_no", debtor.variables?.policy_no)}
