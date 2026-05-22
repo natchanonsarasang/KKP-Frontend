@@ -1481,11 +1481,14 @@ const CallList = () => {
     );
   };
 
+  // processCount / Completed Call in DB is success, failed, completed
   const pendingCount =
     callListItems?.filter((item) => item.status === "pending" || item.status === "retry_pending").length || 0;
   const callingCount = callListItems?.filter((item) => item.status === "calling").length || 0;
   const processedCount =
-    callListItems?.filter((item) => item.status === "completed" || item.status === "failed").length || 0;
+    callListItems?.filter(
+      (item) => item.status === "completed" || item.status === "failed" || item.status === "success",
+    ).length || 0;
 
   // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
   // GLOBAL EXCLUSION: drop "incomplete" rows before any computation (hanged_up IS counted)
