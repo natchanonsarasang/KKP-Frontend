@@ -644,13 +644,22 @@ CRITICAL CLASSIFICATION RULES
    (a) The Bot has disclosed the debt details in the conversation_log, AND
    (b) The customer then provides a clear payment commitment tied to that disclosed debt.
    Then decide:
-   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date.
-   - "Planned More Than 3" → commitment is > 3 days from the call date.
+   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date (inclusive of exactly 3 days).
+   - "Planned More Than 3" → commitment is STRICTLY > 3 days from the call date (i.e. 4 or more days).
    If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+
+   3-DAY BOUNDARY RULE (STRICT):
+   The following Thai phrasings MUST be treated as ≤ 3 days and classified as "Promised to Pay" (assuming debt details were disclosed and a commitment was made). They MUST NEVER be classified as "Planned More Than 3":
+   - "อีก 3 วัน"
+   - "3 วัน"
+   - "ภายใน 3 วัน"
+   - "ไม่เกิน 3 วัน"
+   - any equivalent phrasing meaning "within / no more than / up to 3 days"
+   Only choose "Planned More Than 3" when the customer explicitly commits to a date that is 4 or more days after the call date (e.g. "อีก 5 วัน", "อาทิตย์หน้า", "สิ้นเดือน", a specific date > 3 days out).
 
 4. CLASSIFICATION LOGIC SUMMARY:
    - IF (Debt details NOT disclosed) → MUST be "Inconvenient (With Date)" or "Inconvenient (Without Date)" (regardless of any time/date mentioned), or another non-payment category if more appropriate (e.g. Wrong Person, Refused, Not Reached).
-   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days) or "Planned More Than 3" (> 3 days).
+   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days, inclusive) or "Planned More Than 3" (> 3 days, i.e. ≥ 4 days).
 
 5. ADDITIONAL GUIDELINES:
    - Conversation Behavior categories should ONLY be chosen when no clear business outcome above applies.
