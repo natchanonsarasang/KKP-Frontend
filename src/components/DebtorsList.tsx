@@ -1220,6 +1220,18 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Import Excel
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportExcel}
+            disabled={isExporting || totalCount === 0}
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            {isExporting ? "Exporting..." : "Export Excel"}
+          </Button>
           <Button onClick={() => setShowAddDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Debtor
