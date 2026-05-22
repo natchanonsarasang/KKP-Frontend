@@ -147,3 +147,18 @@ export function formatThaiBuddhistDate(iso: string | null | undefined): string {
     .format(d)
     .replace(/(\S+)\s/, "$1ที่ ");
 }
+
+/** Format date as DD/MM/YYYY in Buddhist Era, e.g. "22/05/2569". */
+export function formatThaiBuddhistDateShort(value: string | null | undefined): string {
+  if (!value) return "-";
+  const iso = String(value).slice(0, 10);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(`${iso}T00:00:00+07:00`)
+    : new Date(value);
+  if (isNaN(d.getTime())) return "-";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear() + 543;
+  return `${day}/${month}/${year}`;
+}
