@@ -139,6 +139,9 @@ const CallDashboard = () => {
         backgroundColor: "#ffffff",
         useCORS: true,
         windowWidth: container.scrollWidth,
+        windowHeight: container.scrollHeight,
+        width: container.scrollWidth,
+        height: container.scrollHeight,
       });
 
       const pdf = new jsPDF("p", "mm", "a4");
