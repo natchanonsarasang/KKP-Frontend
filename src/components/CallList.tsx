@@ -2250,6 +2250,33 @@ const CallList = () => {
                         <TableCell>{getPickedUpDisplay()}</TableCell>
                         <TableCell>{getOutcomeDisplay()}</TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const cat = item.ai_category;
+                            if (!cat) return <span className="text-muted-foreground">-</span>;
+                            const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
+                            const label = resolveLatestStatusLabel(cat);
+                            if (!def) {
+                              return (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                  {label}
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  color: def.color,
+                                  borderColor: `${def.color}66`,
+                                  backgroundColor: `${def.color}1a`,
+                                }}
+                              >
+                                {def.thai || def.label}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {item.called_at
                             ? new Date(item.called_at).toLocaleString("th-TH", {
