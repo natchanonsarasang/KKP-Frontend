@@ -81,6 +81,7 @@ interface CallListItem {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  ai_category?: string | null;
   debtor?: Debtor;
 }
 
