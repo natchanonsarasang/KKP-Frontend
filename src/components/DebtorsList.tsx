@@ -1287,6 +1287,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                       </TableHead>
                       <TableHead className="text-xs w-12">#</TableHead>
                       <TableHead className="text-xs">Contact</TableHead>
+                      <TableHead className="text-xs">Name</TableHead>
                       <TableHead className="text-xs">Latest Call Status</TableHead>
                       <TableHead
                         className="text-xs cursor-pointer hover:bg-muted/50 select-none"
@@ -1297,7 +1298,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                           {getSortIcon("date_con")}
                         </div>
                       </TableHead>
-                      <TableHead className="text-xs">Name</TableHead>
                       <TableHead className="text-xs whitespace-nowrap">Policy Number</TableHead>
                       <TableHead className="text-xs whitespace-nowrap">Outstanding Amount</TableHead>
                       <TableHead className="text-xs whitespace-nowrap">Overdue Installment</TableHead>
