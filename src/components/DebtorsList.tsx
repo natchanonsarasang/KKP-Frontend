@@ -971,6 +971,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           ? new Date(iso).toLocaleDateString("th-TH", {
               day: "numeric",
               month: "long", // full month name
+              year: "numeric", // full year number (B.E)
               hour: "2-digit",
               minute: "2-digit",
             })
