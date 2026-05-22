@@ -322,6 +322,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   // Variable columns: standard customer keys first, then any legacy keys
   // Pinned keys are rendered as dedicated fixed columns and excluded here.
   const PINNED_VARIABLE_KEYS = ["name", "policy_no", "outstanding_amount", "overdue_installments"] as const;
+  const HIDDEN_VARIABLE_KEYS = ["due_date_iso", "paid_date_iso", "policy_number", "price"] as const;
   const variableColumns = useMemo(() => {
     if (!debtors?.length) return [];
     const allKeys = new Set(
