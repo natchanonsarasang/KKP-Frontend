@@ -195,6 +195,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const [showExcelUpload, setShowExcelUpload] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Selection for send to call list
   const [selectedDebtors, setSelectedDebtors] = useState<Set<string>>(new Set());
