@@ -520,7 +520,14 @@ const CallDashboard = () => {
                           <TableRow key={record.id}>
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
                             <TableCell className="text-sm">{record.debtor_name || "-"}</TableCell>
-                            <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
+                            <TableCell className="text-sm">{(() => {
+                              const n = Number(record.amount);
+                              return record.amount
+                                ? Number.isFinite(n)
+                                  ? `฿${new Intl.NumberFormat("th-TH").format(n)}`
+                                  : `฿${record.amount}`
+                                : "-";
+                            })()}</TableCell>
                             <TableCell>
                               {record.picked_up === true ? (
                                 <Badge variant="secondary" className="bg-success/10 text-success text-xs">ใช่</Badge>
