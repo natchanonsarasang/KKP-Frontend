@@ -1689,15 +1689,25 @@ const CallList = () => {
       const amount = rawAmount != null && rawAmount !== ""
         ? Number(String(rawAmount).replace(/,/g, ""))
         : debtor?.total_debt;
+
+      // AI Status label (matches table badge)
+      const cat = item.ai_category;
+      let aiStatus = "-";
+      if (cat) {
+        const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
+        aiStatus = def ? (def.thai || def.label) : resolveLatestStatusLabel(cat);
+      }
+
       return {
         เบอร์โทร: debtor?.phone_number || "-",
         ชื่อ: vars.name || debtor?.name || "-",
+        ยอด: amount && Number.isFinite(amount) ? amount : "-",
         วันครบกำหนด: formatDueDate(vars, debtor?.due_date),
-        จำนวนเงิน: amount && Number.isFinite(amount) ? amount : "-",
-        สถานะ: item.status,
         รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
         ผลการโทร: item.call_outcome || "-",
-        วันที่โทร: item.called_at ? new Date(item.called_at).toLocaleString() : "-",
+        สถานะ: item.status,
+        "AI Status": aiStatus,
+        เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
       };
     });
 
