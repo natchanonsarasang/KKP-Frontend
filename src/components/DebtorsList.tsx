@@ -1006,19 +1006,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Debtors");
-      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-      // UTF-8 BOM prefix for Thai text support
-      const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), buf], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `debtors-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      // Auto-size columns
+      const colWidths = Object.keys(rows[0] || {}).map((key) => ({
+        wch: Math.max(key.length, 15),
+      }));
+      ws["!cols"] = colWidths;
+
+      const fileName = `debtors-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      XLSX.writeFile(wb, fileName);
 
       toast.success(`Exported ${rows.length} debtors`);
     } catch (err: any) {
