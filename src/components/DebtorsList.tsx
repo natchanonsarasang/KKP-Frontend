@@ -1004,7 +1004,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
       // Auto-size columns
       const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-        wch: Math.max(key.length, 15),
+        wch: Math.max(key.length, ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length)),
       }));
       ws["!cols"] = colWidths;
 
