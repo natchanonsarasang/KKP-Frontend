@@ -1708,7 +1708,7 @@ const CallList = () => {
         รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
         ผลการโทร: item.call_outcome || "-",
         สถานะ: item.status,
-        "AI Status": aiStatus,
+        "Call Status": aiStatus,
         เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
         conversationlog: conversationLog || "-",
         audio_url: audioUrl || "-",
