@@ -71,6 +71,7 @@ import {
   parseDebtAmountForColumn,
   splitThaiDate,
   formatThaiBuddhistDate,
+  formatThaiBuddhistDateShort,
 } from "@/lib/debtorVariables";
 import {
   MAIN_STATUSES,
@@ -1031,7 +1032,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           Contact: d.phone_number || "-",
           Name: v.name || "-",
           "Latest Call Status": statusLabel || "-",
-          "Callback Date": d.date_con ? formatThaiBuddhistDate(d.date_con) : "-",
+          "Callback Date": d.date_con ? formatThaiBuddhistDateShort(d.date_con) : "-",
           "Policy Number": v.policy_no || "-",
           "Outstanding Amount": v.outstanding_amount || "-",
           "Overdue Installments": v.overdue_installments || "-",
@@ -1579,7 +1580,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                             </TableCell>
                             <TableCell>
                               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {formatThaiBuddhistDate(debtor.date_con)}
+                                {formatThaiBuddhistDateShort(debtor.date_con)}
                               </span>
                             </TableCell>
                             <TableCell className="text-sm">
