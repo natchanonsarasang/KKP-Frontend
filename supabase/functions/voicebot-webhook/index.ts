@@ -628,14 +628,19 @@ Conversation Behaviors (use ONLY when no clear business outcome above exists):
 - Out of Topic     → Customer kept talking about unrelated topics with no resolution.
 
 CRITICAL CLASSIFICATION RULES
-1. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior.
-   If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a business outcome (e.g. Promised to Pay, Refused, Inconvenient (With Date)) appear in the same call, choose the BUSINESS OUTCOME.
-2. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
-3. Decide based on the FINAL state of the call, not transient mid-call events.
-4. For any payment commitment, you MUST decide between "Promised to Pay" (≤ 3 days from the call date) and "Planned More Than 3" (> 3 days). Compute the gap relative to the call/reference date in the transcript. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
-5. "Inconvenient (With Date)" requires a concrete time/date agreement for a CALLBACK (not a payment). If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
-6. "Refused" requires a clear refusal — not just reluctance or "not convenient".
-7. If unsure between "Planned More Than 3" and a behavior category, prefer "Planned More Than 3" when the customer engaged with the debt info.
+1. CONTEXT & FLOW CHECK (HIGHEST PRIORITY):
+   a. Verification Requirement: Inspect the conversation log to determine whether the Bot has already provided the "Debt Details" to the customer (e.g. license plate number, installment number, outstanding amount, due date). Treat these concrete debt facts as the trigger that unlocks payment-commitment classifications.
+   b. Inconvenient Handling: If the Bot has NOT yet provided the debt details and the customer offers a date/time (e.g. "พรุ่งนี้", "tomorrow", "อาทิตย์หน้า", "next week"), this is a CALLBACK request — classify as "Inconvenient (With Date)". Do NOT classify it as "Promised to Pay" or "Planned More Than 3".
+   c. Payment Promise Validation: ONLY if the Bot has already disclosed the debt details AND the customer then agrees to a payment date may you choose "Promised to Pay" (≤ 3 days) or "Planned More Than 3" (> 3 days).
+2. PRIORITY OVERHAUL: When the customer's intent is rescheduling or asking for a follow-up call, "Inconvenient (With Date)" and "Inconvenient (Without Date)" take the HIGHEST priority over any payment-commitment status.
+3. KEYWORD RESTRICTION: Do NOT use date keywords like "tomorrow", "next week", "พรุ่งนี้", or "อาทิตย์หน้า" alone to trigger a payment status. A payment status requires explicit confirmation tied to the specific debt amount the Bot disclosed.
+4. ALWAYS prioritize the FINAL BUSINESS OUTCOME over intermediate conversation behavior — but only after the Context & Flow Check above is satisfied. If both a behavior (e.g. Not Convenient, Out of Topic, Background Noise) AND a qualifying business outcome appear in the same call, choose the BUSINESS OUTCOME.
+5. Conversation Behavior categories should ONLY be chosen when the call ended WITHOUT any clear business outcome.
+6. Decide based on the FINAL state of the call, not transient mid-call events.
+7. For any qualifying payment commitment (per rule 1c), decide between "Promised to Pay" (≤ 3 days from the call date) and "Planned More Than 3" (> 3 days). Compute the gap relative to the call/reference date in the transcript. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+8. "Inconvenient (With Date)" requires a concrete time/date agreement for a CALLBACK (not a payment). If the customer is unavailable but gives no specific time, choose "Inconvenient (Without Date)".
+9. "Refused" requires a clear refusal — not just reluctance or "not convenient".
+10. If unsure between "Planned More Than 3" and a behavior category, prefer "Planned More Than 3" only when the debt details were disclosed and the customer engaged with them.
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
