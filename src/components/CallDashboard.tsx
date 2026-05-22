@@ -731,24 +731,42 @@ const CallDashboard = () => {
             </p>
           </div>
 
-          <AnalyticsStats callListItems={callListItems || []} />
-          <MainStatusOverview callListItems={callListItems || []} />
-
-          <div className="grid grid-cols-2 gap-4">
-            <SubStatusOverview callListItems={callListItems || []} />
-            <OutcomeDistributionChart callListItems={callListItems || []} />
+          <div className="page-break-avoid">
+            <AnalyticsStats callListItems={callListItems || []} />
+          </div>
+          <div className="page-break-avoid">
+            <MainStatusOverview callListItems={callListItems || []} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
-            <BestTimeInsights callListItems={callListItems || []} />
+            <div className="page-break-avoid">
+              <SubStatusOverview callListItems={callListItems || []} />
+            </div>
+            <div className="page-break-avoid">
+              <OutcomeDistributionChart callListItems={callListItems || []} />
+            </div>
           </div>
 
-          <TrendChart callListItems={callListItems || []} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="page-break-avoid">
+              <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
+            </div>
+            <div className="page-break-avoid">
+              <BestTimeInsights callListItems={callListItems || []} />
+            </div>
+          </div>
+
+          <div className="page-break-avoid">
+            <TrendChart callListItems={callListItems || []} />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <HourlyPickupChart callListItems={callListItems || []} />
-            <DayOfWeekChart callListItems={callListItems || []} />
+            <div className="page-break-avoid">
+              <HourlyPickupChart callListItems={callListItems || []} />
+            </div>
+            <div className="page-break-avoid">
+              <DayOfWeekChart callListItems={callListItems || []} />
+            </div>
           </div>
         </div>
       </div>
