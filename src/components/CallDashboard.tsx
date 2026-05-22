@@ -265,9 +265,22 @@ const CallDashboard = () => {
     return callRecords.map((record) => {
       const debtor = debtorByPhone.get(record.phone_number);
       const cli = cliByRecordId.get(record.id);
+      const vars = debtor?.variables || {};
+      const debtorName =
+        vars.name ||
+        (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
+      const amountVal =
+        vars.amount ||
+        vars.outstanding_amount ||
+        (debtor?.total_debt != null ? String(debtor.total_debt) : "") ||
+        record.amount ||
+        "";
+      const dueDateVal = vars.due_date || debtor?.due_date || record.due_date || "";
       return {
         ...record,
-        debtor_name: debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "",
+        debtor_name: debtorName,
+        amount: amountVal,
+        due_date: dueDateVal,
         picked_up: cli?.picked_up ?? null,
         call_outcome: cli?.call_outcome ?? null,
       };
