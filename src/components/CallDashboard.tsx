@@ -775,7 +775,7 @@ const CallDashboard = () => {
           pointerEvents: "none",
         }}
       >
-        <div ref={exportRef} className="bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
+        <div ref={exportRef} className="pdf-export bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
           <div className="flex items-start justify-between border-b pb-4">
             <div>
               <h2 className="text-2xl font-bold">Analytics Report</h2>
