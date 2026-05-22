@@ -224,7 +224,7 @@ const CallDashboard = () => {
       if (!currentWorkspace?.id) return [];
       const { data, error } = await supabase
         .from("debtors")
-        .select("id, name, last_name, phone_number")
+        .select("id, name, last_name, phone_number, total_debt, due_date, variables")
         .eq("workspace_id", currentWorkspace.id);
       if (error) throw error;
       return data as Debtor[];
