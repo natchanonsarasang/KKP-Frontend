@@ -1625,19 +1625,20 @@ const CallList = () => {
 
   // Export completed calls to Excel
   const handleExportCompletedCalls = useCallback(() => {
-    const completedItems = (callListItems || []).filter((item) =>
-      [
-        "confirmed",
-        "declined",
-        "completed",
-        "failed",
-        "no_answer",
-        "busy",
-        "cancelled",
-        "invalid_number",
-        "timeout",
-      ].includes(item.status),
-    );
+    const completedStatuses = new Set([
+      "completed",
+      "success",
+      "confirmed",
+      "declined",
+      "no_answer",
+      "no_response",
+      "failed",
+      "busy",
+      "cancelled",
+      "invalid_number",
+      "timeout",
+    ]);
+    const completedItems = (callListItems || []).filter((item) => completedStatuses.has(item.status));
 
     if (completedItems.length === 0) {
       toast.error("No completed calls to export");
