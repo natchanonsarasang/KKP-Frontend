@@ -1642,29 +1642,22 @@ const CallList = () => {
       return;
     }
 
-    const exportData = completedItems.map((item, index) => {
-      const notesData = parseNotesData(item.notes);
+    const exportData = completedItems.map((item) => {
+      const debtor = item.debtor;
+      const vars = debtor?.variables || {};
+      const rawAmount = vars.amount || vars.outstanding_amount;
+      const amount = rawAmount != null && rawAmount !== ""
+        ? Number(String(rawAmount).replace(/,/g, ""))
+        : debtor?.total_debt;
       return {
-        "#": index + 1,
-        "Phone Number": item.debtor?.phone_number || "Unknown",
-        Name: item.debtor?.name || "-",
-        Status: item.status,
-        "Picked Up": item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
-        Outcome: item.call_outcome || "-",
-        "Called At": item.called_at ? new Date(item.called_at).toLocaleString() : "-",
-        "Created At": new Date(item.created_at).toLocaleString(),
-        "Conversation Log": notesData.conversationLog || "-",
-        "Full Data (JSON)": JSON.stringify({
-          id: item.id,
-          debtor_id: item.debtor_id,
-          status: item.status,
-          picked_up: item.picked_up,
-          call_outcome: item.call_outcome,
-          called_at: item.called_at,
-          created_at: item.created_at,
-          notes: item.notes,
-          debtor: item.debtor,
-        }),
+        เบอร์โทร: debtor?.phone_number || "-",
+        ชื่อ: vars.name || debtor?.name || "-",
+        วันครบกำหนด: vars.due_date || debtor?.due_date || "-",
+        จำนวนเงิน: amount && Number.isFinite(amount) ? amount : "-",
+        สถานะ: item.status,
+        รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
+        ผลการโทร: item.call_outcome || "-",
+        วันที่โทร: item.called_at ? new Date(item.called_at).toLocaleString() : "-",
       };
     });
 
