@@ -1,8 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -16,7 +22,14 @@ import { toast } from "sonner";
 import { listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
-import { Loader2, RefreshCcw, ArrowRight, Send } from "lucide-react";
+import {
+  Loader2,
+  RefreshCcw,
+  ArrowRight,
+  Send,
+  Search,
+  Users,
+} from "lucide-react";
 
 interface Props {
   onNextStep: () => void;
@@ -26,6 +39,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const [offsetStack, setOffsetStack] = useState<(string | undefined)[]>([undefined]);
   const currentOffset = offsetStack[offsetStack.length - 1];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
@@ -37,16 +51,32 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
   const customers = data?.customers ?? [];
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter((c) => {
+      const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
+      return (
+        name.includes(q) ||
+        (c.phone1 || "").toLowerCase().includes(q) ||
+        (c.phone2 || "").toLowerCase().includes(q) ||
+        (c.phone3 || "").toLowerCase().includes(q) ||
+        (c.campaign || "").toLowerCase().includes(q) ||
+        (c.routingGroup || "").toLowerCase().includes(q)
+      );
+    });
+  }, [customers, search]);
+
   // Rows that have at least one valid phone number can be queued.
   const callable = useMemo(
     () =>
-      customers.filter(
+      filtered.filter(
         (c) =>
           normalizeThaiPhone(c.phone1) ||
           normalizeThaiPhone(c.phone2) ||
           normalizeThaiPhone(c.phone3),
       ),
-    [customers],
+    [filtered],
   );
 
   const allSelected =
@@ -89,147 +119,199 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         `Added ${added} customer${added > 1 ? "s" : ""} to the call list`,
       );
     }
-    // Always advance to the Call List step so the user lands where work happens.
     onNextStep();
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Customers</h2>
-          <p className="text-sm text-muted-foreground">
-            Live data from Airtable · {queued.length} in call queue
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={sendSelectedToCallList}
-            disabled={selectedIds.size === 0}
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Send to Call List ({selectedIds.size})
-          </Button>
-          <Button onClick={onNextStep}>
-            Next: Call List
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            <CardTitle className="text-xl">Customers</CardTitle>
+            <Badge variant="secondary" className="ml-2">
+              {queued.length} in queue
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCcw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={sendSelectedToCallList}
+              disabled={selectedIds.size === 0}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Send to Call List ({selectedIds.size})
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onNextStep}>
+              Next: Call List
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </CardHeader>
 
-      <Card className="p-0 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Loading customers...
+        <CardContent className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, phone, campaign…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        ) : isError ? (
-          <div className="p-6 text-sm text-destructive">
-            {(error as Error)?.message || "Failed to load customers."}
-            <p className="mt-2 text-muted-foreground">
-              Make sure the Airtable secrets <code>AIRTABLE_PAT</code> and <code>AIRTABLE_BASE_ID</code> are set.
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all"
-                    disabled={callable.length === 0}
-                  />
-                </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Routing</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Consent</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    No customers found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                customers.map((c) => {
-                  const hasPhone =
-                    !!normalizeThaiPhone(c.phone1) ||
-                    !!normalizeThaiPhone(c.phone2) ||
-                    !!normalizeThaiPhone(c.phone3);
-                  const inQueue = queuedIds.has(c.id);
-                  return (
-                    <TableRow key={c.id} data-state={selectedIds.has(c.id) ? "selected" : undefined}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(c.id)}
-                          onCheckedChange={() => toggleOne(c.id)}
-                          disabled={!hasPhone}
-                          aria-label="Select customer"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
-                        {c.duplicateFlag && (
-                          <Badge variant="outline" className="ml-2">dup</Badge>
-                        )}
-                        {inQueue && (
-                          <Badge variant="secondary" className="ml-2">in queue</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {hasPhone ? (
-                          c.phone1 || c.phone2 || c.phone3
-                        ) : (
-                          <span className="text-muted-foreground">no valid phone</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{c.routingGroup || "—"}</TableCell>
-                      <TableCell>{c.campaign || "—"}</TableCell>
-                      <TableCell>
-                        {c.consentStatus ? (
-                          <Badge variant="secondary">{c.consentStatus}</Badge>
-                        ) : (
-                          "—"
-                        )}
+
+          <div className="rounded-md border overflow-hidden">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Loading customers...
+              </div>
+            ) : isError ? (
+              <div className="p-6 text-sm text-destructive">
+                {(error as Error)?.message || "Failed to load customers."}
+                <p className="mt-2 text-muted-foreground">
+                  Make sure the Airtable secrets <code>AIRTABLE_PAT</code> and{" "}
+                  <code>AIRTABLE_BASE_ID</code> are set.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          allSelected ? true : someSelected ? "indeterminate" : false
+                        }
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all"
+                        disabled={callable.length === 0}
+                      />
+                    </TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Routing</TableHead>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Consent</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center text-muted-foreground py-8"
+                      >
+                        No customers found.
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                  ) : (
+                    filtered.map((c) => {
+                      const hasPhone =
+                        !!normalizeThaiPhone(c.phone1) ||
+                        !!normalizeThaiPhone(c.phone2) ||
+                        !!normalizeThaiPhone(c.phone3);
+                      const inQueue = queuedIds.has(c.id);
+                      return (
+                        <TableRow
+                          key={c.id}
+                          data-state={selectedIds.has(c.id) ? "selected" : undefined}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds.has(c.id)}
+                              onCheckedChange={() => toggleOne(c.id)}
+                              disabled={!hasPhone}
+                              aria-label="Select customer"
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {[c.firstName, c.lastName].filter(Boolean).join(" ") ||
+                              "—"}
+                            {c.duplicateFlag && (
+                              <Badge variant="outline" className="ml-2">
+                                dup
+                              </Badge>
+                            )}
+                            {inQueue && (
+                              <Badge variant="secondary" className="ml-2">
+                                in queue
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {hasPhone ? (
+                              c.phone1 || c.phone2 || c.phone3
+                            ) : (
+                              <span className="text-muted-foreground">
+                                no valid phone
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>{c.routingGroup || "—"}</TableCell>
+                          <TableCell>{c.campaign || "—"}</TableCell>
+                          <TableCell>
+                            {c.consentStatus ? (
+                              <Badge variant="secondary">{c.consentStatus}</Badge>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={offsetStack.length <= 1}
-          onClick={() => setOffsetStack((s) => s.slice(0, -1))}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!data?.offset}
-          onClick={() => data?.offset && setOffsetStack((s) => [...s, data.offset])}
-        >
-          Next
-        </Button>
-      </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {filtered.length} of {customers.length} on this page
+              {selectedIds.size > 0 && (
+                <>
+                  {" · "}
+                  <span className="font-medium text-foreground">
+                    {selectedIds.size} selected
+                  </span>
+                </>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={offsetStack.length <= 1}
+                onClick={() => setOffsetStack((s) => s.slice(0, -1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!data?.offset}
+                onClick={() =>
+                  data?.offset && setOffsetStack((s) => [...s, data.offset])
+                }
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
