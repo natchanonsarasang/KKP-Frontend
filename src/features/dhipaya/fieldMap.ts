@@ -10,7 +10,7 @@ export const CUSTOMER_FIELDS = {
   duplicateFlag: "Duplicate_Flag",
   routingGroup: "Routing_Group",
   campaign: "Campaign",
-  consentStatus: "Consent_Status",
+  consentStatus: "Consent_Status (from Consents)",
 } as const;
 
 export const POLICY_FIELDS = {
