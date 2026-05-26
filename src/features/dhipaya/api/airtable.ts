@@ -20,7 +20,21 @@ export interface ListResponse<F = AnyFields> {
 }
 
 async function call<T = unknown>(body: ProxyRequest): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("dhipaya-airtable", { body });
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("Airtable request timed out. Please try Sync again.")),
+      25000,
+    );
+  });
+
+  const { data, error } = await Promise.race([
+    supabase.functions.invoke("dhipaya-airtable", { body }),
+    timeout,
+  ]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+
   if (error) throw new Error(error.message);
   if (data && typeof data === "object" && "error" in (data as Record<string, unknown>)) {
     throw new Error(String((data as { error: string }).error));
