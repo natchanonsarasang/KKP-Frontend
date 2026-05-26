@@ -295,8 +295,7 @@ const DhipayaCallList = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Original</TableHead>
-                      <TableHead>Normalized</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Policy</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -304,7 +303,7 @@ const DhipayaCallList = () => {
                   <TableBody>
                     {rowsByTab[tab].length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                           No items.
                         </TableCell>
                       </TableRow>
