@@ -137,7 +137,7 @@ const DhipayaCallList = () => {
       };
       const { data: resp, error: invokeErr } = await supabase.functions.invoke(
         "voicebot-make-call",
-        { body: { phone_number: row.phone, variables, interruptible: false } },
+        { body: { phone_number: row.selectedPhone, variables, interruptible: false } },
       );
       if (invokeErr) throw new Error(invokeErr.message);
       const status: QueueStatus =
@@ -316,8 +316,38 @@ const DhipayaCallList = () => {
                               .filter(Boolean)
                               .join(" ") || "—"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{r.rawPhone}</TableCell>
-                          <TableCell className="font-mono">{r.phone}</TableCell>
+                          <TableCell>
+                            {r.status === "pending" && r.phoneOptions.length > 1 ? (
+                              <Select
+                                value={r.selectedPhone}
+                                onValueChange={(v) => updateRow(r.id, { selectedPhone: v })}
+                              >
+                                <SelectTrigger className="h-8 w-[180px] font-mono">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {r.phoneOptions.map((opt) => (
+                                    <SelectItem key={opt.phone} value={opt.phone}>
+                                      <span className="font-mono mr-2">{opt.phone}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {opt.label}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="font-mono">{r.selectedPhone}</span>
+                            )}
+                            {(() => {
+                              const sel = r.phoneOptions.find((o) => o.phone === r.selectedPhone);
+                              return sel ? (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {sel.label} · {sel.raw}
+                                </p>
+                              ) : null;
+                            })()}
+                          </TableCell>
                           <TableCell>{r.customer.policyNumber || "—"}</TableCell>
                           <TableCell>
                             <StatusBadge status={r.status} />
