@@ -31,7 +31,7 @@ async function call<T = unknown>(body: ProxyRequest): Promise<T> {
 export async function listCustomers(opts?: { pageSize?: number; offset?: string }): Promise<{ customers: Customer[]; offset?: string }> {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
-  const res = await call<ListResponse>({ action: "list", table: "customers", params });
+  const res = await call<ListResponse>({ action: "list", table: "Customer", params });
   return {
     customers: res.records.map(mapCustomer),
     offset: res.offset,
