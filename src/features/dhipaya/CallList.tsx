@@ -18,6 +18,13 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Phone,
@@ -39,11 +46,17 @@ const CONCURRENCY = 5;
 
 type QueueStatus = "pending" | "calling" | "success" | "failed" | "no_answer";
 
+interface PhoneOption {
+  label: string; // e.g. "Phone 1"
+  raw: string;
+  phone: string; // normalized
+}
+
 interface QueueRow {
   id: string;
   customer: Customer;
-  rawPhone: string;
-  phone: string;
+  phoneOptions: PhoneOption[];
+  selectedPhone: string; // normalized; one of phoneOptions[].phone
   status: QueueStatus;
   startedAt?: number;
   finishedAt?: number;
@@ -88,17 +101,25 @@ const DhipayaCallList = () => {
     if (!data?.customers || queue.length > 0) return;
     const rows: QueueRow[] = [];
     for (const c of data.customers) {
-      const raw = c.phone1 || c.phone2 || c.phone3;
-      const phone = normalizeThaiPhone(raw);
-      if (raw && phone) {
-        rows.push({
-          id: c.id,
-          customer: c,
-          rawPhone: raw,
-          phone,
-          status: "pending",
-        });
+      const candidates: Array<{ label: string; raw?: string }> = [
+        { label: "Phone 1", raw: c.phone1 },
+        { label: "Phone 2", raw: c.phone2 },
+        { label: "Phone 3", raw: c.phone3 },
+      ];
+      const phoneOptions: PhoneOption[] = [];
+      for (const { label, raw } of candidates) {
+        if (!raw) continue;
+        const phone = normalizeThaiPhone(raw);
+        if (phone) phoneOptions.push({ label, raw, phone });
       }
+      if (phoneOptions.length === 0) continue;
+      rows.push({
+        id: c.id,
+        customer: c,
+        phoneOptions,
+        selectedPhone: phoneOptions[0].phone,
+        status: "pending",
+      });
     }
     setQueue(rows);
   }, [data, queue.length]);
