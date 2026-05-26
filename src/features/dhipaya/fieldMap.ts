@@ -12,7 +12,6 @@ export const CUSTOMER_FIELDS = {
   campaign: "Campaign",
   consentStatus: "Consent_Status (from Consents)",
   policyNumber: "Policy_Number",
-  policyNumber: "Policy_Number",
   policyStatus: "Policy_Status",
   outstandingBalance: "Outstanding_Balance",
 } as const;
