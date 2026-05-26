@@ -90,7 +90,7 @@ serve(async (req) => {
       event_id: eventId,
       tel_number: phone_number,
       phonenumber: phone_number,
-      variables: preparedVariables
+      variables: preparedVariables,
       sourcephone: "3525<SOURCE_PHONE_NUMBER>",
       speaker: "212",
       language: "th",
