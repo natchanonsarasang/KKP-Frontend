@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Customer } from "./types";
+import type { Customer } from "../types";
 
 // Tiny pub/sub store shared between CustomersList and CallList.
 let queued: Customer[] = [];

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,15 +30,18 @@ import {
   PhoneOff,
   Play,
   Square,
-  Loader2,
-  RefreshCcw,
   CheckCircle,
-  XCircle,
   Clock,
   AlertCircle,
+  Trash2,
+  Inbox,
 } from "lucide-react";
-import { listCustomers } from "./api/airtable";
 import { normalizeThaiPhone } from "./lib/phone";
+import {
+  useCallQueue,
+  clearCallQueue,
+  removeFromCallQueue,
+} from "./lib/callQueueStore";
 import type { Customer } from "./types";
 
 const CONCURRENCY = 5;
