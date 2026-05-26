@@ -34,8 +34,11 @@ export interface QueueRow {
   appointmentTime?: string | null;
 }
 
+// Shared Dhipaya workspace — every authenticated user is a member (see migration).
+export const DHIPAYA_WORKSPACE_ID = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1";
+
 // ---------- module state ----------
-let activeWorkspaceId: string | null = null;
+let activeWorkspaceId: string | null = DHIPAYA_WORKSPACE_ID;
 let activeUserId: string | null = null;
 let rows: QueueRow[] = [];
 let sessionRunning = false;
