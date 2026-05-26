@@ -1,7 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { listCallLogs } from "./api/airtable";
-import { Loader2, Phone, PhoneCall, PhoneOff, Clock } from "lucide-react";
+import {
+  Loader2,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  Clock,
+  BarChart3,
+} from "lucide-react";
 
 const DhipayaAnalytics = () => {
   const { data, isLoading, isError, error } = useQuery({
@@ -11,29 +24,42 @@ const DhipayaAnalytics = () => {
 
   const logs = data?.logs ?? [];
   const total = logs.length;
-  const answered = logs.filter((l) => l.outcome && l.outcome.toLowerCase().includes("answer")).length;
-  const noAnswer = logs.filter((l) => l.outcome && l.outcome.toLowerCase().includes("no")).length;
+  const answered = logs.filter(
+    (l) => l.outcome && l.outcome.toLowerCase().includes("answer"),
+  ).length;
+  const noAnswer = logs.filter(
+    (l) => l.outcome && l.outcome.toLowerCase().includes("no"),
+  ).length;
   const avgDuration =
-    total === 0 ? 0 : Math.round(logs.reduce((s, l) => s + (l.duration ?? 0), 0) / total);
+    total === 0
+      ? 0
+      : Math.round(logs.reduce((s, l) => s + (l.duration ?? 0), 0) / total);
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center gap-2">
+        <BarChart3 className="w-5 h-5 text-primary" />
         <h2 className="text-2xl font-semibold tracking-tight">Analytics</h2>
-        <p className="text-sm text-muted-foreground">Call activity from Airtable</p>
+        <Badge variant="secondary" className="ml-2">
+          Airtable
+        </Badge>
       </div>
 
       {isError && (
-        <Card className="p-4 text-sm text-destructive">
-          {(error as Error)?.message || "Failed to load analytics."}
+        <Card>
+          <CardContent className="p-4 text-sm text-destructive">
+            {(error as Error)?.message || "Failed to load analytics."}
+          </CardContent>
         </Card>
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-          Loading analytics...
-        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            Loading analytics...
+          </CardContent>
+        </Card>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-4">
@@ -43,22 +69,31 @@ const DhipayaAnalytics = () => {
             <StatCard label="Avg Duration (s)" value={avgDuration} icon={Clock} />
           </div>
 
-          <Card className="p-6">
-            <h3 className="font-medium mb-3">Recent Calls</h3>
-            <div className="text-sm text-muted-foreground">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Recent Calls</CardTitle>
+            </CardHeader>
+            <CardContent>
               {logs.length === 0 ? (
-                "No call logs found in Airtable yet."
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No call logs found in Airtable yet.
+                </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="divide-y divide-border">
                   {logs.slice(0, 10).map((l) => (
-                    <li key={l.id} className="flex items-center justify-between border-b border-border/50 pb-2">
-                      <span>{l.outcome || "—"}</span>
-                      <span className="text-xs">{l.calledAt || ""}</span>
+                    <li
+                      key={l.id}
+                      className="flex items-center justify-between py-2.5 text-sm"
+                    >
+                      <span className="font-medium">{l.outcome || "—"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {l.calledAt || ""}
+                      </span>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
+            </CardContent>
           </Card>
         </>
       )}
@@ -72,14 +107,18 @@ interface StatProps {
   icon: React.ComponentType<{ className?: string }>;
 }
 const StatCard = ({ label, value, icon: Icon }: StatProps) => (
-  <Card className="p-4 flex items-center gap-3">
-    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-      <Icon className="w-5 h-5 text-primary" />
-    </div>
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-    </div>
+  <Card>
+    <CardContent className="p-4 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+        <Icon className="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <div className="text-2xl font-semibold">{value}</div>
+      </div>
+    </CardContent>
   </Card>
 );
 
