@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const BOT_ID = "6a0c3158b875327d960f0936";
-const BOT_TYPE = "init";
+const BOT_TYPE = "check_policy";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
@@ -84,14 +84,13 @@ serve(async (req) => {
     const nextIntent = String(next_intent || preparedVariables.next_intent || "{{consent}}").trim();
     const outboundId = String(outbound_id || `outbound_${Date.now()}`);
     const eventId = String(event_id || `event_${Date.now()}`);
-    // const flowString = `<!outbound_id|${outboundId}!>|||<!customer_name|${customerName}!>|||<!name|${customerName}!>|||${nextIntent}`;
+
     const callPayload = {
       outbound_id: outboundId,
       event_id: eventId,
       tel_number: phone_number,
       phonenumber: phone_number,
       variables: preparedVariables,
-      // flow: flowString,
       sourcephone: "3525<SOURCE_PHONE_NUMBER>",
       speaker: "212",
       language: "th",
