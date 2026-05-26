@@ -106,6 +106,7 @@ serve(async (req) => {
       interruptible: interruptible ? "True" : "False",
     };
     console.log(preparedVariables);
+    console.log(BOT_ID);
     console.log("Payload TEST TEST:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch(CALL_API_URL, {
