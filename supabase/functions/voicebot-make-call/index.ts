@@ -98,7 +98,7 @@ serve(async (req) => {
       speed: "1",
       tts: "voicebot-premium",
       bot_id: BOT_ID,
-      bot_type: BOT_TYPE,
+      bot_type: nextIntent,
       asr_provider: ASR_PROVIDER,
       asr_language_code: "th",
       asr_vad_rules: {
