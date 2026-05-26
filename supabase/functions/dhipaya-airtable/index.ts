@@ -20,16 +20,16 @@ interface ProxyRequest {
 }
 
 const ALLOWED_TABLES = new Set([
-  "agents",
-  "bot_sessions",
-  "call_logs",
-  "call_quality_evaluations",
-  "campaigns",
-  "consents",
-  "customers",
-  "installment_kbs",
-  "installment_plans",
-  "policies",
+  "Campaigns",
+  "Customer",
+  "Consents",
+  "Bot Sessions",
+  "Agents",
+  "Call Logs",
+  "Call Quality Evaluations",
+  "Policy",
+  "INSTALLMENT_KB",
+  "INSTALLMENT_PLANS",
 ]);
 
 Deno.serve(async (req) => {
