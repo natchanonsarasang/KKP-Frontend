@@ -332,11 +332,10 @@ async function refreshSessionState() {
 
 // ---------- mutations ----------
 export async function addToCallQueue(customers: Customer[]): Promise<number> {
-  if (!activeWorkspaceId) {
-    return 0;
-  }
   const userId = await getUserId();
   if (!userId) return 0;
+  const workspaceId = await ensureWorkspace();
+  if (!workspaceId) return 0;
 
   let added = 0;
   for (const c of customers) {
