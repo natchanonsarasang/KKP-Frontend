@@ -11,6 +11,10 @@ export const CUSTOMER_FIELDS = {
   routingGroup: "Routing_Group",
   campaign: "Campaign",
   consentStatus: "Consent_Status (from Consents)",
+  policyNumber: "Policy_Number",
+  policyNumber: "Policy_Number",
+  policyStatus: "Policy_Status",
+  outstandingBalance: "Outstanding_Balance",
 } as const;
 
 export const POLICY_FIELDS = {

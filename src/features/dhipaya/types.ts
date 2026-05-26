@@ -15,6 +15,9 @@ export interface Customer {
   routingGroup?: string;
   campaign?: string;
   consentStatus?: string;
+  policyNumber?: string;
+  policyStatus?: string;
+  outstandingBalance?: string;
 }
 
 export interface Policy {

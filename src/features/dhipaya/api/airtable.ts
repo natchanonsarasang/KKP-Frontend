@@ -28,7 +28,10 @@ async function call<T = unknown>(body: ProxyRequest): Promise<T> {
 }
 
 // -------- Customers --------
-export async function listCustomers(opts?: { pageSize?: number; offset?: string }): Promise<{ customers: Customer[]; offset?: string }> {
+export async function listCustomers(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ customers: Customer[]; offset?: string }> {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Customer", params });
@@ -51,11 +54,16 @@ function mapCustomer(rec: AirtableRecord): Customer {
     routingGroup: str(f[CUSTOMER_FIELDS.routingGroup]),
     campaign: str(f[CUSTOMER_FIELDS.campaign]),
     consentStatus: str(f[CUSTOMER_FIELDS.consentStatus]),
+    policyStatus: str(f[CUSTOMER_FIELDS.policyStatus]),
+    outstandingBalance: str(f[CUSTOMER_FIELDS.outstandingBalance]),
   };
 }
 
 // -------- Policies --------
-export async function listPolicies(opts?: { pageSize?: number; offset?: string }): Promise<{ policies: Policy[]; offset?: string }> {
+export async function listPolicies(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ policies: Policy[]; offset?: string }> {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Policy", params });
@@ -73,7 +81,10 @@ export async function listPolicies(opts?: { pageSize?: number; offset?: string }
 }
 
 // -------- Call logs --------
-export async function listCallLogs(opts?: { pageSize?: number; offset?: string }): Promise<{ logs: CallLog[]; offset?: string }> {
+export async function listCallLogs(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ logs: CallLog[]; offset?: string }> {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Call Logs", params });
