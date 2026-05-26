@@ -30,6 +30,11 @@ export interface QueueRow {
   finishedAt?: number;
   errorMessage?: string;
   callOutcome?: string;
+  callDuration?: number;
+  conversationLog?: string | null;
+  audioUrl?: string | null;
+  appointmentDate?: string | null;
+  appointmentTime?: string | null;
 }
 
 // ---------- module state (persists across component mounts) ----------
@@ -37,6 +42,7 @@ let rows: QueueRow[] = [];
 let isRunning = false;
 let stopRequested = false;
 let inFlight = 0;
+let activeWorkspaceId: string | null = null;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -122,6 +128,10 @@ export function setSelectedPhone(id: string, phone: string) {
   updateRow(id, { selectedPhone: phone });
 }
 
+export function setActiveWorkspaceId(workspaceId: string | null) {
+  activeWorkspaceId = workspaceId;
+}
+
 // ---------- dialing ----------
 async function dialOne(rowId: string): Promise<void> {
   const row = rows.find((r) => r.id === rowId);
@@ -129,7 +139,6 @@ async function dialOne(rowId: string): Promise<void> {
 
   updateRow(rowId, { status: "calling", startedAt: Date.now() });
 
-  // Resolve user/workspace for the tracking call_records row.
   let userId: string | null = null;
   try {
     const { data } = await supabase.auth.getUser();
@@ -137,16 +146,14 @@ async function dialOne(rowId: string): Promise<void> {
   } catch {
     /* ignore */
   }
-  const workspaceId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("currentWorkspaceId")
-      : null;
+  const workspaceId = activeWorkspaceId;
 
   try {
+    const fullName = [row.customer.firstName, row.customer.lastName]
+      .filter(Boolean)
+      .join(" ");
     const variables = {
-      name: [row.customer.firstName, row.customer.lastName]
-        .filter(Boolean)
-        .join(" "),
+      name: fullName,
       policy_no: row.customer.policyNumber || "",
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke(
@@ -166,7 +173,6 @@ async function dialOne(rowId: string): Promise<void> {
       undefined;
 
     if (!outboundId) {
-      // No id from API: cannot wait for webhook, fail fast.
       updateRow(rowId, {
         status: "failed",
         finishedAt: Date.now(),
@@ -185,11 +191,17 @@ async function dialOne(rowId: string): Promise<void> {
         status: "pending",
         user_id: userId,
         workspace_id: workspaceId,
+        result_data: {
+          source: "dhipaya",
+          airtable_id: row.customer.id,
+          name: fullName,
+          policy_number: row.customer.policyNumber || null,
+        } as any,
       });
     }
 
     updateRow(rowId, { outboundId });
-    // NOTE: Do NOT mark complete here. Webhook completion handled by realtime.
+    // Webhook completion handled by realtime subscription.
   } catch (e) {
     updateRow(rowId, {
       status: "failed",
@@ -199,7 +211,10 @@ async function dialOne(rowId: string): Promise<void> {
   }
 }
 
-export function startCalling(): { dispatched: number } {
+export function startCalling(workspaceId?: string | null): {
+  dispatched: number;
+} {
+  if (workspaceId !== undefined) activeWorkspaceId = workspaceId;
   if (isRunning) return { dispatched: 0 };
   const pendingIds = rows.filter((r) => r.status === "pending").map((r) => r.id);
   if (pendingIds.length === 0) return { dispatched: 0 };
@@ -252,11 +267,10 @@ function mapDbStatusToQueueStatus(
   switch (status) {
     case "confirmed":
     case "completed":
-      return "success";
     case "declined":
     case "no_response":
     case "not_convenient":
-      return "success"; // call picked up; treat as completed
+      return "success";
     case "no_answer":
       return "no_answer";
     case "failed":
@@ -266,39 +280,40 @@ function mapDbStatusToQueueStatus(
     case "voicemail":
       return "failed";
     case "pending":
-      return null; // still waiting
+      return null;
     default:
       return null;
   }
 }
 
-/**
- * Apply a call_records update keyed by botnoi_call_id.
- * Called by the realtime subscription and by reconcile on mount.
- */
 export function applyCallRecordUpdate(record: {
   botnoi_call_id: string | null;
   status: string | null;
   result_data?: any;
+  call_duration?: number | null;
+  appointment_date?: string | null;
+  appointment_time?: string | null;
 }) {
   if (!record.botnoi_call_id) return;
   const row = rows.find((r) => r.outboundId === record.botnoi_call_id);
   if (!row || row.status !== "calling") return;
   const next = mapDbStatusToQueueStatus(record.status);
   if (!next) return;
-  const action = record.result_data?.action || record.result_data?.status;
+  const rd = record.result_data || {};
+  const action = rd.action || rd.status;
   updateRow(row.id, {
     status: next,
     finishedAt: Date.now(),
     callOutcome:
       typeof action === "string" && action ? action : record.status || undefined,
+    callDuration: record.call_duration ?? undefined,
+    conversationLog: rd.conversation_log ?? null,
+    audioUrl: rd.audio_url ?? null,
+    appointmentDate: record.appointment_date ?? null,
+    appointmentTime: record.appointment_time ?? null,
   });
 }
 
-/**
- * Reconcile any 'calling' rows that may have completed while the
- * subscription was not mounted (e.g. user navigated away).
- */
 export async function reconcileCallingRows() {
   const outboundIds = rows
     .filter((r) => r.status === "calling" && r.outboundId)
@@ -306,7 +321,9 @@ export async function reconcileCallingRows() {
   if (outboundIds.length === 0) return;
   const { data } = await supabase
     .from("call_records")
-    .select("botnoi_call_id, status, result_data")
+    .select(
+      "botnoi_call_id, status, result_data, call_duration, appointment_date, appointment_time",
+    )
     .in("botnoi_call_id", outboundIds);
   if (!data) return;
   for (const rec of data) applyCallRecordUpdate(rec as any);
