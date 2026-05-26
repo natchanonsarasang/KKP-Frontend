@@ -8,6 +8,7 @@ const corsHeaders = {
 const BOT_ID = "6a0c3158b875327d960f0936";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
+const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
 
 const THAI_DIGIT_WORDS: Record<string, string> = {
   "0": "ศูนย์",
@@ -77,25 +78,38 @@ serve(async (req) => {
   }
 
   try {
-    const { phone_number, variables, interruptible } = await req.json();
+    const { phone_number, variables, interruptible, outbound_id, event_id, next_intent } = await req.json();
+    const preparedVariables = prepareVoicebotVariables(variables);
+    const outboundId = String(outbound_id || `outbound_${Date.now()}`);
+    const eventId = String(event_id || `event_${Date.now()}`);
+    const nextIntent = String(next_intent || preparedVariables.next_intent || "{{consent}}").trim();
 
     const callPayload = {
+      outbound_id: outboundId,
+      event_id: eventId,
+      phonenumber: phone_number,
+      flow:
+        "<!outbound_id|<OUTBOUND_REF>!>|||" +
+        "<!customer_name|<<customer_name>>!>|||" +
+        "<!name|<<name>>!>|||" +
+        nextIntent,
+      sourcephone: "3525<SOURCE_PHONE_NUMBER>",
+      speaker: "212",
+      language: "th",
+      agent_phone_number: "0800000000",
+      speed: "1",
+      tts: "voicebot-premium",
       bot_id: BOT_ID,
-      bot_type: "Confirm1",
-      tel_number: phone_number,
-      variables: prepareVoicebotVariables(variables),
-      asr: {
-        asr_provider: "botnoi-aws-th-noise-classifier-v17c",
-        asr_timeout: 5,
+      asr_provider: ASR_PROVIDER,
+      asr_language_code: "th",
+      asr_vad_rules: {
+        false_timeout_sec: 1,
+        false_silence_sec: 0.1,
+        true_silence_sec: 0.25,
       },
       interruptible: interruptible || "False",
-      vad: {
-        false_timeout_sec: "5",
-        false_silence_sec: "0.1",
-        true_silence_sec: "0.25",
-      },
     };
-    console.log(prepareVoicebotVariables(variables));
+    console.log(preparedVariables);
     console.log("Payload TEST TEST:", JSON.stringify(callPayload, null, 2));
 
     const response = await fetch(CALL_API_URL, {
