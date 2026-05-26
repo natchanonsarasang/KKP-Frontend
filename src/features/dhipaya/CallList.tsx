@@ -18,6 +18,13 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Phone,
@@ -39,11 +46,17 @@ const CONCURRENCY = 5;
 
 type QueueStatus = "pending" | "calling" | "success" | "failed" | "no_answer";
 
+interface PhoneOption {
+  label: string; // e.g. "Phone 1"
+  raw: string;
+  phone: string; // normalized
+}
+
 interface QueueRow {
   id: string;
   customer: Customer;
-  rawPhone: string;
-  phone: string;
+  phoneOptions: PhoneOption[];
+  selectedPhone: string; // normalized; one of phoneOptions[].phone
   status: QueueStatus;
   startedAt?: number;
   finishedAt?: number;
@@ -88,17 +101,25 @@ const DhipayaCallList = () => {
     if (!data?.customers || queue.length > 0) return;
     const rows: QueueRow[] = [];
     for (const c of data.customers) {
-      const raw = c.phone1 || c.phone2 || c.phone3;
-      const phone = normalizeThaiPhone(raw);
-      if (raw && phone) {
-        rows.push({
-          id: c.id,
-          customer: c,
-          rawPhone: raw,
-          phone,
-          status: "pending",
-        });
+      const candidates: Array<{ label: string; raw?: string }> = [
+        { label: "Phone 1", raw: c.phone1 },
+        { label: "Phone 2", raw: c.phone2 },
+        { label: "Phone 3", raw: c.phone3 },
+      ];
+      const phoneOptions: PhoneOption[] = [];
+      for (const { label, raw } of candidates) {
+        if (!raw) continue;
+        const phone = normalizeThaiPhone(raw);
+        if (phone) phoneOptions.push({ label, raw, phone });
       }
+      if (phoneOptions.length === 0) continue;
+      rows.push({
+        id: c.id,
+        customer: c,
+        phoneOptions,
+        selectedPhone: phoneOptions[0].phone,
+        status: "pending",
+      });
     }
     setQueue(rows);
   }, [data, queue.length]);
@@ -116,7 +137,7 @@ const DhipayaCallList = () => {
       };
       const { data: resp, error: invokeErr } = await supabase.functions.invoke(
         "voicebot-make-call",
-        { body: { phone_number: row.phone, variables, interruptible: false } },
+        { body: { phone_number: row.selectedPhone, variables, interruptible: false } },
       );
       if (invokeErr) throw new Error(invokeErr.message);
       const status: QueueStatus =
@@ -274,8 +295,7 @@ const DhipayaCallList = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Original</TableHead>
-                      <TableHead>Normalized</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Policy</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -283,7 +303,7 @@ const DhipayaCallList = () => {
                   <TableBody>
                     {rowsByTab[tab].length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                           No items.
                         </TableCell>
                       </TableRow>
@@ -295,8 +315,38 @@ const DhipayaCallList = () => {
                               .filter(Boolean)
                               .join(" ") || "—"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{r.rawPhone}</TableCell>
-                          <TableCell className="font-mono">{r.phone}</TableCell>
+                          <TableCell>
+                            {r.status === "pending" && r.phoneOptions.length > 1 ? (
+                              <Select
+                                value={r.selectedPhone}
+                                onValueChange={(v) => updateRow(r.id, { selectedPhone: v })}
+                              >
+                                <SelectTrigger className="h-8 w-[180px] font-mono">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {r.phoneOptions.map((opt) => (
+                                    <SelectItem key={opt.phone} value={opt.phone}>
+                                      <span className="font-mono mr-2">{opt.phone}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {opt.label}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="font-mono">{r.selectedPhone}</span>
+                            )}
+                            {(() => {
+                              const sel = r.phoneOptions.find((o) => o.phone === r.selectedPhone);
+                              return sel ? (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {sel.label} · {sel.raw}
+                                </p>
+                              ) : null;
+                            })()}
+                          </TableCell>
                           <TableCell>{r.customer.policyNumber || "—"}</TableCell>
                           <TableCell>
                             <StatusBadge status={r.status} />
