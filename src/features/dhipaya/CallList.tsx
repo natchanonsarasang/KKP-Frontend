@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,34 +12,204 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Phone, RefreshCcw } from "lucide-react";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import { toast } from "sonner";
+import {
+  Phone,
+  PhoneOff,
+  Play,
+  Square,
+  Loader2,
+  RefreshCcw,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import { listCustomers } from "./api/airtable";
 import { normalizeThaiPhone } from "./lib/phone";
 import type { Customer } from "./types";
 
-interface QueueItem {
+const CONCURRENCY = 5;
+
+type QueueStatus = "pending" | "calling" | "success" | "failed" | "no_answer";
+
+interface QueueRow {
+  id: string;
   customer: Customer;
   rawPhone: string;
-  phone: string; // normalized 0XXXXXXXXX
+  phone: string;
+  status: QueueStatus;
+  startedAt?: number;
+  finishedAt?: number;
+  errorMessage?: string;
+}
+
+const statusConfig: Record<
+  QueueStatus,
+  { label: string; className: string; icon: typeof CheckCircle }
+> = {
+  pending: { label: "Pending", className: "bg-muted text-muted-foreground", icon: Clock },
+  calling: { label: "Calling", className: "bg-primary/10 text-primary", icon: Phone },
+  success: { label: "Success", className: "bg-success/10 text-success", icon: CheckCircle },
+  failed: { label: "Failed", className: "bg-destructive/10 text-destructive", icon: AlertCircle },
+  no_answer: { label: "No Answer", className: "bg-muted text-muted-foreground", icon: PhoneOff },
+};
+
+function StatusBadge({ status }: { status: QueueStatus }) {
+  const cfg = statusConfig[status];
+  const Icon = cfg.icon;
+  return (
+    <Badge variant="outline" className={`gap-1 ${cfg.className}`}>
+      <Icon className="w-3 h-3" />
+      {cfg.label}
+    </Badge>
+  );
 }
 
 const DhipayaCallList = () => {
-  const [calling, setCalling] = useState(false);
+  const [queue, setQueue] = useState<QueueRow[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const stopRef = useRef(false);
+  const runningRef = useRef(0);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["dhipaya-calllist-customers"],
     queryFn: () => listCustomers({ pageSize: 100 }),
   });
 
-  const queue: QueueItem[] = useMemo(() => {
-    const out: QueueItem[] = [];
-    for (const c of data?.customers ?? []) {
+  // Seed the queue from Airtable customers (only when we have no rows yet).
+  useEffect(() => {
+    if (!data?.customers || queue.length > 0) return;
+    const rows: QueueRow[] = [];
+    for (const c of data.customers) {
       const raw = c.phone1 || c.phone2 || c.phone3;
       const phone = normalizeThaiPhone(raw);
-      if (raw && phone) out.push({ customer: c, rawPhone: raw, phone });
+      if (raw && phone) {
+        rows.push({
+          id: c.id,
+          customer: c,
+          rawPhone: raw,
+          phone,
+          status: "pending",
+        });
+      }
     }
-    return out;
-  }, [data]);
+    setQueue(rows);
+  }, [data, queue.length]);
+
+  const updateRow = (id: string, patch: Partial<QueueRow>) => {
+    setQueue((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+
+  async function dialOne(row: QueueRow): Promise<void> {
+    updateRow(row.id, { status: "calling", startedAt: Date.now() });
+    try {
+      const variables = {
+        name: [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" "),
+        policy_no: row.customer.policyNumber || "",
+      };
+      const { data: resp, error: invokeErr } = await supabase.functions.invoke(
+        "voicebot-make-call",
+        { body: { phone_number: row.phone, variables, interruptible: false } },
+      );
+      if (invokeErr) throw new Error(invokeErr.message);
+      const status: QueueStatus =
+        resp && typeof resp === "object" && "success" in resp && !(resp as any).success
+          ? "failed"
+          : "success";
+      updateRow(row.id, { status, finishedAt: Date.now() });
+    } catch (e) {
+      updateRow(row.id, {
+        status: "failed",
+        finishedAt: Date.now(),
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  const counts = useMemo(() => {
+    const c = { pending: 0, calling: 0, completed: 0, total: queue.length };
+    for (const r of queue) {
+      if (r.status === "pending") c.pending++;
+      else if (r.status === "calling") c.calling++;
+      else c.completed++;
+    }
+    return c;
+  }, [queue]);
+
+  async function startCalling() {
+    if (isRunning || queue.length === 0) return;
+    setIsRunning(true);
+    stopRef.current = false;
+
+    // Snapshot pending IDs at start; new pendings added later are ignored.
+    let cursor = 0;
+    const pendingIds = queue.filter((r) => r.status === "pending").map((r) => r.id);
+    if (pendingIds.length === 0) {
+      toast.info("Nothing to call");
+      setIsRunning(false);
+      return;
+    }
+    toast.success(`Starting ${pendingIds.length} calls (max ${CONCURRENCY} parallel)`);
+
+    await new Promise<void>((resolve) => {
+      const pump = () => {
+        if (stopRef.current && runningRef.current === 0) {
+          resolve();
+          return;
+        }
+        while (
+          !stopRef.current &&
+          runningRef.current < CONCURRENCY &&
+          cursor < pendingIds.length
+        ) {
+          const id = pendingIds[cursor++];
+          // Re-read latest row each time
+          setQueue((prev) => {
+            const row = prev.find((r) => r.id === id);
+            if (row && row.status === "pending") {
+              runningRef.current++;
+              dialOne(row).finally(() => {
+                runningRef.current--;
+                pump();
+              });
+            }
+            return prev;
+          });
+        }
+        if (
+          (cursor >= pendingIds.length || stopRef.current) &&
+          runningRef.current === 0
+        ) {
+          resolve();
+        }
+      };
+      pump();
+    });
+
+    setIsRunning(false);
+    stopRef.current = false;
+    toast.success("Call session finished");
+  }
+
+  function stopCalling() {
+    stopRef.current = true;
+    toast.info("Stopping after in-flight calls finish");
+  }
+
+  const rowsByTab: Record<"pending" | "calling" | "completed", QueueRow[]> = {
+    pending: queue.filter((r) => r.status === "pending"),
+    calling: queue.filter((r) => r.status === "calling"),
+    completed: queue.filter(
+      (r) => r.status === "success" || r.status === "failed" || r.status === "no_answer",
+    ),
+  };
 
   return (
     <div className="space-y-4">
@@ -46,73 +217,114 @@ const DhipayaCallList = () => {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Call List</h2>
           <p className="text-sm text-muted-foreground">
-            Calling queue for Dhipaya customers (phones normalized to 0XXXXXXXXX)
+            Dhipaya queue from Airtable · phones normalized to 0XXXXXXXXX · max{" "}
+            {CONCURRENCY} parallel
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching || isRunning}>
             <RefreshCcw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button
-            disabled={calling || queue.length === 0}
-            onClick={() => setCalling(true)}
-          >
-            <Phone className="w-4 h-4 mr-2" />
-            Start Calling ({queue.length})
-          </Button>
+          {isRunning ? (
+            <Button variant="destructive" onClick={stopCalling}>
+              <Square className="w-4 h-4 mr-2" />
+              Stop
+            </Button>
+          ) : (
+            <Button onClick={startCalling} disabled={counts.pending === 0}>
+              <Play className="w-4 h-4 mr-2" />
+              Start Calling ({counts.pending})
+            </Button>
+          )}
         </div>
       </div>
 
-      <Card className="p-0 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Loading queue...
-          </div>
-        ) : isError ? (
-          <div className="p-6 text-sm text-destructive">
-            {(error as Error)?.message || "Failed to load customers."}
-          </div>
-        ) : queue.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground text-sm">
-            No callable customers found. Make sure the Customer table has phone numbers.
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Original</TableHead>
-                <TableHead>Normalized</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Consent</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {queue.map(({ customer: c, rawPhone, phone }) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{rawPhone}</TableCell>
-                  <TableCell className="font-mono">{phone}</TableCell>
-                  <TableCell>{c.campaign || "—"}</TableCell>
-                  <TableCell>
-                    {c.consentStatus ? (
-                      <Badge variant="secondary">{c.consentStatus}</Badge>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Total" value={counts.total} />
+        <StatCard label="Pending" value={counts.pending} />
+        <StatCard label="Calling" value={counts.calling} />
+        <StatCard label="Completed" value={counts.completed} />
+      </div>
+
+      {isLoading ? (
+        <Card className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          Loading queue...
+        </Card>
+      ) : isError ? (
+        <Card className="p-6 text-sm text-destructive">
+          {(error as Error)?.message || "Failed to load customers."}
+        </Card>
+      ) : queue.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground text-sm">
+          No callable customers found.
+        </Card>
+      ) : (
+        <Tabs defaultValue="pending">
+          <TabsList>
+            <TabsTrigger value="pending">Pending ({rowsByTab.pending.length})</TabsTrigger>
+            <TabsTrigger value="calling">Calling ({rowsByTab.calling.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({rowsByTab.completed.length})</TabsTrigger>
+          </TabsList>
+          {(["pending", "calling", "completed"] as const).map((tab) => (
+            <TabsContent key={tab} value={tab} className="mt-3">
+              <Card className="p-0 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Original</TableHead>
+                      <TableHead>Normalized</TableHead>
+                      <TableHead>Policy</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rowsByTab[tab].length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No items.
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      "—"
+                      rowsByTab[tab].map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">
+                            {[r.customer.firstName, r.customer.lastName]
+                              .filter(Boolean)
+                              .join(" ") || "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{r.rawPhone}</TableCell>
+                          <TableCell className="font-mono">{r.phone}</TableCell>
+                          <TableCell>{r.customer.policyNumber || "—"}</TableCell>
+                          <TableCell>
+                            <StatusBadge status={r.status} />
+                            {r.errorMessage && (
+                              <p className="text-xs text-destructive mt-1">{r.errorMessage}</p>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </div>
   );
 };
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <Card className="p-4">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-2xl font-semibold mt-1">{value}</p>
+    </Card>
+  );
+}
 
 export default DhipayaCallList;
