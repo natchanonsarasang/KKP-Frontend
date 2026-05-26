@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,7 +19,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
@@ -37,34 +35,6 @@ interface Props {
   onNextStep: () => void;
 }
 
-function useAuthReady() {
-  const [isReady, setIsReady] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setUser(data.session?.user ?? null);
-      setIsReady(true);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setIsReady(true);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  return { isReady, user };
-}
-
 const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const [offsetStack, setOffsetStack] = useState<(string | undefined)[]>([undefined]);
   const currentOffset = offsetStack[offsetStack.length - 1];
@@ -73,19 +43,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
-  const { isReady: authReady, user } = useAuthReady();
 
   const queryClient = useQueryClient();
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ["dhipaya-customers", user?.id, currentOffset],
+    queryKey: ["dhipaya-customers", currentOffset],
     queryFn: () => listCustomers({ pageSize: 50, offset: currentOffset }),
-    enabled: authReady && !!user,
-    retry: 1,
     staleTime: 0,
     gcTime: 0,
   });
 
-  const customers = useMemo(() => data?.customers ?? [], [data?.customers]);
+  const customers = data?.customers ?? [];
 
   // Reconcile selection against the latest fetched page — drop ghost IDs.
   useEffect(() => {
@@ -162,16 +129,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     });
   }
 
-  async function sendSelectedToCallList() {
+  function sendSelectedToCallList() {
     const chosen = customers.filter((c) => selectedIds.has(c.id));
     if (chosen.length === 0) {
       toast.error("Select at least one customer");
       return;
     }
-    const added = await addToCallQueue(chosen);
+    const added = addToCallQueue(chosen);
     setSelectedIds(new Set());
     if (added === 0) {
-      toast.error("Could not add to call list (missing phone numbers?)");
+      toast.info("All selected customers are already in the call queue");
     } else {
       toast.success(
         `Added ${added} customer${added > 1 ? "s" : ""} to the call list`,
@@ -230,14 +197,10 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
           </div>
 
           <div className="rounded-md border overflow-hidden">
-            {!authReady || (authReady && !!user && isLoading) ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-16 text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading customers...
-              </div>
-            ) : !user ? (
-              <div className="p-6 text-sm text-destructive">
-                Please sign in again before loading customers.
               </div>
             ) : isError ? (
               <div className="p-6 text-sm text-destructive">

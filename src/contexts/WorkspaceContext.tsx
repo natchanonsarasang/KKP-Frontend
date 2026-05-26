@@ -96,19 +96,13 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const workspaces = workspacesQuery.data ?? [];
   const isLoading = !authReady ? true : !!userId ? workspacesQuery.isLoading : false;
 
-  // Set default workspace when workspaces load, and recover if current workspace
-  // no longer exists (e.g. it was deleted server-side).
+  // Set default workspace when workspaces load
   useEffect(() => {
-    if (workspaces.length === 0) return;
-    const savedWorkspaceId = localStorage.getItem("currentWorkspaceId");
-    const stillExists = currentWorkspace
-      ? workspaces.some((w) => w.id === currentWorkspace.id)
-      : false;
-    if (!currentWorkspace || !stillExists) {
-      const saved = workspaces.find((w) => w.id === savedWorkspaceId);
-      const next = saved || workspaces[0];
-      setCurrentWorkspaceState(next);
-      localStorage.setItem("currentWorkspaceId", next.id);
+    if (workspaces.length > 0 && !currentWorkspace) {
+      // Try to restore from localStorage
+      const savedWorkspaceId = localStorage.getItem("currentWorkspaceId");
+      const savedWorkspace = workspaces.find(w => w.id === savedWorkspaceId);
+      setCurrentWorkspaceState(savedWorkspace || workspaces[0]);
     }
   }, [workspaces, currentWorkspace]);
 
