@@ -399,7 +399,8 @@ export async function setSelectedPhone(itemId: string, phone: string) {
 export async function startCalling(
   workspaceId?: string | null,
 ): Promise<{ dispatched: number }> {
-  if (workspaceId !== undefined) activeWorkspaceId = workspaceId;
+  // Workspace is fixed (shared Dhipaya workspace); ignore any passed-in id.
+  void workspaceId;
   if (!activeWorkspaceId) return { dispatched: 0 };
   const userId = await getUserId();
   if (!userId) return { dispatched: 0 };
