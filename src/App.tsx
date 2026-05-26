@@ -8,6 +8,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
+import Dhipaya from "./pages/Dhipaya";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
