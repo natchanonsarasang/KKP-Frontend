@@ -1,83 +1,62 @@
-# Dhipaya Insurance System — Isolated `/dhipaya` Module
+## Goals
 
-A complete clone of the current Dashboard flow, living at `/dhipaya`, backed by **Airtable** (Base `appERiu56nzFnX26r`) instead of Supabase. Shares Lovable Cloud login but gated by a new `dhipaya` role. Zero coupling to the Finlution data layer.
+Bring the Dhipaya Call List to parity with the default `src/components/CallList.tsx` in behavior, persistence, and look — minus workspace/template UI which the Dhipaya flow doesn't use.
 
-## 1. Architecture
+## Changes
 
-```text
-/dhipaya  ──►  DhipayaDashboard (cloned UI shell)
-                ├── Customers  (was: Debtors)
-                ├── Call List  (calling queue, voicebot)
-                └── Analytics  (call_logs / call_quality_evaluations)
-                         │
-                         ▼
-                Supabase Edge Function: `dhipaya-airtable`
-                         │  (auth-checked + role-checked proxy)
-                         ▼
-                Airtable Connector Gateway
-                  Base: appERiu56nzFnX26r
-                  Tables: customers, policies, installment_plans,
-                          campaigns, consents, call_logs,
-                          call_quality_evaluations, bot_sessions,
-                          installment_kbs, agents
-```
+### 1. Auto-navigate after "Send to Call List" (CustomersList)
 
-Key isolation guarantees:
-- No reads/writes to the existing `debtors`, `call_list_items`, `call_attempts`, `workspaces` tables from any `/dhipaya/*` code.
-- Airtable credentials live only in the edge function (gateway pattern).
-- A new `app_role` value `'dhipaya'` gates route access.
+In `src/features/dhipaya/CustomersList.tsx`, after a successful `addToCallQueue(...)`:
+- Call the existing `onNextStep()` prop to switch the Dhipaya dashboard tab from **Customers** → **Call List**.
+- Keep the toast confirmation. Drop the now-redundant "Next: Call List" button (or keep it as a secondary affordance — recommend removing to avoid duplication).
 
-## 2. Setup steps
+### 2. Transition to "Calling" tab when calls start (CallList)
 
-1. **Connect Airtable** via `standard_connectors--connect` (Lovable Airtable connector).
-2. **DB migration**: extend `app_role` enum with `'dhipaya'`; admin panel can assign it.
-3. **Edge function** `dhipaya-airtable`:
-   - Verifies JWT, checks caller has `dhipaya` (or `admin`) role.
-   - Generic actions: `list`, `get`, `create`, `update`, `delete` against any allow-listed table.
-   - Maps Airtable fields ↔ JSON shape used by the UI.
-4. **Route + guard**: `/dhipaya` mounted in `App.tsx`, wrapped in `DhipayaGuard` that calls `has_role(uid, 'dhipaya')`.
+In `src/features/dhipaya/CallList.tsx`:
+- Replace `defaultValue` on `<Tabs>` with a controlled `value` + `onValueChange` driven by local state.
+- In `handleStart()`, after `startCalling()` dispatches successfully, set the active tab to `"calling"`.
+- Also auto-switch to `"calling"` whenever `counts.calling` transitions from 0 → >0 (covers the brief gap before `dialOne` updates status).
+- When the queue finishes (no calling, no pending, completed > 0), auto-switch to `"completed"`.
 
-## 3. Folder layout (all new, no edits to existing components)
+### 3. Persist completed call data like the default page (queue store)
 
-```text
-src/
-  pages/
-    Dhipaya.tsx                       # entry route, auth + role guard
-  features/dhipaya/
-    DhipayaDashboard.tsx              # 3-step shell (cloned from Dashboard.tsx)
-    CustomersList.tsx                 # list, filter, import (cloned DebtorsList)
-    CallList.tsx                      # calling queue (cloned CallList)
-    Analytics.tsx                     # KPI cards + charts (cloned CallDashboard)
-    api/airtable.ts                   # typed client → calls dhipaya-airtable fn
-    types.ts                          # Customer, Policy, CallLog, ...
-    fieldMap.ts                       # Airtable field ↔ UI field mapping
-supabase/functions/
-  dhipaya-airtable/index.ts           # gateway proxy
-```
+The default page persists every call via three tables: `call_records` (we already write), plus richer fields the webhook fills in (`result_data`, `call_duration`, `appointment_*`, conversation log / audio URL stored in notes).
 
-## 4. Field mapping (initial)
+Update `src/features/dhipaya/lib/callQueueStore.ts`:
 
-| UI field        | Airtable table.field                  |
-|-----------------|----------------------------------------|
-| id              | record id                              |
-| firstName       | customers.first_name                   |
-| lastName        | customers.last_name                    |
-| phone1/2/3      | customers.phone_number1/2/3            |
-| consentStatus   | consents.consent_status                |
-| policyNumber    | policies.policy_number                 |
-| policyStatus    | policies.policy_status                 |
-| renewalPremium  | policies.renewal_premium               |
-| outstanding     | policies.outstanding_balance           |
-| campaign        | campaigns (linked)                     |
-| routingGroup    | customers.routing_group                |
-| duplicateFlag   | customers.duplicate_flag               |
+- **Pre-insert with full context** in `dialOne`:
+  - Include `phone_number`, `botnoi_call_id`, `user_id`, `workspace_id`, `status: 'pending'`.
+  - Add a minimal `result_data` seed with the customer reference (Airtable record id, name, policy_number) so completed rows can be traced back to a Dhipaya customer in reports.
+- **Capture webhook completion fully** in `applyCallRecordUpdate`:
+  - Pull `result_data.conversation_log`, `result_data.audio_url`, `call_duration`, `appointment_date`, `appointment_time` from the updated `call_records` row and store on the queue row (extend `QueueRow` with `audioUrl?`, `conversationLog?`, `callDuration?`).
+  - Keep the existing status mapping; ensure `hanged_up`, `voicemail`, `busy`, `rejected` are surfaced as failed (already done) and `confirmed` / `declined` / `no_response` / `completed` are surfaced as success with `callOutcome` set from `action || status`.
+- **Reconcile fetches the same extra fields** (`select` list extended).
+- **Resolve `workspace_id` properly** — replace the `localStorage.getItem("currentWorkspaceId")` hack by accepting an optional `workspaceId` parameter on `startCalling`/`dialOne` (passed from the component, which already has it via `useWorkspace()`).
 
-`fieldMap.ts` centralises this so renaming an Airtable column is a one-line change.
+This gives the same long-term persistence guarantee as the default page: every dispatched call has a `call_records` row that the webhook completes with transcript, audio, duration and outcome, queryable later by workspace.
 
-## 5. Out of scope (this round)
-- Excel import for Dhipaya (Airtable is source of truth; we can add CSV→Airtable later).
-- Webhooks writing call results back into Airtable (call_logs sync) — designed but built next iteration.
-- New design language; reuses existing tokens/components.
+### 4. UI/UX parity with default CallList
 
-## 6. Open question
-You listed tables but I will only wire **customers + policies + consents + call_logs** in v1 so we can validate the gateway end-to-end. Confirm or tell me which other tables you need rendered immediately.
+Refactor `src/features/dhipaya/CallList.tsx` to mirror the default page structure, minus workspace/template controls:
+
+- **Header**: title + subtitle, action cluster on the right with Start / Stop / Clear completed / Clear all (already present, restyle to match).
+- **Stat strip**: reuse the same labels/order as default — Total, Pending, Calling (highlight when active), Success, Failed/No Answer. Match card density and typography.
+- **Progress card**: keep the in-progress banner + Progress bar + "you can leave this page" hint (already present, ensure same spacing/typography as default).
+- **Tabs**: Pending / Calling / Completed (controlled, see #2).
+- **Table columns**: Name, Phone (with per-row dropdown when pending), Policy, Status (+ outcome subtext), Duration, Actions. For completed rows, show a **View transcript** button (opens a Dialog with conversation log + audio player) — mirrors `handleViewTranscript` in default.
+- **Transcript dialog**: lightweight version of the default page's dialog — render `conversationLog` as preformatted text and `audioUrl` in an `<audio controls>` element. No need to support legacy notes formats since Dhipaya rows always come from the JSON `result_data`.
+- **Omit on purpose** (per request): workspace switcher, template selector, scheduled time picker, settings dialog, filter dialog, Excel/import buttons, token coin badge, retry-pending UI, admin impersonation controls.
+
+Keep all styling on semantic tokens (`bg-primary`, `text-muted-foreground`, etc.) — no raw colors.
+
+## Files touched
+
+- `src/features/dhipaya/CustomersList.tsx` — auto-navigate on Send.
+- `src/features/dhipaya/CallList.tsx` — controlled tabs, auto-switch logic, parity layout, transcript dialog, render new fields.
+- `src/features/dhipaya/lib/callQueueStore.ts` — accept workspaceId param, richer pre-insert, capture webhook fields, extend `QueueRow`.
+
+## Out of scope
+
+- No DB migrations (existing `call_records` columns + `result_data` JSON cover all new fields).
+- No changes to `voicebot-webhook` (already writes everything we now read).
+- No changes to Analytics tab.
