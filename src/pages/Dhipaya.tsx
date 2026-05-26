@@ -37,20 +37,8 @@ const Dhipaya = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const { data: hasAccess, isLoading: checkingRole } = useQuery({
-    queryKey: ["dhipaya-access", user?.id],
-    queryFn: async () => {
-      if (!user) return false;
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .in("role", ["dhipaya", "admin"]);
-      if (error) throw error;
-      return (data?.length ?? 0) > 0;
-    },
-    enabled: !!user,
-  });
+  const hasAccess = !!user;
+  const checkingRole = false;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
