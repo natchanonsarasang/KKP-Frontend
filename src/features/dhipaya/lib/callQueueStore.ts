@@ -144,6 +144,7 @@ async function dialOne(rowId: string): Promise<void> {
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
     const variables = {
+      name: fullName,
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
     };
