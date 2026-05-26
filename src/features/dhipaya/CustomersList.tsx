@@ -76,8 +76,6 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     await refetch();
   }
 
-  const customers = data?.customers ?? [];
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return customers;
