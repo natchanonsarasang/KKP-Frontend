@@ -58,7 +58,7 @@ function mapCustomer(rec: AirtableRecord): Customer {
 export async function listPolicies(opts?: { pageSize?: number; offset?: string }): Promise<{ policies: Policy[]; offset?: string }> {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
-  const res = await call<ListResponse>({ action: "list", table: "policies", params });
+  const res = await call<ListResponse>({ action: "list", table: "Policy", params });
   return {
     policies: res.records.map((r) => ({
       id: r.id,
