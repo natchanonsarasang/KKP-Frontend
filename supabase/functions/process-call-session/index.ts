@@ -461,7 +461,7 @@ async function processSession(supabase: any, sessionId: string) {
   const BOT_ID = "6a0c3158b875327d960f0936";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
-  const BOT_TYPE = "Confirm1";
+  const BOT_TYPE = "template";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -632,37 +632,29 @@ async function processSession(supabase: any, sessionId: string) {
           tokensUsed: tokensToDeduct,
         };
       } else {
-        // REAL MODE: Make actual call via flow payload format
+        // REAL MODE: Make actual call via template/custom payload format
         const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
-        const outboundId = `outbound_${item.id}`;
-        const eventId = `event_${sessionId}_${item.id}`;
         const nextIntent = String(vars.next_intent || "{{consent}}").trim();
 
         const callPayload = {
-          outbound_id: outboundId,
-          event_id: eventId,
-          phonenumber: debtor.phone_number,
-          flow:
-            "<!outbound_id|<OUTBOUND_REF>!>|||" +
-            "<!customer_name|<<customer_name>>!>|||" +
-            "<!name|<<name>>!>|||" +
-            nextIntent,
-          sourcephone: "3525<SOURCE_PHONE_NUMBER>",
-          speaker: "212",
-          language: "th",
-          agent_phone_number: "0800000000",
-          speed: "1",
-          tts: "voicebot-premium",
           bot_id: BOT_ID,
-          bot_type: nextIntent,
+          bot_type: BOT_TYPE,
+          tel_number: debtor.phone_number,
+          speaker_id: "212",
+          tts: "voicebot-premium",
+          language: "th",
           asr_provider: ASR_PROVIDER,
           asr_language_code: "th",
-          asr_vad_rules: {
-            false_timeout_sec: 1,
-            false_silence_sec: 0.1,
-            true_silence_sec: 0.25,
+          false_timeout_sec: "1",
+          false_silence_sec: "0.1",
+          true_silence_sec: "0.25",
+          interruptible: typedSession.settings.interruptible ? "true" : "false",
+          variables: {
+            ...vars,
+            intent: nextIntent,
+            customer_name: String(vars.customer_name || vars.name || debtor.name || "<<customer_name>>"),
+            name: String(vars.name || vars.customer_name || debtor.name || "<<name>>"),
           },
-          interruptible: typedSession.settings.interruptible ? "True" : "False",
         };
 
         console.log(`[Session ${sessionId}] Calling ${debtor.phone_number} via Voicebot API...`);
