@@ -34,11 +34,9 @@ export interface QueueRow {
   appointmentTime?: string | null;
 }
 
-// Shared Dhipaya workspace — every authenticated user is a member (see migration).
-export const DHIPAYA_WORKSPACE_ID = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1";
-
 // ---------- module state ----------
-let activeWorkspaceId: string | null = DHIPAYA_WORKSPACE_ID;
+// Each user uses their own personal workspace (no shared workspace).
+let activeWorkspaceId: string | null = null;
 let activeUserId: string | null = null;
 let rows: QueueRow[] = [];
 let sessionRunning = false;
@@ -109,12 +107,24 @@ function mapDbStatus(s: string | null | undefined): QueueStatus {
   }
 }
 
-// ---------- workspace setter (kept for back-compat; the Dhipaya workspace is now fixed) ----------
-export function setActiveWorkspaceId(_workspaceId: string | null) {
-  // No-op: Dhipaya always uses the shared workspace. We just make sure realtime is wired up.
-  if (!realtimeChannel) setupRealtime();
-  void refreshFromDb();
-  void refreshSessionState();
+// Resolve the current user's own workspace (owned, or first membership).
+async function resolveWorkspaceId(userId: string): Promise<string | null> {
+  const { data: owned } = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("owner_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (owned?.id) return owned.id as string;
+
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  return (membership?.workspace_id as string) ?? null;
 }
 
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -159,13 +169,42 @@ function setupRealtime() {
     .subscribe();
 }
 
-// Bootstrap once on module load.
-if (typeof window !== "undefined") {
+export function setActiveWorkspaceId(workspaceId: string | null) {
+  activeWorkspaceId = workspaceId;
   setupRealtime();
   void refreshFromDb();
   void refreshSessionState();
-  supabase.auth.onAuthStateChange((_e, session) => {
+}
+
+async function ensureWorkspace(): Promise<string | null> {
+  if (activeWorkspaceId) return activeWorkspaceId;
+  const userId = await getUserId();
+  if (!userId) return null;
+  const ws = await resolveWorkspaceId(userId);
+  if (ws) {
+    activeWorkspaceId = ws;
+    setupRealtime();
+  }
+  return activeWorkspaceId;
+}
+
+// Bootstrap once on module load.
+if (typeof window !== "undefined") {
+  void (async () => {
+    const { data } = await supabase.auth.getUser();
+    activeUserId = data.user?.id ?? null;
+    if (activeUserId) {
+      await ensureWorkspace();
+      void refreshFromDb();
+      void refreshSessionState();
+    }
+  })();
+  supabase.auth.onAuthStateChange(async (_e, session) => {
     activeUserId = session?.user?.id ?? null;
+    activeWorkspaceId = null;
+    if (activeUserId) {
+      await ensureWorkspace();
+    }
     void refreshFromDb();
     void refreshSessionState();
   });
@@ -293,11 +332,10 @@ async function refreshSessionState() {
 
 // ---------- mutations ----------
 export async function addToCallQueue(customers: Customer[]): Promise<number> {
-  if (!activeWorkspaceId) {
-    return 0;
-  }
   const userId = await getUserId();
   if (!userId) return 0;
+  const workspaceId = await ensureWorkspace();
+  if (!workspaceId) return 0;
 
   let added = 0;
   for (const c of customers) {
@@ -399,11 +437,11 @@ export async function setSelectedPhone(itemId: string, phone: string) {
 export async function startCalling(
   workspaceId?: string | null,
 ): Promise<{ dispatched: number }> {
-  // Workspace is fixed (shared Dhipaya workspace); ignore any passed-in id.
   void workspaceId;
-  if (!activeWorkspaceId) return { dispatched: 0 };
   const userId = await getUserId();
   if (!userId) return { dispatched: 0 };
+  const ws = await ensureWorkspace();
+  if (!ws) return { dispatched: 0 };
 
   const pendingCount = rows.filter((r) => r.status === "pending").length;
   if (pendingCount === 0) return { dispatched: 0 };
