@@ -159,6 +159,18 @@ function setupRealtime() {
     .subscribe();
 }
 
+// Bootstrap once on module load.
+if (typeof window !== "undefined") {
+  setupRealtime();
+  void refreshFromDb();
+  void refreshSessionState();
+  supabase.auth.onAuthStateChange((_e, session) => {
+    activeUserId = session?.user?.id ?? null;
+    void refreshFromDb();
+    void refreshSessionState();
+  });
+}
+
 async function getUserId(): Promise<string | null> {
   if (activeUserId) return activeUserId;
   const { data } = await supabase.auth.getUser();
