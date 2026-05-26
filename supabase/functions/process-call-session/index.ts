@@ -461,7 +461,7 @@ async function processSession(supabase: any, sessionId: string) {
   const BOT_ID = "6a0c3158b875327d960f0936";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
-  const BOT_TYPE = "init1";
+  const BOT_TYPE = "init";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
