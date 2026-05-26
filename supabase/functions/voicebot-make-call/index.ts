@@ -90,7 +90,7 @@ serve(async (req) => {
       event_id: eventId,
       tel_number: phone_number,
       phonenumber: phone_number,
-      flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
+      variables: preparedVariables
       sourcephone: "3525<SOURCE_PHONE_NUMBER>",
       speaker: "212",
       language: "th",

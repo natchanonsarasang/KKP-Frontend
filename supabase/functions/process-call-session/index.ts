@@ -637,13 +637,13 @@ async function processSession(supabase: any, sessionId: string) {
         const nextIntent = String(vars.next_intent || "{{consent}}").trim();
         const outboundId = `outbound_${item.id}`;
         const eventId = `event_${sessionId}_${item.id}`;
-
+        // flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
         const callPayload = {
           outbound_id: outboundId,
           event_id: eventId,
           tel_number: debtor.phone_number,
           phonenumber: debtor.phone_number,
-          flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
+          variables: preparedVariables
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
           speaker: "212",
           language: "th",
