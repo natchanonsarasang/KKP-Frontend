@@ -458,7 +458,7 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
 
-  const BOT_ID = "69d7214db875327d960ef7ac";
+  const BOT_ID = "6a0c3158b875327d960f0936";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 
@@ -641,10 +641,7 @@ async function processSession(supabase: any, sessionId: string) {
           outbound_id: outboundId,
           event_id: eventId,
           phonenumber: debtor.phone_number,
-          flow:
-            "<!outbound_id|<OUTBOUND_REF>!>|||" +
-            "<!customer_name|{{customer_name}}!>|||" +
-            nextIntent,
+          flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
           speaker: "212",
           language: "th",
@@ -669,7 +666,7 @@ async function processSession(supabase: any, sessionId: string) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${CALL_API_BEARER_TOKEN}`,
+            Authorization: `Bearer ${CALL_API_BEARER_TOKEN}`,
           },
           body: JSON.stringify(callPayload),
         });
@@ -817,7 +814,9 @@ async function processSession(supabase: any, sessionId: string) {
     .eq("id", sessionId);
 
   if (!isTestMode) {
-    console.log(`[Session ${sessionId}] Call initiated. Tokens deducted: ${tokensUsedInBatch}. Waiting for webhook to update stats.`);
+    console.log(
+      `[Session ${sessionId}] Call initiated. Tokens deducted: ${tokensUsedInBatch}. Waiting for webhook to update stats.`,
+    );
   }
 
   // Check if more items to process and if we have available slots
@@ -875,7 +874,9 @@ async function processSession(supabase: any, sessionId: string) {
       .gt("next_retry_at", checkNowIso);
 
     if (waitingForRetry && waitingForRetry > 0) {
-      console.log(`[Session ${sessionId}] No items ready now, but ${waitingForRetry} retries waiting for delay. Keeping session running.`);
+      console.log(
+        `[Session ${sessionId}] No items ready now, but ${waitingForRetry} retries waiting for delay. Keeping session running.`,
+      );
       return;
     }
 
