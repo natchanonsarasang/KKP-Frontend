@@ -89,6 +89,8 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         `Added ${added} customer${added > 1 ? "s" : ""} to the call list`,
       );
     }
+    // Always advance to the Call List step so the user lands where work happens.
+    onNextStep();
   }
 
   return (
