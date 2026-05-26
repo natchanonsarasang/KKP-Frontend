@@ -631,22 +631,36 @@ async function processSession(supabase: any, sessionId: string) {
           tokensUsed: tokensToDeduct,
         };
       } else {
-        // REAL MODE: Make actual call via new Voicebot API
+        // REAL MODE: Make actual call via flow payload format
+        const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
+        const outboundId = `outbound_${item.id}`;
+        const eventId = `event_${sessionId}_${item.id}`;
+        const nextIntent = String(vars.next_intent || "{{consent}}").trim();
+
         const callPayload = {
+          outbound_id: outboundId,
+          event_id: eventId,
+          phonenumber: debtor.phone_number,
+          flow:
+            "<!outbound_id|<OUTBOUND_REF>!>|||" +
+            "<!customer_name|<<customer_name>>!>|||" +
+            "<!name|<<name>>!>|||" +
+            nextIntent,
+          sourcephone: "3525<SOURCE_PHONE_NUMBER>",
+          speaker: "212",
+          language: "th",
+          agent_phone_number: "0800000000",
+          speed: "1",
+          tts: "voicebot-premium",
           bot_id: BOT_ID,
-          bot_type: "Confirm1",
-          tel_number: debtor.phone_number,
-          variables: vars,
-          asr: {
-            asr_provider: "botnoi-aws-th-noise-classifier-v17c",
-            asr_timeout: 5
+          asr_provider: ASR_PROVIDER,
+          asr_language_code: "th",
+          asr_vad_rules: {
+            false_timeout_sec: 1,
+            false_silence_sec: 0.1,
+            true_silence_sec: 0.25,
           },
           interruptible: typedSession.settings.interruptible ? "True" : "False",
-          vad: {
-            false_timeout_sec: "5",
-            false_silence_sec: "0.1",
-            true_silence_sec: "0.25",
-          },
         };
 
         console.log(`[Session ${sessionId}] Calling ${debtor.phone_number} via Voicebot API...`);
