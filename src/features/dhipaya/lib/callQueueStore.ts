@@ -143,10 +143,12 @@ async function dialOne(rowId: string): Promise<void> {
 
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
+    const nextIntent = row.customer.consentStatus === "Consent Given" ? "check_policy" : "consent";
     const variables = {
       name: fullName,
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
+      next_intent: nextIntent,
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("voicebot-make-call", {
       body: {
