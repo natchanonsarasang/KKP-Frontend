@@ -643,7 +643,7 @@ async function processSession(supabase: any, sessionId: string) {
           event_id: eventId,
           tel_number: debtor.phone_number,
           phonenumber: debtor.phone_number,
-          variables: preparedVariables
+          variables: preparedVariables,
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
           speaker: "212",
           language: "th",
