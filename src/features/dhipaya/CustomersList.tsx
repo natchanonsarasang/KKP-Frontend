@@ -44,10 +44,37 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
 
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["dhipaya-customers", currentOffset],
     queryFn: () => listCustomers({ pageSize: 50, offset: currentOffset }),
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  const customers = data?.customers ?? [];
+
+  // Reconcile selection against the latest fetched page — drop ghost IDs.
+  useEffect(() => {
+    if (!data) return;
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const currentIds = new Set(customers.map((c) => c.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  async function handleSync() {
+    await queryClient.invalidateQueries({ queryKey: ["dhipaya-customers"] });
+    await refetch();
+  }
 
   const customers = data?.customers ?? [];
 
