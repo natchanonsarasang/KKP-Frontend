@@ -9,6 +9,7 @@ const BOT_ID = "6a0c3158b875327d960f0936";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
+const BOT_TYPE = "Confirm1";
 
 const THAI_DIGIT_WORDS: Record<string, string> = {
   "0": "ศูนย์",
@@ -78,7 +79,7 @@ serve(async (req) => {
   }
 
   try {
-    const { phone_number, variables, interruptible, outbound_id, event_id, next_intent } = await req.json();
+    const { phone_number, variables, interruptible, outbound_id, event_id, next_intent, bot_type } = await req.json();
     const preparedVariables = prepareVoicebotVariables(variables);
     const outboundId = String(outbound_id || `outbound_${Date.now()}`);
     const eventId = String(event_id || `event_${Date.now()}`);
@@ -100,6 +101,7 @@ serve(async (req) => {
       speed: "1",
       tts: "voicebot-premium",
       bot_id: BOT_ID,
+      bot_type: nextIntent,
       asr_provider: ASR_PROVIDER,
       asr_language_code: "th",
       asr_vad_rules: {
