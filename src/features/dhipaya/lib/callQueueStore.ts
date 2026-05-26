@@ -437,11 +437,11 @@ export async function setSelectedPhone(itemId: string, phone: string) {
 export async function startCalling(
   workspaceId?: string | null,
 ): Promise<{ dispatched: number }> {
-  // Workspace is fixed (shared Dhipaya workspace); ignore any passed-in id.
   void workspaceId;
-  if (!activeWorkspaceId) return { dispatched: 0 };
   const userId = await getUserId();
   if (!userId) return { dispatched: 0 };
+  const ws = await ensureWorkspace();
+  if (!ws) return { dispatched: 0 };
 
   const pendingCount = rows.filter((r) => r.status === "pending").length;
   if (pendingCount === 0) return { dispatched: 0 };
