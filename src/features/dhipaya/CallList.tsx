@@ -188,8 +188,8 @@ const DhipayaCallList = () => {
     ? Math.round(((counts.completed + counts.calling * 0.5) / counts.total) * 100)
     : 0;
 
-  function handleStart() {
-    const { dispatched } = startCalling(currentWorkspace?.id ?? null);
+  async function handleStart() {
+    const { dispatched } = await startCalling(currentWorkspace?.id ?? null);
     if (dispatched === 0) {
       toast.info("Nothing to call");
     } else {
