@@ -6,12 +6,7 @@ import type { Customer } from "../types";
 // Concurrency limit applied across the whole page (background-safe).
 export const CONCURRENCY = 5;
 
-export type QueueStatus =
-  | "pending"
-  | "calling"
-  | "success"
-  | "failed"
-  | "no_answer";
+export type QueueStatus = "pending" | "calling" | "success" | "failed" | "no_answer";
 
 export interface PhoneOption {
   label: string;
@@ -105,9 +100,7 @@ export function clearCallQueue() {
 }
 
 export function clearCompleted() {
-  const next = rows.filter(
-    (r) => r.status === "pending" || r.status === "calling",
-  );
+  const next = rows.filter((r) => r.status === "pending" || r.status === "calling");
   if (next.length !== rows.length) {
     rows = next;
     emit();
@@ -149,36 +142,28 @@ async function dialOne(rowId: string): Promise<void> {
   const workspaceId = activeWorkspaceId;
 
   try {
-    const fullName = [row.customer.firstName, row.customer.lastName]
-      .filter(Boolean)
-      .join(" ");
+    const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
     const variables = {
-      name: fullName,
+      customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
     };
-    const { data: resp, error: invokeErr } = await supabase.functions.invoke(
-      "voicebot-make-call",
-      {
-        body: {
-          phone_number: row.selectedPhone,
-          variables,
-          interruptible: false,
-        },
+    const { data: resp, error: invokeErr } = await supabase.functions.invoke("voicebot-make-call", {
+      body: {
+        phone_number: row.selectedPhone,
+        variables,
+        interruptible: false,
       },
-    );
+    });
     if (invokeErr) throw new Error(invokeErr.message);
 
-    const outboundId: string | undefined =
-      (resp && typeof resp === "object" && (resp as any).outbound_id) ||
-      undefined;
+    const outboundId: string | undefined = (resp && typeof resp === "object" && (resp as any).outbound_id) || undefined;
 
     if (!outboundId) {
       updateRow(rowId, {
         status: "failed",
         finishedAt: Date.now(),
         errorMessage:
-          (resp && typeof resp === "object" && (resp as any).error) ||
-          "No outbound_id returned from voicebot API",
+          (resp && typeof resp === "object" && (resp as any).error) || "No outbound_id returned from voicebot API",
       });
       return;
     }
@@ -260,9 +245,7 @@ export function stopCalling() {
 }
 
 // ---------- webhook reconciliation ----------
-function mapDbStatusToQueueStatus(
-  status: string | null | undefined,
-): QueueStatus | null {
+function mapDbStatusToQueueStatus(status: string | null | undefined): QueueStatus | null {
   if (!status) return null;
   switch (status) {
     case "confirmed":
@@ -304,8 +287,7 @@ export function applyCallRecordUpdate(record: {
   updateRow(row.id, {
     status: next,
     finishedAt: Date.now(),
-    callOutcome:
-      typeof action === "string" && action ? action : record.status || undefined,
+    callOutcome: typeof action === "string" && action ? action : record.status || undefined,
     callDuration: record.call_duration ?? undefined,
     conversationLog: rd.conversation_log ?? null,
     audioUrl: rd.audio_url ?? null,
@@ -315,15 +297,11 @@ export function applyCallRecordUpdate(record: {
 }
 
 export async function reconcileCallingRows() {
-  const outboundIds = rows
-    .filter((r) => r.status === "calling" && r.outboundId)
-    .map((r) => r.outboundId!) as string[];
+  const outboundIds = rows.filter((r) => r.status === "calling" && r.outboundId).map((r) => r.outboundId!) as string[];
   if (outboundIds.length === 0) return;
   const { data } = await supabase
     .from("call_records")
-    .select(
-      "botnoi_call_id, status, result_data, call_duration, appointment_date, appointment_time",
-    )
+    .select("botnoi_call_id, status, result_data, call_duration, appointment_date, appointment_time")
     .in("botnoi_call_id", outboundIds);
   if (!data) return;
   for (const rec of data) applyCallRecordUpdate(rec as any);
