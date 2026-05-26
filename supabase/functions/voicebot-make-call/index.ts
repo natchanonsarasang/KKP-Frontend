@@ -9,7 +9,7 @@ const BOT_ID = "6a0c3158b875327d960f0936";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
-const BOT_TYPE = "template";
+const BOT_TYPE = "consent";
 
 const THAI_DIGIT_WORDS: Record<string, string> = {
   "0": "ศูนย์",
