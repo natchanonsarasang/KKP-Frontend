@@ -109,14 +109,12 @@ function mapDbStatus(s: string | null | undefined): QueueStatus {
   }
 }
 
-// ---------- workspace setter ----------
-export function setActiveWorkspaceId(workspaceId: string | null) {
-  if (activeWorkspaceId === workspaceId) return;
-  activeWorkspaceId = workspaceId;
-  rows = [];
-  emit();
+// ---------- workspace setter (kept for back-compat; the Dhipaya workspace is now fixed) ----------
+export function setActiveWorkspaceId(_workspaceId: string | null) {
+  // No-op: Dhipaya always uses the shared workspace. We just make sure realtime is wired up.
+  if (!realtimeChannel) setupRealtime();
   void refreshFromDb();
-  setupRealtime();
+  void refreshSessionState();
 }
 
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
