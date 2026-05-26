@@ -162,11 +162,11 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
+              onClick={handleSync}
               disabled={isFetching}
             >
               <RefreshCcw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
+              {isFetching ? "Syncing…" : "Sync"}
             </Button>
             <Button
               variant="default"
