@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Phone,
@@ -39,6 +46,8 @@ import {
   Inbox,
   Loader2,
   X,
+  FileText,
+  Volume2,
 } from "lucide-react";
 import {
   useQueueRows,
@@ -51,6 +60,7 @@ import {
   setSelectedPhone,
   applyCallRecordUpdate,
   reconcileCallingRows,
+  setActiveWorkspaceId,
   CONCURRENCY,
   type QueueRow,
   type QueueStatus,
@@ -82,13 +92,31 @@ function StatusBadge({ status }: { status: QueueStatus }) {
   );
 }
 
+function formatDuration(s?: number) {
+  if (!s || s <= 0) return "—";
+  const m = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return `${m}:${ss}`;
+}
+
+type TabKey = "pending" | "calling" | "completed";
+
 const DhipayaCallList = () => {
   const queue = useQueueRows();
   const isRunning = useIsCalling();
   const { currentWorkspace } = useWorkspace();
+  const [activeTab, setActiveTab] = useState<TabKey>("pending");
+  const [transcript, setTranscript] = useState<{
+    conversationLog: string | null;
+    audioUrl: string | null;
+  } | null>(null);
 
-  // Reconcile any in-flight calls on mount (in case user navigated away
-  // and the webhook fired while this page was not subscribed).
+  // Keep store in sync with the current workspace.
+  useEffect(() => {
+    setActiveWorkspaceId(currentWorkspace?.id ?? null);
+  }, [currentWorkspace?.id]);
+
+  // Reconcile any in-flight calls on mount.
   useEffect(() => {
     reconcileCallingRows();
   }, []);
@@ -140,15 +168,33 @@ const DhipayaCallList = () => {
     return c;
   }, [queue]);
 
+  // Auto switch tabs based on activity.
+  const callingCount = counts.calling;
+  useEffect(() => {
+    if (callingCount > 0) setActiveTab("calling");
+  }, [callingCount]);
+
+  useEffect(() => {
+    if (
+      counts.total > 0 &&
+      counts.pending === 0 &&
+      counts.calling === 0 &&
+      counts.completed > 0
+    ) {
+      setActiveTab("completed");
+    }
+  }, [counts.total, counts.pending, counts.calling, counts.completed]);
+
   const progressPct = counts.total
     ? Math.round(((counts.completed + counts.calling * 0.5) / counts.total) * 100)
     : 0;
 
   function handleStart() {
-    const { dispatched } = startCalling();
+    const { dispatched } = startCalling(currentWorkspace?.id ?? null);
     if (dispatched === 0) {
       toast.info("Nothing to call");
     } else {
+      setActiveTab("calling");
       toast.success(
         `Calling ${dispatched} customer${dispatched > 1 ? "s" : ""} (max ${CONCURRENCY} in parallel)`,
       );
@@ -160,7 +206,7 @@ const DhipayaCallList = () => {
     toast.info("Stopping after in-flight calls dispatch");
   }
 
-  const rowsByTab: Record<"pending" | "calling" | "completed", QueueRow[]> = {
+  const rowsByTab: Record<TabKey, QueueRow[]> = {
     pending: queue.filter((r) => r.status === "pending"),
     calling: queue.filter((r) => r.status === "calling"),
     completed: queue.filter(
@@ -213,7 +259,6 @@ const DhipayaCallList = () => {
         </div>
       </div>
 
-      {/* Progress bar — visible whenever there's something to track */}
       {queue.length > 0 && (
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
@@ -266,7 +311,7 @@ const DhipayaCallList = () => {
           </p>
         </Card>
       ) : (
-        <Tabs defaultValue={counts.calling > 0 ? "calling" : "pending"}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
           <TabsList>
             <TabsTrigger value="pending">
               Pending ({rowsByTab.pending.length})
@@ -288,14 +333,15 @@ const DhipayaCallList = () => {
                       <TableHead>Phone</TableHead>
                       <TableHead>Policy</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="w-[60px]"></TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead className="w-[120px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rowsByTab[tab].length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="text-center text-muted-foreground py-8"
                         >
                           No items.
@@ -357,7 +403,10 @@ const DhipayaCallList = () => {
                               </p>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDuration(r.callDuration)}
+                          </TableCell>
+                          <TableCell className="text-right">
                             {r.status === "pending" && (
                               <Button
                                 variant="ghost"
@@ -368,6 +417,24 @@ const DhipayaCallList = () => {
                                 <X className="w-4 h-4" />
                               </Button>
                             )}
+                            {(r.status === "success" ||
+                              r.status === "failed" ||
+                              r.status === "no_answer") &&
+                              (r.conversationLog || r.audioUrl) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    setTranscript({
+                                      conversationLog: r.conversationLog ?? null,
+                                      audioUrl: r.audioUrl ?? null,
+                                    })
+                                  }
+                                >
+                                  <FileText className="w-4 h-4 mr-1" />
+                                  Transcript
+                                </Button>
+                              )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -379,6 +446,42 @@ const DhipayaCallList = () => {
           ))}
         </Tabs>
       )}
+
+      <Dialog open={!!transcript} onOpenChange={(o) => !o && setTranscript(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Call Transcript</DialogTitle>
+            <DialogDescription>
+              Conversation log and recording from this call.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {transcript?.audioUrl ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Volume2 className="w-4 h-4" />
+                  Recording
+                </div>
+                <audio controls className="w-full" src={transcript.audioUrl} />
+              </div>
+            ) : null}
+            {transcript?.conversationLog ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Conversation</div>
+                <pre className="text-xs whitespace-pre-wrap bg-muted p-3 rounded max-h-[400px] overflow-auto">
+                  {transcript.conversationLog}
+                </pre>
+              </div>
+            ) : (
+              !transcript?.audioUrl && (
+                <p className="text-sm text-muted-foreground">
+                  No transcript available.
+                </p>
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
