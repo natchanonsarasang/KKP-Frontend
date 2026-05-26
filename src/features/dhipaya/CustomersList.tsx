@@ -85,7 +85,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     gcTime: 0,
   });
 
-  const customers = data?.customers ?? [];
+  const customers = useMemo(() => data?.customers ?? [], [data?.customers]);
 
   // Reconcile selection against the latest fetched page — drop ghost IDs.
   useEffect(() => {
