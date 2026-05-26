@@ -129,16 +129,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     });
   }
 
-  function sendSelectedToCallList() {
+  async function sendSelectedToCallList() {
     const chosen = customers.filter((c) => selectedIds.has(c.id));
     if (chosen.length === 0) {
       toast.error("Select at least one customer");
       return;
     }
-    const added = addToCallQueue(chosen);
+    const added = await addToCallQueue(chosen);
     setSelectedIds(new Set());
     if (added === 0) {
-      toast.info("All selected customers are already in the call queue");
+      toast.error("Could not add to call list (missing phone numbers?)");
     } else {
       toast.success(
         `Added ${added} customer${added > 1 ? "s" : ""} to the call list`,
