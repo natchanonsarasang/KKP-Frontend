@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,15 +30,18 @@ import {
   PhoneOff,
   Play,
   Square,
-  Loader2,
-  RefreshCcw,
   CheckCircle,
-  XCircle,
   Clock,
   AlertCircle,
+  Trash2,
+  Inbox,
 } from "lucide-react";
-import { listCustomers } from "./api/airtable";
 import { normalizeThaiPhone } from "./lib/phone";
+import {
+  useCallQueue,
+  clearCallQueue,
+  removeFromCallQueue,
+} from "./lib/callQueueStore";
 import type { Customer } from "./types";
 
 const CONCURRENCY = 5;
@@ -91,38 +93,43 @@ const DhipayaCallList = () => {
   const stopRef = useRef(false);
   const runningRef = useRef(0);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ["dhipaya-calllist-customers"],
-    queryFn: () => listCustomers({ pageSize: 100 }),
-  });
+  const queued = useCallQueue();
 
-  // Seed the queue from Airtable customers (only when we have no rows yet).
+  // Sync rows from the shared queue store. Keep existing per-row state
+  // (selected phone, status, errors) when the same customer is still queued.
   useEffect(() => {
-    if (!data?.customers || queue.length > 0) return;
-    const rows: QueueRow[] = [];
-    for (const c of data.customers) {
-      const candidates: Array<{ label: string; raw?: string }> = [
-        { label: "Phone 1", raw: c.phone1 },
-        { label: "Phone 2", raw: c.phone2 },
-        { label: "Phone 3", raw: c.phone3 },
-      ];
-      const phoneOptions: PhoneOption[] = [];
-      for (const { label, raw } of candidates) {
-        if (!raw) continue;
-        const phone = normalizeThaiPhone(raw);
-        if (phone) phoneOptions.push({ label, raw, phone });
+    setQueue((prev) => {
+      const prevById = new Map(prev.map((r) => [r.id, r]));
+      const next: QueueRow[] = [];
+      for (const c of queued) {
+        const existing = prevById.get(c.id);
+        if (existing) {
+          next.push(existing);
+          continue;
+        }
+        const candidates: Array<{ label: string; raw?: string }> = [
+          { label: "Phone 1", raw: c.phone1 },
+          { label: "Phone 2", raw: c.phone2 },
+          { label: "Phone 3", raw: c.phone3 },
+        ];
+        const phoneOptions: PhoneOption[] = [];
+        for (const { label, raw } of candidates) {
+          if (!raw) continue;
+          const phone = normalizeThaiPhone(raw);
+          if (phone) phoneOptions.push({ label, raw, phone });
+        }
+        if (phoneOptions.length === 0) continue;
+        next.push({
+          id: c.id,
+          customer: c,
+          phoneOptions,
+          selectedPhone: phoneOptions[0].phone,
+          status: "pending",
+        });
       }
-      if (phoneOptions.length === 0) continue;
-      rows.push({
-        id: c.id,
-        customer: c,
-        phoneOptions,
-        selectedPhone: phoneOptions[0].phone,
-        status: "pending",
-      });
-    }
-    setQueue(rows);
-  }, [data, queue.length]);
+      return next;
+    });
+  }, [queued]);
 
   const updateRow = (id: string, patch: Partial<QueueRow>) => {
     setQueue((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -238,14 +245,19 @@ const DhipayaCallList = () => {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Call List</h2>
           <p className="text-sm text-muted-foreground">
-            Dhipaya queue from Airtable · phones normalized to 0XXXXXXXXX · max{" "}
+            Dhipaya queue · phones normalized to 0XXXXXXXXX · max{" "}
             {CONCURRENCY} parallel
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching || isRunning}>
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Refresh
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => clearCallQueue()}
+            disabled={isRunning || queue.length === 0}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Clear queue
           </Button>
           {isRunning ? (
             <Button variant="destructive" onClick={stopCalling}>
@@ -268,18 +280,16 @@ const DhipayaCallList = () => {
         <StatCard label="Completed" value={counts.completed} />
       </div>
 
-      {isLoading ? (
-        <Card className="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-          Loading queue...
-        </Card>
-      ) : isError ? (
-        <Card className="p-6 text-sm text-destructive">
-          {(error as Error)?.message || "Failed to load customers."}
-        </Card>
-      ) : queue.length === 0 ? (
-        <Card className="p-12 text-center text-muted-foreground text-sm">
-          No callable customers found.
+      {queue.length === 0 ? (
+        <Card className="p-12 text-center space-y-3">
+          <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+            <Inbox className="w-6 h-6 text-muted-foreground" />
+          </div>
+          <p className="font-medium">Your call queue is empty</p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Go to the Customers step, select the customers you want to call, and
+            click <span className="font-medium">Send to Call List</span>.
+          </p>
         </Card>
       ) : (
         <Tabs defaultValue="pending">
