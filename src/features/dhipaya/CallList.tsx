@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -35,35 +37,24 @@ import {
   AlertCircle,
   Trash2,
   Inbox,
+  Loader2,
+  X,
 } from "lucide-react";
-import { normalizeThaiPhone } from "./lib/phone";
 import {
-  useCallQueue,
+  useQueueRows,
+  useIsCalling,
+  startCalling,
+  stopCalling,
   clearCallQueue,
+  clearCompleted,
   removeFromCallQueue,
+  setSelectedPhone,
+  applyCallRecordUpdate,
+  reconcileCallingRows,
+  CONCURRENCY,
+  type QueueRow,
+  type QueueStatus,
 } from "./lib/callQueueStore";
-import type { Customer } from "./types";
-
-const CONCURRENCY = 5;
-
-type QueueStatus = "pending" | "calling" | "success" | "failed" | "no_answer";
-
-interface PhoneOption {
-  label: string; // e.g. "Phone 1"
-  raw: string;
-  phone: string; // normalized
-}
-
-interface QueueRow {
-  id: string;
-  customer: Customer;
-  phoneOptions: PhoneOption[];
-  selectedPhone: string; // normalized; one of phoneOptions[].phone
-  status: QueueStatus;
-  startedAt?: number;
-  finishedAt?: number;
-  errorMessage?: string;
-}
 
 const statusConfig: Record<
   QueueStatus,
@@ -81,191 +72,140 @@ function StatusBadge({ status }: { status: QueueStatus }) {
   const Icon = cfg.icon;
   return (
     <Badge variant="outline" className={`gap-1 ${cfg.className}`}>
-      <Icon className="w-3 h-3" />
+      {status === "calling" ? (
+        <Loader2 className="w-3 h-3 animate-spin" />
+      ) : (
+        <Icon className="w-3 h-3" />
+      )}
       {cfg.label}
     </Badge>
   );
 }
 
 const DhipayaCallList = () => {
-  const [queue, setQueue] = useState<QueueRow[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const stopRef = useRef(false);
-  const runningRef = useRef(0);
+  const queue = useQueueRows();
+  const isRunning = useIsCalling();
+  const { currentWorkspace } = useWorkspace();
 
-  const queued = useCallQueue();
-
-  // Sync rows from the shared queue store. Keep existing per-row state
-  // (selected phone, status, errors) when the same customer is still queued.
+  // Reconcile any in-flight calls on mount (in case user navigated away
+  // and the webhook fired while this page was not subscribed).
   useEffect(() => {
-    setQueue((prev) => {
-      const prevById = new Map(prev.map((r) => [r.id, r]));
-      const next: QueueRow[] = [];
-      for (const c of queued) {
-        const existing = prevById.get(c.id);
-        if (existing) {
-          next.push(existing);
-          continue;
-        }
-        const candidates: Array<{ label: string; raw?: string }> = [
-          { label: "Phone 1", raw: c.phone1 },
-          { label: "Phone 2", raw: c.phone2 },
-          { label: "Phone 3", raw: c.phone3 },
-        ];
-        const phoneOptions: PhoneOption[] = [];
-        for (const { label, raw } of candidates) {
-          if (!raw) continue;
-          const phone = normalizeThaiPhone(raw);
-          if (phone) phoneOptions.push({ label, raw, phone });
-        }
-        if (phoneOptions.length === 0) continue;
-        next.push({
-          id: c.id,
-          customer: c,
-          phoneOptions,
-          selectedPhone: phoneOptions[0].phone,
-          status: "pending",
-        });
-      }
-      return next;
-    });
-  }, [queued]);
+    reconcileCallingRows();
+  }, []);
 
-  const updateRow = (id: string, patch: Partial<QueueRow>) => {
-    setQueue((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  };
-
-  async function dialOne(row: QueueRow): Promise<void> {
-    updateRow(row.id, { status: "calling", startedAt: Date.now() });
-    try {
-      const variables = {
-        name: [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" "),
-        policy_no: row.customer.policyNumber || "",
-      };
-      const { data: resp, error: invokeErr } = await supabase.functions.invoke(
-        "voicebot-make-call",
-        { body: { phone_number: row.selectedPhone, variables, interruptible: false } },
-      );
-      if (invokeErr) throw new Error(invokeErr.message);
-      const status: QueueStatus =
-        resp && typeof resp === "object" && "success" in resp && !(resp as any).success
-          ? "failed"
-          : "success";
-      updateRow(row.id, { status, finishedAt: Date.now() });
-    } catch (e) {
-      updateRow(row.id, {
-        status: "failed",
-        finishedAt: Date.now(),
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }
+  // Realtime subscription on call_records → completion signal from webhook.
+  useEffect(() => {
+    if (!currentWorkspace?.id) return;
+    const channel = supabase
+      .channel(`dhipaya-call-records-${currentWorkspace.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "call_records",
+          filter: `workspace_id=eq.${currentWorkspace.id}`,
+        },
+        (payload) => {
+          const rec = (payload.new || payload.old) as any;
+          if (rec) applyCallRecordUpdate(rec);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentWorkspace?.id]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, calling: 0, completed: 0, total: queue.length };
+    const c = {
+      pending: 0,
+      calling: 0,
+      completed: 0,
+      success: 0,
+      failed: 0,
+      no_answer: 0,
+      total: queue.length,
+    };
     for (const r of queue) {
       if (r.status === "pending") c.pending++;
       else if (r.status === "calling") c.calling++;
-      else c.completed++;
+      else {
+        c.completed++;
+        if (r.status === "success") c.success++;
+        else if (r.status === "failed") c.failed++;
+        else if (r.status === "no_answer") c.no_answer++;
+      }
     }
     return c;
   }, [queue]);
 
-  async function startCalling() {
-    if (isRunning || queue.length === 0) return;
-    setIsRunning(true);
-    stopRef.current = false;
+  const progressPct = counts.total
+    ? Math.round(((counts.completed + counts.calling * 0.5) / counts.total) * 100)
+    : 0;
 
-    // Snapshot pending IDs at start; new pendings added later are ignored.
-    let cursor = 0;
-    const pendingIds = queue.filter((r) => r.status === "pending").map((r) => r.id);
-    if (pendingIds.length === 0) {
+  function handleStart() {
+    const { dispatched } = startCalling();
+    if (dispatched === 0) {
       toast.info("Nothing to call");
-      setIsRunning(false);
-      return;
+    } else {
+      toast.success(
+        `Calling ${dispatched} customer${dispatched > 1 ? "s" : ""} (max ${CONCURRENCY} in parallel)`,
+      );
     }
-    toast.success(`Starting ${pendingIds.length} calls (max ${CONCURRENCY} parallel)`);
-
-    await new Promise<void>((resolve) => {
-      const pump = () => {
-        if (stopRef.current && runningRef.current === 0) {
-          resolve();
-          return;
-        }
-        while (
-          !stopRef.current &&
-          runningRef.current < CONCURRENCY &&
-          cursor < pendingIds.length
-        ) {
-          const id = pendingIds[cursor++];
-          // Re-read latest row each time
-          setQueue((prev) => {
-            const row = prev.find((r) => r.id === id);
-            if (row && row.status === "pending") {
-              runningRef.current++;
-              dialOne(row).finally(() => {
-                runningRef.current--;
-                pump();
-              });
-            }
-            return prev;
-          });
-        }
-        if (
-          (cursor >= pendingIds.length || stopRef.current) &&
-          runningRef.current === 0
-        ) {
-          resolve();
-        }
-      };
-      pump();
-    });
-
-    setIsRunning(false);
-    stopRef.current = false;
-    toast.success("Call session finished");
   }
 
-  function stopCalling() {
-    stopRef.current = true;
-    toast.info("Stopping after in-flight calls finish");
+  function handleStop() {
+    stopCalling();
+    toast.info("Stopping after in-flight calls dispatch");
   }
 
   const rowsByTab: Record<"pending" | "calling" | "completed", QueueRow[]> = {
     pending: queue.filter((r) => r.status === "pending"),
     calling: queue.filter((r) => r.status === "calling"),
     completed: queue.filter(
-      (r) => r.status === "success" || r.status === "failed" || r.status === "no_answer",
+      (r) =>
+        r.status === "success" ||
+        r.status === "failed" ||
+        r.status === "no_answer",
     ),
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Call List</h2>
           <p className="text-sm text-muted-foreground">
-            Dhipaya queue · phones normalized to 0XXXXXXXXX · max{" "}
-            {CONCURRENCY} parallel
+            Dhipaya queue · max {CONCURRENCY} parallel · completion confirmed by
+            webhook
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => clearCallQueue()}
+            onClick={clearCompleted}
+            disabled={counts.completed === 0}
+          >
+            Clear completed
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearCallQueue}
             disabled={isRunning || queue.length === 0}
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            Clear queue
+            Clear all
           </Button>
           {isRunning ? (
-            <Button variant="destructive" onClick={stopCalling}>
+            <Button variant="destructive" onClick={handleStop}>
               <Square className="w-4 h-4 mr-2" />
               Stop
             </Button>
           ) : (
-            <Button onClick={startCalling} disabled={counts.pending === 0}>
+            <Button onClick={handleStart} disabled={counts.pending === 0}>
               <Play className="w-4 h-4 mr-2" />
               Start Calling ({counts.pending})
             </Button>
@@ -273,11 +213,45 @@ const DhipayaCallList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Progress bar — visible whenever there's something to track */}
+      {queue.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              {isRunning || counts.calling > 0 ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : (
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
+              )}
+              <span className="font-medium">
+                {counts.calling > 0
+                  ? `${counts.calling} call${counts.calling > 1 ? "s" : ""} in progress`
+                  : isRunning
+                    ? "Dispatching calls…"
+                    : counts.pending > 0
+                      ? "Idle"
+                      : "All done"}
+              </span>
+              <span className="text-muted-foreground">
+                · {counts.completed}/{counts.total} completed
+              </span>
+            </div>
+            <span className="text-muted-foreground">{progressPct}%</span>
+          </div>
+          <Progress value={progressPct} className="h-2" />
+          <p className="text-xs text-muted-foreground">
+            You can leave this page — calls continue in the background and will
+            be marked complete when the voicebot webhook returns.
+          </p>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="Total" value={counts.total} />
         <StatCard label="Pending" value={counts.pending} />
-        <StatCard label="Calling" value={counts.calling} />
-        <StatCard label="Completed" value={counts.completed} />
+        <StatCard label="Calling" value={counts.calling} highlight={counts.calling > 0} />
+        <StatCard label="Success" value={counts.success} />
+        <StatCard label="Failed / No Answer" value={counts.failed + counts.no_answer} />
       </div>
 
       {queue.length === 0 ? (
@@ -292,11 +266,17 @@ const DhipayaCallList = () => {
           </p>
         </Card>
       ) : (
-        <Tabs defaultValue="pending">
+        <Tabs defaultValue={counts.calling > 0 ? "calling" : "pending"}>
           <TabsList>
-            <TabsTrigger value="pending">Pending ({rowsByTab.pending.length})</TabsTrigger>
-            <TabsTrigger value="calling">Calling ({rowsByTab.calling.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({rowsByTab.completed.length})</TabsTrigger>
+            <TabsTrigger value="pending">
+              Pending ({rowsByTab.pending.length})
+            </TabsTrigger>
+            <TabsTrigger value="calling">
+              Calling ({rowsByTab.calling.length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              Completed ({rowsByTab.completed.length})
+            </TabsTrigger>
           </TabsList>
           {(["pending", "calling", "completed"] as const).map((tab) => (
             <TabsContent key={tab} value={tab} className="mt-3">
@@ -308,12 +288,16 @@ const DhipayaCallList = () => {
                       <TableHead>Phone</TableHead>
                       <TableHead>Policy</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rowsByTab[tab].length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell
+                          colSpan={5}
+                          className="text-center text-muted-foreground py-8"
+                        >
                           No items.
                         </TableCell>
                       </TableRow>
@@ -329,7 +313,7 @@ const DhipayaCallList = () => {
                             {r.status === "pending" && r.phoneOptions.length > 1 ? (
                               <Select
                                 value={r.selectedPhone}
-                                onValueChange={(v) => updateRow(r.id, { selectedPhone: v })}
+                                onValueChange={(v) => setSelectedPhone(r.id, v)}
                               >
                                 <SelectTrigger className="h-8 w-[180px] font-mono">
                                   <SelectValue />
@@ -349,7 +333,9 @@ const DhipayaCallList = () => {
                               <span className="font-mono">{r.selectedPhone}</span>
                             )}
                             {(() => {
-                              const sel = r.phoneOptions.find((o) => o.phone === r.selectedPhone);
+                              const sel = r.phoneOptions.find(
+                                (o) => o.phone === r.selectedPhone,
+                              );
                               return sel ? (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {sel.label} · {sel.raw}
@@ -360,8 +346,27 @@ const DhipayaCallList = () => {
                           <TableCell>{r.customer.policyNumber || "—"}</TableCell>
                           <TableCell>
                             <StatusBadge status={r.status} />
+                            {r.callOutcome && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {r.callOutcome}
+                              </p>
+                            )}
                             {r.errorMessage && (
-                              <p className="text-xs text-destructive mt-1">{r.errorMessage}</p>
+                              <p className="text-xs text-destructive mt-1">
+                                {r.errorMessage}
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {r.status === "pending" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => removeFromCallQueue(r.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
                             )}
                           </TableCell>
                         </TableRow>
@@ -378,10 +383,20 @@ const DhipayaCallList = () => {
   );
 };
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
   return (
-    <Card className="p-4">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+    <Card className={`p-4 ${highlight ? "ring-2 ring-primary" : ""}`}>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
     </Card>
   );
