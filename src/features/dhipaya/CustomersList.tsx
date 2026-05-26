@@ -139,7 +139,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <TableRow>
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={allSelected || (someSelected && "indeterminate")}
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
                     onCheckedChange={toggleAll}
                     aria-label="Select all"
                     disabled={callable.length === 0}
