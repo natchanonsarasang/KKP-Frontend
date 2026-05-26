@@ -34,8 +34,11 @@ export interface QueueRow {
   appointmentTime?: string | null;
 }
 
+// Shared Dhipaya workspace — every authenticated user is a member (see migration).
+export const DHIPAYA_WORKSPACE_ID = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1";
+
 // ---------- module state ----------
-let activeWorkspaceId: string | null = null;
+let activeWorkspaceId: string | null = DHIPAYA_WORKSPACE_ID;
 let activeUserId: string | null = null;
 let rows: QueueRow[] = [];
 let sessionRunning = false;
@@ -106,14 +109,12 @@ function mapDbStatus(s: string | null | undefined): QueueStatus {
   }
 }
 
-// ---------- workspace setter ----------
-export function setActiveWorkspaceId(workspaceId: string | null) {
-  if (activeWorkspaceId === workspaceId) return;
-  activeWorkspaceId = workspaceId;
-  rows = [];
-  emit();
+// ---------- workspace setter (kept for back-compat; the Dhipaya workspace is now fixed) ----------
+export function setActiveWorkspaceId(_workspaceId: string | null) {
+  // No-op: Dhipaya always uses the shared workspace. We just make sure realtime is wired up.
+  if (!realtimeChannel) setupRealtime();
   void refreshFromDb();
-  setupRealtime();
+  void refreshSessionState();
 }
 
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -156,6 +157,18 @@ function setupRealtime() {
       () => void refreshSessionState(),
     )
     .subscribe();
+}
+
+// Bootstrap once on module load.
+if (typeof window !== "undefined") {
+  setupRealtime();
+  void refreshFromDb();
+  void refreshSessionState();
+  supabase.auth.onAuthStateChange((_e, session) => {
+    activeUserId = session?.user?.id ?? null;
+    void refreshFromDb();
+    void refreshSessionState();
+  });
 }
 
 async function getUserId(): Promise<string | null> {
@@ -386,7 +399,8 @@ export async function setSelectedPhone(itemId: string, phone: string) {
 export async function startCalling(
   workspaceId?: string | null,
 ): Promise<{ dispatched: number }> {
-  if (workspaceId !== undefined) activeWorkspaceId = workspaceId;
+  // Workspace is fixed (shared Dhipaya workspace); ignore any passed-in id.
+  void workspaceId;
   if (!activeWorkspaceId) return { dispatched: 0 };
   const userId = await getUserId();
   if (!userId) return { dispatched: 0 };
