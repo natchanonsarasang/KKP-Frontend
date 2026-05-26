@@ -133,6 +133,19 @@ Deno.serve(async (req) => {
     const text = await upstream.text();
     const ct = upstream.headers.get("content-type") ?? "application/json";
 
+    if (!upstream.ok) {
+      console.error("Airtable error", {
+        status: upstream.status,
+        table: body.table,
+        method,
+        baseIdPrefix: AIRTABLE_BASE_ID.slice(0, 6),
+        baseIdLooksValid: AIRTABLE_BASE_ID.startsWith("app"),
+        patPrefix: AIRTABLE_PAT.slice(0, 6),
+        patLooksValid: AIRTABLE_PAT.startsWith("pat"),
+        response: text.slice(0, 500),
+      });
+    }
+
     return new Response(text, {
       status: upstream.status,
       headers: { ...corsHeaders, "Content-Type": ct },
