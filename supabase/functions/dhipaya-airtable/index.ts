@@ -60,17 +60,7 @@ Deno.serve(async (req) => {
 
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
-    const userId = userRes.user.id;
-
-    // Role check: dhipaya or admin
-    const { data: roles, error: rolesErr } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .in("role", ["dhipaya", "admin"]);
-
-    if (rolesErr) return json({ error: "Role check failed" }, 500);
-    if (!roles || roles.length === 0) return json({ error: "Forbidden: dhipaya role required" }, 403);
+    // Any authenticated user may access Dhipaya.
 
     // Parse request
     const body = (await req.json()) as ProxyRequest;
