@@ -641,7 +641,7 @@ async function processSession(supabase: any, sessionId: string) {
         const callPayload = {
           outbound_id: outboundId,
           event_id: eventId,
-          tel: debtor.phone_number,
+          tel_number: debtor.phone_number,
           phonenumber: debtor.phone_number,
           flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
