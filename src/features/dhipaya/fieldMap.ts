@@ -33,7 +33,7 @@ export const POLICY_FIELDS = {
   renewalPremium: "renewal_premium",
   outstanding: "outstanding_balance",
   customer: "customer",
-  expiryDate: "Expiry_date",
+  expiryDate: "Expiry_Date",
 } as const;
 
 export const CALL_LOG_FIELDS = {
