@@ -458,10 +458,10 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
 
-  const BOT_ID = "6a0c3158b875327d960f0936";
+  const BOT_ID = "6a06964fb875327d960f05f0";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
-  const BOT_TYPE = "init1";
+  const BOT_TYPE = "Confirm1";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -634,7 +634,6 @@ async function processSession(supabase: any, sessionId: string) {
       } else {
         // REAL MODE: Make actual call via flow payload format
         const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
-        const nextIntent = String(vars.next_intent || "{{consent}}").trim();
         const outboundId = `outbound_${item.id}`;
         const eventId = `event_${sessionId}_${item.id}`;
         // flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
@@ -643,7 +642,7 @@ async function processSession(supabase: any, sessionId: string) {
           event_id: eventId,
           tel_number: debtor.phone_number,
           phonenumber: debtor.phone_number,
-          variables: preparedVariables,
+          variables: vars,
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
           speaker: "212",
           language: "th",
@@ -651,7 +650,7 @@ async function processSession(supabase: any, sessionId: string) {
           speed: "1",
           tts: "voicebot-premium",
           bot_id: BOT_ID,
-          bot_type: nextIntent,
+          bot_type: BOT_TYPE,
           asr_provider: ASR_PROVIDER,
           asr_language_code: "th",
           asr_vad_rules: {
