@@ -358,7 +358,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
                           <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
                           <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
-                          <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
+                          <TableCell>{c.planCode ? planMap.get(c.planCode) || c.planCode : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
                           <TableCell>
