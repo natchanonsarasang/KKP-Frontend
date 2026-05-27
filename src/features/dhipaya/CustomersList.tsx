@@ -204,26 +204,41 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            <CardTitle className="text-xl">Customers</CardTitle>
-            <Badge variant="secondary" className="ml-2">
-              {queued.length} in queue
-            </Badge>
+    <div className="space-y-6">
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="flex flex-col gap-4 pb-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-semibold tracking-tight">Customers</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {customers.length} on this page · <span className="font-medium text-foreground">{queued.length}</span> in queue
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching} className="h-9">
               <RefreshCcw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               {isFetching ? "Syncing…" : "Sync"}
             </Button>
-            <Button variant="default" size="sm" onClick={sendSelectedToCallList} disabled={selectedIds.size === 0}>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={sendSelectedToCallList}
+              disabled={selectedIds.size === 0}
+              className="h-9 shadow-sm"
+            >
               <Send className="w-4 h-4 mr-2" />
-              Send to Call List ({selectedIds.size})
+              Send to Call List
+              {selectedIds.size > 0 && (
+                <span className="ml-2 rounded-md bg-primary-foreground/20 px-1.5 py-0.5 text-xs font-semibold">
+                  {selectedIds.size}
+                </span>
+              )}
             </Button>
-            <Button size="sm" variant="secondary" onClick={onNextStep}>
+            <Button size="sm" variant="secondary" onClick={onNextStep} className="h-9">
               Next: Call List
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -232,18 +247,18 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
         <CardContent className="space-y-4">
           {/* Search + Consent filter */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, phone, routing…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-10 bg-muted/30 border-border/60 focus-visible:bg-background"
               />
             </div>
             <Select value={consentFilter} onValueChange={setConsentFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px] h-10 bg-muted/30 border-border/60">
                 <SelectValue placeholder="Filter by consent" />
               </SelectTrigger>
               <SelectContent>
@@ -255,7 +270,9 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             </Select>
           </div>
 
-          <div className="rounded-md border overflow-hidden">
+          <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
+            <div className="max-h-[640px] overflow-auto">
+
             {isLoading ? (
               <div className="flex items-center justify-center py-16 text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
