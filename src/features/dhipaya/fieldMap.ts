@@ -28,11 +28,11 @@ export const CONSENT_FIELDS = {
 } as const;
 
 export const POLICY_FIELDS = {
-  policyNumber: "policy_number",
-  policyStatus: "policy_status",
-  renewalPremium: "renewal_premium",
-  outstanding: "outstanding_balance",
-  customer: "customer",
+  policyNumber: "Policy_number",
+  policyStatus: "Policy_Status",
+  renewalPremium: "Renewal_Rremium",
+  outstanding: "Outstanding_Balance",
+  customer: "Customer",
   expiryDate: "Expiry_Date",
 } as const;
 
