@@ -382,6 +382,12 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
           </div>
         </CardContent>
       </Card>
+
+      <EditCustomerDialog
+        customer={editing}
+        open={!!editing}
+        onOpenChange={(open) => !open && setEditing(null)}
+      />
     </div>
   );
 };
