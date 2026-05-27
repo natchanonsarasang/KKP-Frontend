@@ -45,3 +45,21 @@ export const CALL_LOG_FIELDS = {
   audioUrl: "audio_url",
   calledAt: "called_at",
 } as const;
+
+export const INSTALLMENT_KB_FIELDS = {
+  planCode: "Plan_Code",
+  planNameTh: "Plan_Name_TH",
+  planNameEn: "Plan_Name_EN",
+  productType: "Product_Type",
+  installmentMonths: "Installment_Months",
+  paymentMethod: "Payment_Method",
+  bankName: "Bank_Name",
+  premiumMin: "Premium_Min",
+  premiumMax: "Premium_Max",
+  interestRate: "Interest_Rate",
+  isZeroInterest: "Is_Zero_Interest",
+  conditionTh: "Condition_TH",
+  conditionEn: "Condition_EN",
+  isActive: "Is_Active",
+  policy: "Policy",
+} as const;
