@@ -327,6 +327,17 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               "—"
                             )}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setEditing(c)}
+                              aria-label="Edit customer"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })
