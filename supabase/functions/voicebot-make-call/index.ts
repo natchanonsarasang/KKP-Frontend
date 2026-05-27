@@ -5,8 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BOT_ID = "6a0c3158b875327d960f0936";
-const BOT_TYPE = "check_policy";
+const BOT_ID = "6a06964fb875327d960f05f0";
+const BOT_TYPE = "Confirm1";
 const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
 const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
 const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
@@ -81,7 +81,6 @@ serve(async (req) => {
   try {
     const { phone_number, variables, interruptible, next_intent, outbound_id, event_id } = await req.json();
     const preparedVariables = prepareVoicebotVariables(variables);
-    const nextIntent = String(next_intent || preparedVariables.next_intent || "{{consent}}").trim();
     const outboundId = String(outbound_id || `outbound_${Date.now()}`);
     const eventId = String(event_id || `event_${Date.now()}`);
 
@@ -98,7 +97,7 @@ serve(async (req) => {
       speed: "1",
       tts: "voicebot-premium",
       bot_id: BOT_ID,
-      bot_type: nextIntent,
+      bot_type: BOT_TYPE,
       asr_provider: ASR_PROVIDER,
       asr_language_code: "th",
       asr_vad_rules: {
