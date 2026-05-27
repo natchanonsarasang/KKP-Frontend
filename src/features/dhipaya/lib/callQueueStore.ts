@@ -6,6 +6,29 @@ import { CUSTOMER_FIELDS } from "../fieldMap";
 
 export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
 
+const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+export function formatThaiDate(input?: string | null): string {
+  if (!input) return "";
+  let d: Date | null = null;
+  const s = String(input).trim();
+  // Try M/D/YYYY or D/M/YYYY style (Airtable US default is M/D/YYYY)
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const [, a, b, y] = slash;
+    d = new Date(Number(y), Number(a) - 1, Number(b));
+  } else {
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) d = parsed;
+  }
+  if (!d || isNaN(d.getTime())) return "";
+  return `วัน${THAI_DAYS[d.getDay()]}ที่ ${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
 export function checkConditionFlow(customer: Customer): NextIntent {
   const get = (key: keyof typeof CUSTOMER_FIELDS): string => {
     const v = (customer as unknown as Record<string, unknown>)[key];
@@ -190,7 +213,7 @@ async function dialOne(rowId: string): Promise<void> {
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
       renewal_premium: row.customer.renewalPremium,
-      expiry_date: row.customer.expiryDate || "",
+      expiry_date: formatThaiDate(row.customer.expiryDate),
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
