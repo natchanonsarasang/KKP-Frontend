@@ -201,15 +201,28 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, phone, campaign…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          {/* Search + Consent filter */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, phone, campaign…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={consentFilter} onValueChange={setConsentFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filter by consent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="Consent Given">Consent Given</SelectItem>
+                <SelectItem value="Consent Denied">Consent Denied</SelectItem>
+                <SelectItem value="none">—</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="rounded-md border overflow-hidden">
