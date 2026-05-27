@@ -1,30 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,17 +29,7 @@ import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
 import type { Customer } from "./types";
-import {
-  Loader2,
-  RefreshCcw,
-  ArrowRight,
-  Send,
-  Search,
-  Users,
-  Pencil,
-  MoreHorizontal,
-  Trash2,
-} from "lucide-react";
+import { Loader2, RefreshCcw, ArrowRight, Send, Search, Users, Pencil, MoreHorizontal, Trash2 } from "lucide-react";
 
 interface Props {
   onNextStep: () => void;
@@ -119,8 +91,6 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     },
   });
 
-
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return customers.filter((c) => {
@@ -149,16 +119,12 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const callable = useMemo(
     () =>
       filtered.filter(
-        (c) =>
-          normalizeThaiPhone(c.phone1) ||
-          normalizeThaiPhone(c.phone2) ||
-          normalizeThaiPhone(c.phone3),
+        (c) => normalizeThaiPhone(c.phone1) || normalizeThaiPhone(c.phone2) || normalizeThaiPhone(c.phone3),
       ),
     [filtered],
   );
 
-  const allSelected =
-    callable.length > 0 && callable.every((c) => selectedIds.has(c.id));
+  const allSelected = callable.length > 0 && callable.every((c) => selectedIds.has(c.id));
   const someSelected = !allSelected && callable.some((c) => selectedIds.has(c.id));
 
   function toggleAll() {
@@ -193,9 +159,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     if (added === 0) {
       toast.info("All selected customers are already in the call queue");
     } else {
-      toast.success(
-        `Added ${added} customer${added > 1 ? "s" : ""} to the call list`,
-      );
+      toast.success(`Added ${added} customer${added > 1 ? "s" : ""} to the call list`);
     }
     onNextStep();
   }
@@ -212,21 +176,11 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSync}
-              disabled={isFetching}
-            >
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching}>
               <RefreshCcw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               {isFetching ? "Syncing…" : "Sync"}
             </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={sendSelectedToCallList}
-              disabled={selectedIds.size === 0}
-            >
+            <Button variant="default" size="sm" onClick={sendSelectedToCallList} disabled={selectedIds.size === 0}>
               <Send className="w-4 h-4 mr-2" />
               Send to Call List ({selectedIds.size})
             </Button>
@@ -272,8 +226,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <div className="p-6 text-sm text-destructive">
                 {(error as Error)?.message || "Failed to load customers."}
                 <p className="mt-2 text-muted-foreground">
-                  Make sure the Airtable secrets <code>AIRTABLE_PAT</code> and{" "}
-                  <code>AIRTABLE_BASE_ID</code> are set.
+                  Make sure the Airtable secrets <code>AIRTABLE_PAT</code> and <code>AIRTABLE_BASE_ID</code> are set.
                 </p>
               </div>
             ) : (
@@ -282,9 +235,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                   <TableRow>
                     <TableHead className="w-10">
                       <Checkbox
-                        checked={
-                          allSelected ? true : someSelected ? "indeterminate" : false
-                        }
+                        checked={allSelected ? true : someSelected ? "indeterminate" : false}
                         onCheckedChange={toggleAll}
                         aria-label="Select all"
                         disabled={callable.length === 0}
@@ -295,9 +246,9 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Routing</TableHead>
                     <TableHead>Consent</TableHead>
                     <TableHead>Policy</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Premium</TableHead>
-                    <TableHead>Balance</TableHead>
+                    <TableHead>Policy Status</TableHead>
+                    <TableHead>Renewal Premium</TableHead>
+                    <TableHead>Outstanding Balance</TableHead>
                     <TableHead>Plan Code</TableHead>
                     <TableHead>Notice Sent</TableHead>
                     <TableHead>Payment Date</TableHead>
@@ -308,10 +259,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={13}
-                        className="text-center text-muted-foreground py-8"
-                      >
+                      <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                         No customers found.
                       </TableCell>
                     </TableRow>
@@ -323,10 +271,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                         !!normalizeThaiPhone(c.phone3);
                       const inQueue = queuedIds.has(c.id);
                       return (
-                        <TableRow
-                          key={c.id}
-                          data-state={selectedIds.has(c.id) ? "selected" : undefined}
-                        >
+                        <TableRow key={c.id} data-state={selectedIds.has(c.id) ? "selected" : undefined}>
                           <TableCell>
                             <Checkbox
                               checked={selectedIds.has(c.id)}
@@ -336,8 +281,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                             />
                           </TableCell>
                           <TableCell className="font-medium">
-                            {[c.firstName, c.lastName].filter(Boolean).join(" ") ||
-                              "—"}
+                            {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
                             {c.duplicateFlag && (
                               <Badge variant="outline" className="ml-2">
                                 dup
@@ -353,18 +297,12 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                             {hasPhone ? (
                               c.phone1 || c.phone2 || c.phone3
                             ) : (
-                              <span className="text-muted-foreground">
-                                no valid phone
-                              </span>
+                              <span className="text-muted-foreground">no valid phone</span>
                             )}
                           </TableCell>
                           <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
                           <TableCell>
-                            {c.consentStatus ? (
-                              <Badge variant="secondary">{c.consentStatus}</Badge>
-                            ) : (
-                              "—"
-                            )}
+                            {c.consentStatus ? <Badge variant="secondary">{c.consentStatus}</Badge> : "—"}
                           </TableCell>
                           <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
                           <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
@@ -377,12 +315,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  aria-label="Open actions"
-                                >
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open actions">
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -416,9 +349,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               {selectedIds.size > 0 && (
                 <>
                   {" · "}
-                  <span className="font-medium text-foreground">
-                    {selectedIds.size} selected
-                  </span>
+                  <span className="font-medium text-foreground">{selectedIds.size} selected</span>
                 </>
               )}
             </p>
@@ -435,9 +366,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 variant="outline"
                 size="sm"
                 disabled={!data?.offset}
-                onClick={() =>
-                  data?.offset && setOffsetStack((s) => [...s, data.offset])
-                }
+                onClick={() => data?.offset && setOffsetStack((s) => [...s, data.offset])}
               >
                 Next
               </Button>
@@ -446,11 +375,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         </CardContent>
       </Card>
 
-      <EditCustomerDialog
-        customer={editing}
-        open={!!editing}
-        onOpenChange={(open) => !open && setEditing(null)}
-      />
+      <EditCustomerDialog customer={editing} open={!!editing} onOpenChange={(open) => !open && setEditing(null)} />
 
       <AlertDialog
         open={!!deleting}
@@ -464,16 +389,13 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             <AlertDialogDescription>
               This will permanently remove{" "}
               <span className="font-medium text-foreground">
-                {[deleting?.firstName, deleting?.lastName].filter(Boolean).join(" ") ||
-                  "this customer"}
+                {[deleting?.firstName, deleting?.lastName].filter(Boolean).join(" ") || "this customer"}
               </span>{" "}
               from Airtable. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteMutation.isPending}
@@ -482,9 +404,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 if (deleting) deleteMutation.mutate(deleting.id);
               }}
             >
-              {deleteMutation.isPending && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
