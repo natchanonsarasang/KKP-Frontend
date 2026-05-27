@@ -319,9 +319,17 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                             {(() => {
                               const s = (c.consentStatus ?? "").trim();
                               if (s === "Consent Given")
-                                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent">{s}</Badge>;
+                                return (
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent">
+                                    {s}
+                                  </Badge>
+                                );
                               if (s === "Consent Denied")
-                                return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent">{s}</Badge>;
+                                return (
+                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent">
+                                    {s}
+                                  </Badge>
+                                );
                               return s ? <Badge variant="secondary">{s}</Badge> : "—";
                             })()}
                           </TableCell>
@@ -332,7 +340,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
-                          <TableCell>{policyMap.get(c.id) ?? "—"}</TableCell>
+                          <TableCell>{policyMap.get(c.customerID) ?? "—"}</TableCell>
                           <TableCell>{c.policy ? c.policy : "—"}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
