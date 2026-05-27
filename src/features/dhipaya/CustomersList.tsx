@@ -107,6 +107,20 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     await refetch();
   }
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCustomer(id),
+    onSuccess: () => {
+      toast.success("Customer deleted");
+      queryClient.invalidateQueries({ queryKey: ["dhipaya-customers"] });
+      setDeleting(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to delete customer");
+    },
+  });
+
+
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return customers.filter((c) => {
