@@ -213,7 +213,7 @@ async function dialOne(rowId: string): Promise<void> {
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
       renewal_premium: row.customer.renewalPremium,
-      expiry_date: row.customer.expiryDate || "",
+      expiry_date: formatThaiDate(row.customer.expiryDate),
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
