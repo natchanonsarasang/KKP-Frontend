@@ -183,7 +183,14 @@ export async function listCallLogs(opts?: {
     offset: res.offset,
   };
 }
-
+// วางฟังก์ชันนี้ในไฟล์ api/airtable.ts
+export async function listPlans(): Promise<Array<{ id: string; name: string }>> {
+  const res = await call<ListResponse>({ action: "list", table: "Plan" });
+  return res.records.map((r) => ({
+    id: r.id,
+    name: String(r.fields["Name"] || r.id), // เช็คชื่อคอลัมน์ "Name" ในตาราง Plan ของคุณให้ตรง
+  }));
+}
 // -------- helpers --------
 function str(v: unknown): string | undefined {
   if (v === null || v === undefined) return undefined;
