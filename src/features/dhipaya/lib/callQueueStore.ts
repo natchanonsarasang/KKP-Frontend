@@ -157,6 +157,16 @@ async function dialOne(rowId: string): Promise<void> {
   const row = rows.find((r) => r.id === rowId);
   if (!row || row.status !== "pending") return;
 
+  const nextIntent = checkConditionFlow(row.customer);
+  if (nextIntent === "skip") {
+    updateRow(rowId, {
+      status: "success",
+      finishedAt: Date.now(),
+      callOutcome: "Call skipped",
+    });
+    return;
+  }
+
   updateRow(rowId, { status: "calling", startedAt: Date.now() });
 
   let userId: string | null = null;
@@ -170,12 +180,10 @@ async function dialOne(rowId: string): Promise<void> {
 
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
-    const nextIntent = row.customer.consentStatus === "Consent Given" ? "check_policy" : "consent";
     const variables = {
       name: row.customer.firstName,
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
-      next_intent: nextIntent,
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
