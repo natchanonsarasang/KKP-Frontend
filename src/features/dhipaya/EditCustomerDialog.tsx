@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateCustomer } from "./api/airtable";
+import { setCustomerConsent, updateCustomer } from "./api/airtable";
 import type { Customer } from "./types";
 
 interface Props {
