@@ -20,7 +20,7 @@ export interface Customer {
   policyStatus?: string;
   renewalPremium?: string;
   outstandingBalance?: string;
-  planCode?: string;
+  planCodeId?: string;
   noticeSent?: string;
   paymentDate?: string;
   policy?: string;
