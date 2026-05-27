@@ -41,6 +41,23 @@ export async function listCustomers(opts?: {
   };
 }
 
+export async function updateCustomer(
+  recordId: string,
+  patch: Partial<Pick<Customer, "firstName" | "lastName" | "phone1" | "consentStatus">>,
+): Promise<Customer> {
+  const fields: AnyFields = {};
+  if (patch.firstName !== undefined) fields[CUSTOMER_FIELDS.firstName] = patch.firstName;
+  if (patch.lastName !== undefined) fields[CUSTOMER_FIELDS.lastName] = patch.lastName;
+  if (patch.phone1 !== undefined) fields[CUSTOMER_FIELDS.phone1] = patch.phone1;
+  if (patch.consentStatus !== undefined) fields[CUSTOMER_FIELDS.consentStatus] = patch.consentStatus;
+  const rec = await call<AirtableRecord>({
+    action: "update",
+    table: "Customer",
+    recordId,
+    fields,
+  });
+  return mapCustomer(rec);
+
 function mapCustomer(rec: AirtableRecord): Customer {
   const f = rec.fields as AnyFields;
   return {
