@@ -287,8 +287,8 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               </div>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                  <TableRow className="hover:bg-transparent border-b border-border/60">
                     <TableHead className="w-10">
                       <Checkbox
                         checked={allSelected ? true : someSelected ? "indeterminate" : false}
@@ -297,26 +297,27 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                         disabled={callable.length === 0}
                       />
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Routing</TableHead>
-                    <TableHead>Consent</TableHead>
-                    <TableHead>Policy</TableHead>
-                    <TableHead>Policy Status</TableHead>
-                    <TableHead>Renewal Premium</TableHead>
-                    <TableHead>Outstanding Balance</TableHead>
-                    <TableHead>Plan Code</TableHead>
-                    <TableHead>Notice Sent</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Policy (Detail)</TableHead>
-                    <TableHead className="w-12 text-right">Actions</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Routing</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consent</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy Status</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Renewal Premium</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outstanding</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan Code</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notice Sent</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Date</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expiry Date</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy (Detail)</TableHead>
+                    <TableHead className="w-12 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={15} className="text-center text-muted-foreground py-12">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
                         No customers found.
                       </TableCell>
                     </TableRow>
@@ -327,78 +328,91 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                         !!normalizeThaiPhone(c.phone2) ||
                         !!normalizeThaiPhone(c.phone3);
                       const inQueue = queuedIds.has(c.id);
+                      const isSelected = selectedIds.has(c.id);
                       return (
-                        <TableRow key={c.id} data-state={selectedIds.has(c.id) ? "selected" : undefined}>
+                        <TableRow
+                          key={c.id}
+                          data-state={isSelected ? "selected" : undefined}
+                          className="group transition-colors hover:bg-muted/40 data-[state=selected]:bg-primary/5"
+                        >
                           <TableCell>
                             <Checkbox
-                              checked={selectedIds.has(c.id)}
+                              checked={isSelected}
                               onCheckedChange={() => toggleOne(c.id)}
                               disabled={!hasPhone}
                               aria-label="Select customer"
                             />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
-                            {c.duplicateFlag && (
-                              <Badge variant="outline" className="ml-2">
-                                dup
-                              </Badge>
-                            )}
-                            {inQueue && (
-                              <Badge variant="secondary" className="ml-2">
-                                in queue
-                              </Badge>
-                            )}
+                          <TableCell className="font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                {((c.firstName?.[0] || "") + (c.lastName?.[0] || "")).toUpperCase() || "?"}
+                              </div>
+                              <span>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}</span>
+                              {c.duplicateFlag && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  dup
+                                </Badge>
+                              )}
+                              {inQueue && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-transparent hover:bg-blue-200">
+                                  queued
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
+                          <TableCell className="font-mono text-xs">
                             {hasPhone ? (
                               c.phone1 || c.phone2 || c.phone3
                             ) : (
-                              <span className="text-muted-foreground">no valid phone</span>
+                              <span className="text-muted-foreground italic">no phone</span>
                             )}
                           </TableCell>
-                          <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
+                          <TableCell className="text-sm">{c.routingGroup ? c.routingGroup : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell>
                             {(() => {
                               const s = (c.consentStatus ?? "").trim();
                               if (s === "Consent Given")
                                 return (
-                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent">
-                                    {s}
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent font-medium">
+                                    ✓ Given
                                   </Badge>
                                 );
                               if (s === "Consent Denied")
                                 return (
-                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent">
-                                    {s}
+                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent font-medium">
+                                    ✗ Denied
                                   </Badge>
                                 );
-                              return s ? <Badge variant="secondary">{s}</Badge> : "—";
+                              return s ? <Badge variant="secondary">{s}</Badge> : <span className="text-muted-foreground">—</span>;
                             })()}
                           </TableCell>
-                          <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
-                          <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
-                          <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
-                          <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
-                          <TableCell>{c.planCodeId ? (planCodeMap.get(c.planCodeId) ?? c.planCodeId) : "—"}</TableCell>
-                          <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
-                          <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
-                          <TableCell>
+                          <TableCell className="font-mono text-xs">{c.policyNumber ? c.policyNumber : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.policyStatus ? <Badge variant="outline" className="font-normal">{c.policyStatus}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.renewalPremium ? c.renewalPremium : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.outstandingBalance ? c.outstandingBalance : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.planCodeId ? (planCodeMap.get(c.planCodeId) ?? c.planCodeId) : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.noticeSent ? c.noticeSent : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{c.paymentDate ? c.paymentDate : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
                             {(() => {
                               const byRecId = policyMap.mapByCustomer.get(c.id);
                               if (byRecId) return byRecId;
-
                               const byPolicy = c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : null;
                               if (byPolicy) return byPolicy;
-
-                              return "—";
+                              return <span className="text-muted-foreground">—</span>;
                             })()}
                           </TableCell>
-                          <TableCell>{c.policy ? c.policy : "—"}</TableCell>
+                          <TableCell className="text-sm">{c.policy ? c.policy : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open actions">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"
+                                  aria-label="Open actions"
+                                >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -424,7 +438,9 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 </TableBody>
               </Table>
             )}
+            </div>
           </div>
+
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
