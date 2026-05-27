@@ -33,7 +33,7 @@ export function formatThaiDate(input?: string | null): string {
     }
   }
   if (!d || isNaN(d.getTime())) return "";
-  return `วัน${THAI_DAYS[d.getDay()]}ที่ ${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
+  return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
 export function checkConditionFlow(customer: Customer): NextIntent {
