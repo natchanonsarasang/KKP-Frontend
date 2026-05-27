@@ -442,13 +442,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
           </div>
 
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
             <p className="text-xs text-muted-foreground">
-              {filtered.length} of {customers.length} on this page
+              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              <span className="font-semibold text-foreground">{customers.length}</span>
               {selectedIds.size > 0 && (
                 <>
                   {" · "}
-                  <span className="font-medium text-foreground">{selectedIds.size} selected</span>
+                  <span className="font-semibold text-primary">{selectedIds.size} selected</span>
                 </>
               )}
             </p>
@@ -456,6 +457,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9"
                 disabled={offsetStack.length <= 1}
                 onClick={() => setOffsetStack((s) => s.slice(0, -1))}
               >
@@ -464,6 +466,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9"
                 disabled={!data?.offset}
                 onClick={() => data?.offset && setOffsetStack((s) => [...s, data.offset])}
               >
@@ -471,6 +474,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               </Button>
             </div>
           </div>
+
         </CardContent>
       </Card>
 
