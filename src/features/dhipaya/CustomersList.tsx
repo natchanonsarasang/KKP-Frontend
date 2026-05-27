@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,8 +25,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { listCustomers } from "./api/airtable";
+import { deleteCustomer, listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
@@ -39,6 +55,8 @@ import {
   Search,
   Users,
   Pencil,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 
 interface Props {
