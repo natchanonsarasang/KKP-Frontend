@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteCustomer, listCustomers, listPolicies } from "./api/airtable";
+import { deleteCustomer, listCustomers, listPolicies, listInstallmentKb } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
@@ -61,6 +61,19 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     queryKey: ["dhipaya-policies"],
     queryFn: () => listPolicies({ pageSize: 100 }),
   });
+
+  const { data: installmentKbData } = useQuery({
+    queryKey: ["dhipaya-installment-kb"],
+    queryFn: () => listInstallmentKb({ pageSize: 100 }),
+  });
+
+  const planCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of installmentKbData?.items ?? []) {
+      if (item.planCode) map.set(item.id, item.planCode);
+    }
+    return map;
+  }, [installmentKbData]);
 
   const policyMap = useMemo(() => {
     const mapByCustomer = new Map<string, string>();
@@ -350,7 +363,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
                           <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
                           <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
-                          <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
+                          <TableCell>{c.planCode ? (planCodeMap.get(c.planCode) ?? c.planCode) : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
                           <TableCell>
