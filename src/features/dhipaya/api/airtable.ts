@@ -57,6 +57,9 @@ export async function updateCustomer(
     fields,
   });
   return mapCustomer(rec);
+}
+
+
 
 function mapCustomer(rec: AirtableRecord): Customer {
   const f = rec.fields as AnyFields;
