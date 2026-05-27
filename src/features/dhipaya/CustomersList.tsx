@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteCustomer, listCustomers, listPolicies } from "./api/airtable";
+import { deleteCustomer, listCustomers, listPolicies, listInstallmentKb } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
