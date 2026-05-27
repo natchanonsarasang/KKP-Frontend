@@ -302,7 +302,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           </TableCell>
                           <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
                           <TableCell>
-                            {c.consentStatus ? <Badge variant="secondary">{c.consentStatus}</Badge> : "—"}
+                            {(() => {
+                              const s = (c.consentStatus ?? "").trim();
+                              if (s === "Consent Given")
+                                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent">{s}</Badge>;
+                              if (s === "Consent Denied")
+                                return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent">{s}</Badge>;
+                              return s ? <Badge variant="secondary">{s}</Badge> : "—";
+                            })()}
                           </TableCell>
                           <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
                           <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
