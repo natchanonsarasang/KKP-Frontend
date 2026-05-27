@@ -50,11 +50,21 @@ const EditCustomerDialog = ({ customer, open, onOpenChange }: Props) => {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!customer) throw new Error("No customer selected");
+      const nextConsent = consentStatus.trim();
+      const prevConsent = (customer.consentStatus ?? "").trim();
+
+      // Consent lives on the linked Consents table (lookup on Customer is
+      // read-only). Update it first so the relationship is in sync before we
+      // touch Customer fields.
+      if (nextConsent !== prevConsent) {
+        await setCustomerConsent(customer.id, nextConsent);
+      }
+
+      // Then update the editable fields on the Customer table.
       return updateCustomer(customer.id, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone1: phone1.trim(),
-        consentStatus: consentStatus || undefined,
       });
     },
     onSuccess: () => {
