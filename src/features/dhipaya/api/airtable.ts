@@ -149,6 +149,7 @@ export async function listPolicies(opts?: {
       renewalPremium: num(r.fields[POLICY_FIELDS.renewalPremium]),
       outstanding: num(r.fields[POLICY_FIELDS.outstanding]),
       customerId: firstLinked(r.fields[POLICY_FIELDS.customer]),
+      expiryDate: str(r.fields[POLICY_FIELDS.expiryDate]),
     })),
     offset: res.offset,
   };
