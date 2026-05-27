@@ -43,13 +43,17 @@ export async function listCustomers(opts?: {
 
 export async function updateCustomer(
   recordId: string,
-  patch: Partial<Pick<Customer, "firstName" | "lastName" | "phone1" | "consentStatus">>,
+  patch: Partial<Pick<Customer, "firstName" | "lastName" | "phone1">>,
 ): Promise<Customer> {
   const fields: AnyFields = {};
   if (patch.firstName !== undefined) fields[CUSTOMER_FIELDS.firstName] = patch.firstName;
   if (patch.lastName !== undefined) fields[CUSTOMER_FIELDS.lastName] = patch.lastName;
   if (patch.phone1 !== undefined) fields[CUSTOMER_FIELDS.phone1] = patch.phone1;
-  if (patch.consentStatus !== undefined) fields[CUSTOMER_FIELDS.consentStatus] = patch.consentStatus;
+  if (Object.keys(fields).length === 0) {
+    // Nothing to patch on Customer; just return the existing record.
+    const rec = await call<AirtableRecord>({ action: "get", table: "Customer", recordId });
+    return mapCustomer(rec);
+  }
   const rec = await call<AirtableRecord>({
     action: "update",
     table: "Customer",
@@ -57,6 +61,49 @@ export async function updateCustomer(
     fields,
   });
   return mapCustomer(rec);
+}
+
+/**
+ * Update the linked Consents record for a customer.
+ * Consent is a separate Airtable table joined via a linked-record field
+ * (`Customer`). We cannot write directly to the lookup column on Customer.
+ * If a Consents row already exists for the customer it is patched; otherwise
+ * a new row is created and linked.
+ */
+export async function setCustomerConsent(
+  customerRecordId: string,
+  consentStatus: string,
+): Promise<void> {
+  // Find an existing Consents row linked to this customer.
+  const formula = `FIND('${customerRecordId}', ARRAYJOIN({${CONSENT_FIELDS.customer}}))`;
+  const found = await call<ListResponse>({
+    action: "list",
+    table: "Consents",
+    params: { filterByFormula: formula, maxRecords: 1 },
+  });
+
+  const existing = found.records?.[0];
+  const fields: AnyFields = {
+    [CONSENT_FIELDS.consentStatus]: consentStatus || "",
+  };
+
+  if (existing) {
+    await call({
+      action: "update",
+      table: "Consents",
+      recordId: existing.id,
+      fields,
+    });
+  } else {
+    await call({
+      action: "create",
+      table: "Consents",
+      fields: {
+        ...fields,
+        [CONSENT_FIELDS.customer]: [customerRecordId],
+      },
+    });
+  }
 }
 
 export async function deleteCustomer(recordId: string): Promise<void> {
