@@ -347,8 +347,8 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
                           <TableCell>
                             {(() => {
-                              const byId = c.customerId ? policyMap.mapByCustomer.get(String(c.customerId)) : null;
-                              if (byId) return byId;
+                              const byRecId = policyMap.mapByCustomer.get(c.id);
+                              if (byRecId) return byRecId;
 
                               const byPolicy = c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : null;
                               if (byPolicy) return byPolicy;
