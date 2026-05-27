@@ -56,7 +56,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   });
 
   const customers = data?.customers ?? [];
-
+  console.log("Customer data details: ", customers);
   const { data: policiesData } = useQuery({
     queryKey: ["dhipaya-policies"],
     queryFn: () => listPolicies({ pageSize: 100 }),
