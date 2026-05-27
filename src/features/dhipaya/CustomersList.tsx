@@ -63,12 +63,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   });
 
   const policyMap = useMemo(() => {
-    const map = new Map<string, string>();
+    const mapByCustomer = new Map<string, string>();
+    const mapByPolicy = new Map<string, string>();
+    console.log("Policies Data:", policiesData?.policies);
     for (const p of policiesData?.policies ?? []) {
-      if (p.customerId && p.expiryDate) map.set(p.customerId, p.expiryDate);
+      if (p.expiryDate) {
+        if (p.customerId) mapByCustomer.set(p.customerId, p.expiryDate);
+        if (p.policyNumber) mapByPolicy.set(p.policyNumber, p.expiryDate);
+      }
     }
-    console.log(map);
-    return map;
+    return { mapByCustomer, mapByPolicy };
   }, [policiesData]);
 
   // Reconcile selection against the latest fetched page — drop ghost IDs.
@@ -341,7 +345,17 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
-                          <TableCell>{policyMap.get(String(c.customerId ?? "")) ?? "—"}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const byId = c.customerId ? policyMap.mapByCustomer.get(String(c.customerId)) : null;
+                              if (byId) return byId;
+
+                              const byPolicy = c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : null;
+                              if (byPolicy) return byPolicy;
+
+                              return "—";
+                            })()}
+                          </TableCell>
                           <TableCell>{c.policy ? c.policy : "—"}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
