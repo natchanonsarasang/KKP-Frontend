@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { AirtableRecord, Customer, Policy, CallLog } from "../types";
-import { CUSTOMER_FIELDS, POLICY_FIELDS, CALL_LOG_FIELDS, CONSENT_FIELDS } from "../fieldMap";
+import type { AirtableRecord, Customer, Policy, CallLog, InstallmentKb } from "../types";
+import { CUSTOMER_FIELDS, POLICY_FIELDS, CALL_LOG_FIELDS, CONSENT_FIELDS, INSTALLMENT_KB_FIELDS } from "../fieldMap";
 
 type AnyFields = Record<string, unknown>;
 
@@ -180,6 +180,41 @@ export async function listCallLogs(opts?: {
       audioUrl: str(r.fields[CALL_LOG_FIELDS.audioUrl]),
       calledAt: str(r.fields[CALL_LOG_FIELDS.calledAt]),
     })),
+    offset: res.offset,
+  };
+}
+
+// -------- Installment KB --------
+export async function listInstallmentKb(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ items: InstallmentKb[]; offset?: string }> {
+  const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
+  if (opts?.offset) params.offset = opts.offset;
+  const res = await call<ListResponse>({ action: "list", table: "INSTALLMENT_KB", params });
+  return {
+    items: res.records.map((r) => {
+      const f = r.fields;
+      const policyLinks = f[INSTALLMENT_KB_FIELDS.policy];
+      return {
+        id: r.id,
+        planCode: str(f[INSTALLMENT_KB_FIELDS.planCode]),
+        planNameTh: str(f[INSTALLMENT_KB_FIELDS.planNameTh]),
+        planNameEn: str(f[INSTALLMENT_KB_FIELDS.planNameEn]),
+        productType: str(f[INSTALLMENT_KB_FIELDS.productType]),
+        installmentMonths: num(f[INSTALLMENT_KB_FIELDS.installmentMonths]),
+        paymentMethod: str(f[INSTALLMENT_KB_FIELDS.paymentMethod]),
+        bankName: str(f[INSTALLMENT_KB_FIELDS.bankName]),
+        premiumMin: num(f[INSTALLMENT_KB_FIELDS.premiumMin]),
+        premiumMax: num(f[INSTALLMENT_KB_FIELDS.premiumMax]),
+        interestRate: num(f[INSTALLMENT_KB_FIELDS.interestRate]),
+        isZeroInterest: Boolean(f[INSTALLMENT_KB_FIELDS.isZeroInterest]),
+        conditionTh: str(f[INSTALLMENT_KB_FIELDS.conditionTh]),
+        conditionEn: str(f[INSTALLMENT_KB_FIELDS.conditionEn]),
+        isActive: Boolean(f[INSTALLMENT_KB_FIELDS.isActive]),
+        policyIds: Array.isArray(policyLinks) ? (policyLinks as unknown[]).map(String) : undefined,
+      };
+    }),
     offset: res.offset,
   };
 }
