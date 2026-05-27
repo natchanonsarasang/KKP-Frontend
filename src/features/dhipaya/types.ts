@@ -47,3 +47,22 @@ export interface CallLog {
   audioUrl?: string;
   calledAt?: string;
 }
+
+export interface InstallmentKb {
+  id: string;
+  planCode?: string;
+  planNameTh?: string;
+  planNameEn?: string;
+  productType?: string;
+  installmentMonths?: number;
+  paymentMethod?: string;
+  bankName?: string;
+  premiumMin?: number;
+  premiumMax?: number;
+  interestRate?: number;
+  isZeroInterest?: boolean;
+  conditionTh?: string;
+  conditionEn?: string;
+  isActive?: boolean;
+  policyIds?: string[];
+}
