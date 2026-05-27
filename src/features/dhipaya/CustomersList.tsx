@@ -18,6 +18,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
@@ -40,6 +47,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const currentOffset = offsetStack[offsetStack.length - 1];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [consentFilter, setConsentFilter] = useState<string>("all");
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
@@ -78,8 +86,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return customers;
     return customers.filter((c) => {
+      if (consentFilter !== "all") {
+        const status = (c.consentStatus ?? "").trim();
+        if (consentFilter === "none") {
+          if (status !== "" && status !== "—") return false;
+        } else if (status !== consentFilter) {
+          return false;
+        }
+      }
+      if (!q) return true;
       const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
       return (
         name.includes(q) ||
@@ -90,7 +106,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         (c.routingGroup || "").toLowerCase().includes(q)
       );
     });
-  }, [customers, search]);
+  }, [customers, search, consentFilter]);
 
   // Rows that have at least one valid phone number can be queued.
   const callable = useMemo(
@@ -185,15 +201,28 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, phone, campaign…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          {/* Search + Consent filter */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, phone, campaign…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={consentFilter} onValueChange={setConsentFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filter by consent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="Consent Given">Consent Given</SelectItem>
+                <SelectItem value="Consent Denied">Consent Denied</SelectItem>
+                <SelectItem value="none">—</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="rounded-md border overflow-hidden">
