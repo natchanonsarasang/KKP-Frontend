@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteCustomer, listCustomers } from "./api/airtable";
+import { deleteCustomer, listCustomers, listPolicies } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
@@ -56,6 +56,19 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   });
 
   const customers = data?.customers ?? [];
+
+  const { data: policiesData } = useQuery({
+    queryKey: ["dhipaya-policies"],
+    queryFn: () => listPolicies({ pageSize: 100 }),
+  });
+
+  const policyMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of policiesData?.policies ?? []) {
+      if (p.customerId && p.expiryDate) map.set(p.customerId, p.expiryDate);
+    }
+    return map;
+  }, [policiesData]);
 
   // Reconcile selection against the latest fetched page — drop ghost IDs.
   useEffect(() => {
@@ -252,6 +265,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Plan Code</TableHead>
                     <TableHead>Notice Sent</TableHead>
                     <TableHead>Payment Date</TableHead>
+                    <TableHead>Expiry Date</TableHead>
                     <TableHead>Policy (Detail)</TableHead>
                     <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
@@ -259,7 +273,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
                         No customers found.
                       </TableCell>
                     </TableRow>
@@ -318,6 +332,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
+                          <TableCell>{policyMap.get(c.id) ?? "—"}</TableCell>
                           <TableCell>{c.policy ? c.policy : "—"}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
