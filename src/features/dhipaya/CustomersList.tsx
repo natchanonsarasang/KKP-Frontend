@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { deleteCustomer, listCustomers, listPolicies, listPlans } from "./api/airtable";
+import { deleteCustomer, listCustomers, listPolicies } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
@@ -56,6 +56,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   });
 
   const customers = data?.customers ?? [];
+
   const { data: policiesData } = useQuery({
     queryKey: ["dhipaya-policies"],
     queryFn: () => listPolicies({ pageSize: 100 }),
@@ -64,7 +65,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const policyMap = useMemo(() => {
     const mapByCustomer = new Map<string, string>();
     const mapByPolicy = new Map<string, string>();
-
+    console.log("Policies Data:", policiesData?.policies);
     for (const p of policiesData?.policies ?? []) {
       if (p.expiryDate) {
         if (p.customerId) mapByCustomer.set(p.customerId, p.expiryDate);
@@ -73,23 +74,6 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     }
     return { mapByCustomer, mapByPolicy };
   }, [policiesData]);
-
-  const { data: plans } = useQuery({
-    queryKey: ["dhipaya-plans"],
-    queryFn: () => listPlans(),
-    staleTime: 600000,
-  });
-
-  const planMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (plans) {
-      for (const p of plans) {
-        map.set(p.id, p.name);
-      }
-    }
-    console.log("Check Plan Map:", Array.from(map.entries()));
-    return map;
-  }, [plans]);
 
   // Reconcile selection against the latest fetched page — drop ghost IDs.
   useEffect(() => {
@@ -183,7 +167,15 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   }
 
   function sendSelectedToCallList() {
-    const chosen = customers.filter((c) => selectedIds.has(c.id));
+    const chosen = customers
+      .filter((c) => selectedIds.has(c.id))
+      .map((c) => ({
+        ...c,
+        expiryDate:
+          policyMap.mapByCustomer.get(c.id) ||
+          (c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : undefined) ||
+          c.expiryDate,
+      }));
     if (chosen.length === 0) {
       toast.error("Select at least one customer");
       return;
@@ -358,13 +350,13 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                           <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
                           <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
                           <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
-                          <TableCell>{c.planCode ? planMap.get(c.planCode) || c.planCode : "—"}</TableCell>
+                          <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
                           <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
                           <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
                           <TableCell>
                             {(() => {
-                              const byId = c.customerId ? policyMap.mapByCustomer.get(String(c.customerId)) : null;
-                              if (byId) return byId;
+                              const byRecId = policyMap.mapByCustomer.get(c.id);
+                              if (byRecId) return byRecId;
 
                               const byPolicy = c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : null;
                               if (byPolicy) return byPolicy;

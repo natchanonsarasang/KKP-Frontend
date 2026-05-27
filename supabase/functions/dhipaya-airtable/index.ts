@@ -30,7 +30,6 @@ const ALLOWED_TABLES = new Set([
   "Policy",
   "INSTALLMENT_KB",
   "INSTALLMENT_PLANS",
-  "Plan",
 ]);
 
 Deno.serve(async (req) => {
