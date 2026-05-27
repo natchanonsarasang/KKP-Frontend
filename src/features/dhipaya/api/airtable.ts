@@ -146,6 +146,7 @@ export async function listPolicies(opts?: {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Policy", params });
+  console.log("ตรวจสอบข้อมูล Policy ดิบ:", res.records.length > 0 ? res.records[0].fields : "ไม่พบข้อมูล");
   return {
     policies: res.records.map((r) => ({
       id: r.id,
