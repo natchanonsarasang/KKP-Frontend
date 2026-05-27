@@ -33,6 +33,7 @@ export interface Policy {
   renewalPremium?: number;
   outstanding?: number;
   customerId?: string;
+  expiryDate?: string;
 }
 
 export interface CallLog {
