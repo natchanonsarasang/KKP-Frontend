@@ -167,7 +167,15 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   }
 
   function sendSelectedToCallList() {
-    const chosen = customers.filter((c) => selectedIds.has(c.id));
+    const chosen = customers
+      .filter((c) => selectedIds.has(c.id))
+      .map((c) => ({
+        ...c,
+        expiryDate:
+          policyMap.mapByCustomer.get(c.id) ||
+          (c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : undefined) ||
+          c.expiryDate,
+      }));
     if (chosen.length === 0) {
       toast.error("Select at least one customer");
       return;
