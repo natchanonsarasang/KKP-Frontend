@@ -21,6 +21,11 @@ export const CUSTOMER_FIELDS = {
   policy: "Policy",
 } as const;
 
+export const CONSENT_FIELDS = {
+  customer: "Customer",
+  consentStatus: "Consent_Status",
+} as const;
+
 export const POLICY_FIELDS = {
   policyNumber: "policy_number",
   policyStatus: "policy_status",
