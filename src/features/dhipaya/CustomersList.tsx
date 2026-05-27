@@ -86,8 +86,16 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return customers;
     return customers.filter((c) => {
+      if (consentFilter !== "all") {
+        const status = (c.consentStatus ?? "").trim();
+        if (consentFilter === "none") {
+          if (status !== "" && status !== "—") return false;
+        } else if (status !== consentFilter) {
+          return false;
+        }
+      }
+      if (!q) return true;
       const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
       return (
         name.includes(q) ||
@@ -98,7 +106,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         (c.routingGroup || "").toLowerCase().includes(q)
       );
     });
-  }, [customers, search]);
+  }, [customers, search, consentFilter]);
 
   // Rows that have at least one valid phone number can be queued.
   const callable = useMemo(
