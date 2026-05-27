@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
+import EditCustomerDialog from "./EditCustomerDialog";
+import type { Customer } from "./types";
 import {
   Loader2,
   RefreshCcw,
@@ -36,6 +38,7 @@ import {
   Send,
   Search,
   Users,
+  Pencil,
 } from "lucide-react";
 
 interface Props {
@@ -48,6 +51,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [consentFilter, setConsentFilter] = useState<string>("all");
+  const [editing, setEditing] = useState<Customer | null>(null);
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
@@ -258,13 +262,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Routing</TableHead>
                     <TableHead>Campaign</TableHead>
                     <TableHead>Consent</TableHead>
+                    <TableHead className="w-12 text-right">Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="text-center text-muted-foreground py-8"
                       >
                         No customers found.
@@ -322,6 +327,17 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               "—"
                             )}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setEditing(c)}
+                              aria-label="Edit customer"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -366,6 +382,12 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
           </div>
         </CardContent>
       </Card>
+
+      <EditCustomerDialog
+        customer={editing}
+        open={!!editing}
+        onOpenChange={(open) => !open && setEditing(null)}
+      />
     </div>
   );
 };
