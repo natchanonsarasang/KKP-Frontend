@@ -189,6 +189,7 @@ async function dialOne(rowId: string): Promise<void> {
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
+      renewal_premium: row.customer.renewalPremium,
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
