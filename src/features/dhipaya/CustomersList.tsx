@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
+import EditCustomerDialog from "./EditCustomerDialog";
+import type { Customer } from "./types";
 import {
   Loader2,
   RefreshCcw,
@@ -36,6 +38,7 @@ import {
   Send,
   Search,
   Users,
+  Pencil,
 } from "lucide-react";
 
 interface Props {
