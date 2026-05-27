@@ -437,6 +437,45 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
       />
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete customer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">
+                {[deleting?.firstName, deleting?.lastName].filter(Boolean).join(" ") ||
+                  "this customer"}
+              </span>{" "}
+              from Airtable. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleting) deleteMutation.mutate(deleting.id);
+              }}
+            >
+              {deleteMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
