@@ -62,6 +62,19 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     queryFn: () => listPolicies({ pageSize: 100 }),
   });
 
+  const { data: installmentKbData } = useQuery({
+    queryKey: ["dhipaya-installment-kb"],
+    queryFn: () => listInstallmentKb({ pageSize: 100 }),
+  });
+
+  const planCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of installmentKbData?.items ?? []) {
+      if (item.planCode) map.set(item.id, item.planCode);
+    }
+    return map;
+  }, [installmentKbData]);
+
   const policyMap = useMemo(() => {
     const mapByCustomer = new Map<string, string>();
     const mapByPolicy = new Map<string, string>();
