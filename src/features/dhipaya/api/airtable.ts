@@ -146,16 +146,6 @@ export async function listPolicies(opts?: {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Policy", params });
-  test = res.records.map((r) => ({
-    id: r.id,
-    policyNumber: str(r.fields[POLICY_FIELDS.policyNumber]),
-    policyStatus: str(r.fields[POLICY_FIELDS.policyStatus]),
-    renewalPremium: num(r.fields[POLICY_FIELDS.renewalPremium]),
-    outstanding: num(r.fields[POLICY_FIELDS.outstanding]),
-    customerId: firstLinked(r.fields[POLICY_FIELDS.customer]),
-    expiryDate: str(r.fields[POLICY_FIELDS.expiryDate]),
-  }));
-  console.log(test);
   return {
     policies: res.records.map((r) => ({
       id: r.id,
