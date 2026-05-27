@@ -204,26 +204,41 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            <CardTitle className="text-xl">Customers</CardTitle>
-            <Badge variant="secondary" className="ml-2">
-              {queued.length} in queue
-            </Badge>
+    <div className="space-y-6">
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="flex flex-col gap-4 pb-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-semibold tracking-tight">Customers</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {customers.length} on this page · <span className="font-medium text-foreground">{queued.length}</span> in queue
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching} className="h-9">
               <RefreshCcw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               {isFetching ? "Syncing…" : "Sync"}
             </Button>
-            <Button variant="default" size="sm" onClick={sendSelectedToCallList} disabled={selectedIds.size === 0}>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={sendSelectedToCallList}
+              disabled={selectedIds.size === 0}
+              className="h-9 shadow-sm"
+            >
               <Send className="w-4 h-4 mr-2" />
-              Send to Call List ({selectedIds.size})
+              Send to Call List
+              {selectedIds.size > 0 && (
+                <span className="ml-2 rounded-md bg-primary-foreground/20 px-1.5 py-0.5 text-xs font-semibold">
+                  {selectedIds.size}
+                </span>
+              )}
             </Button>
-            <Button size="sm" variant="secondary" onClick={onNextStep}>
+            <Button size="sm" variant="secondary" onClick={onNextStep} className="h-9">
               Next: Call List
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -232,18 +247,18 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
         <CardContent className="space-y-4">
           {/* Search + Consent filter */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, phone, routing…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-10 bg-muted/30 border-border/60 focus-visible:bg-background"
               />
             </div>
             <Select value={consentFilter} onValueChange={setConsentFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px] h-10 bg-muted/30 border-border/60">
                 <SelectValue placeholder="Filter by consent" />
               </SelectTrigger>
               <SelectContent>
@@ -255,7 +270,9 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             </Select>
           </div>
 
-          <div className="rounded-md border overflow-hidden">
+          <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
+            <div className="max-h-[640px] overflow-auto">
+
             {isLoading ? (
               <div className="flex items-center justify-center py-16 text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
@@ -270,8 +287,8 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               </div>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                  <TableRow className="hover:bg-transparent border-b border-border/60">
                     <TableHead className="w-10">
                       <Checkbox
                         checked={allSelected ? true : someSelected ? "indeterminate" : false}
@@ -280,26 +297,27 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                         disabled={callable.length === 0}
                       />
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Routing</TableHead>
-                    <TableHead>Consent</TableHead>
-                    <TableHead>Policy</TableHead>
-                    <TableHead>Policy Status</TableHead>
-                    <TableHead>Renewal Premium</TableHead>
-                    <TableHead>Outstanding Balance</TableHead>
-                    <TableHead>Plan Code</TableHead>
-                    <TableHead>Notice Sent</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Policy (Detail)</TableHead>
-                    <TableHead className="w-12 text-right">Actions</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Routing</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consent</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy Status</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Renewal Premium</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outstanding</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan Code</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notice Sent</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Date</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expiry Date</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Policy (Detail)</TableHead>
+                    <TableHead className="w-12 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={15} className="text-center text-muted-foreground py-12">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
                         No customers found.
                       </TableCell>
                     </TableRow>
@@ -310,78 +328,91 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                         !!normalizeThaiPhone(c.phone2) ||
                         !!normalizeThaiPhone(c.phone3);
                       const inQueue = queuedIds.has(c.id);
+                      const isSelected = selectedIds.has(c.id);
                       return (
-                        <TableRow key={c.id} data-state={selectedIds.has(c.id) ? "selected" : undefined}>
+                        <TableRow
+                          key={c.id}
+                          data-state={isSelected ? "selected" : undefined}
+                          className="group transition-colors hover:bg-muted/40 data-[state=selected]:bg-primary/5"
+                        >
                           <TableCell>
                             <Checkbox
-                              checked={selectedIds.has(c.id)}
+                              checked={isSelected}
                               onCheckedChange={() => toggleOne(c.id)}
                               disabled={!hasPhone}
                               aria-label="Select customer"
                             />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}
-                            {c.duplicateFlag && (
-                              <Badge variant="outline" className="ml-2">
-                                dup
-                              </Badge>
-                            )}
-                            {inQueue && (
-                              <Badge variant="secondary" className="ml-2">
-                                in queue
-                              </Badge>
-                            )}
+                          <TableCell className="font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                {((c.firstName?.[0] || "") + (c.lastName?.[0] || "")).toUpperCase() || "?"}
+                              </div>
+                              <span>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}</span>
+                              {c.duplicateFlag && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  dup
+                                </Badge>
+                              )}
+                              {inQueue && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-transparent hover:bg-blue-200">
+                                  queued
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
+                          <TableCell className="font-mono text-xs">
                             {hasPhone ? (
                               c.phone1 || c.phone2 || c.phone3
                             ) : (
-                              <span className="text-muted-foreground">no valid phone</span>
+                              <span className="text-muted-foreground italic">no phone</span>
                             )}
                           </TableCell>
-                          <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
+                          <TableCell className="text-sm">{c.routingGroup ? c.routingGroup : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell>
                             {(() => {
                               const s = (c.consentStatus ?? "").trim();
                               if (s === "Consent Given")
                                 return (
-                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent">
-                                    {s}
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-transparent font-medium">
+                                    ✓ Given
                                   </Badge>
                                 );
                               if (s === "Consent Denied")
                                 return (
-                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent">
-                                    {s}
+                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-transparent font-medium">
+                                    ✗ Denied
                                   </Badge>
                                 );
-                              return s ? <Badge variant="secondary">{s}</Badge> : "—";
+                              return s ? <Badge variant="secondary">{s}</Badge> : <span className="text-muted-foreground">—</span>;
                             })()}
                           </TableCell>
-                          <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
-                          <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
-                          <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
-                          <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
-                          <TableCell>{c.planCodeId ? (planCodeMap.get(c.planCodeId) ?? c.planCodeId) : "—"}</TableCell>
-                          <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
-                          <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
-                          <TableCell>
+                          <TableCell className="font-mono text-xs">{c.policyNumber ? c.policyNumber : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.policyStatus ? <Badge variant="outline" className="font-normal">{c.policyStatus}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.renewalPremium ? c.renewalPremium : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.outstandingBalance ? c.outstandingBalance : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.planCodeId ? (planCodeMap.get(c.planCodeId) ?? c.planCodeId) : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">{c.noticeSent ? c.noticeSent : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{c.paymentDate ? c.paymentDate : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
                             {(() => {
                               const byRecId = policyMap.mapByCustomer.get(c.id);
                               if (byRecId) return byRecId;
-
                               const byPolicy = c.policyNumber ? policyMap.mapByPolicy.get(c.policyNumber) : null;
                               if (byPolicy) return byPolicy;
-
-                              return "—";
+                              return <span className="text-muted-foreground">—</span>;
                             })()}
                           </TableCell>
-                          <TableCell>{c.policy ? c.policy : "—"}</TableCell>
+                          <TableCell className="text-sm">{c.policy ? c.policy : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open actions">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"
+                                  aria-label="Open actions"
+                                >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -407,15 +438,18 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                 </TableBody>
               </Table>
             )}
+            </div>
           </div>
 
-          <div className="flex items-center justify-between">
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
             <p className="text-xs text-muted-foreground">
-              {filtered.length} of {customers.length} on this page
+              Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              <span className="font-semibold text-foreground">{customers.length}</span>
               {selectedIds.size > 0 && (
                 <>
                   {" · "}
-                  <span className="font-medium text-foreground">{selectedIds.size} selected</span>
+                  <span className="font-semibold text-primary">{selectedIds.size} selected</span>
                 </>
               )}
             </p>
@@ -423,6 +457,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9"
                 disabled={offsetStack.length <= 1}
                 onClick={() => setOffsetStack((s) => s.slice(0, -1))}
               >
@@ -431,6 +466,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9"
                 disabled={!data?.offset}
                 onClick={() => data?.offset && setOffsetStack((s) => [...s, data.offset])}
               >
@@ -438,6 +474,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
               </Button>
             </div>
           </div>
+
         </CardContent>
       </Card>
 
