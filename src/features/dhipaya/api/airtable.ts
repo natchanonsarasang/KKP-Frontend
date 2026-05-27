@@ -70,10 +70,7 @@ export async function updateCustomer(
  * If a Consents row already exists for the customer it is patched; otherwise
  * a new row is created and linked.
  */
-export async function setCustomerConsent(
-  customerRecordId: string,
-  consentStatus: string,
-): Promise<void> {
+export async function setCustomerConsent(customerRecordId: string, consentStatus: string): Promise<void> {
   // Find an existing Consents row linked to this customer.
   const formula = `FIND('${customerRecordId}', ARRAYJOIN({${CONSENT_FIELDS.customer}}))`;
   const found = await call<ListResponse>({
@@ -110,10 +107,9 @@ export async function deleteCustomer(recordId: string): Promise<void> {
   await call({ action: "delete", table: "Customer", recordId });
 }
 
-
-
 function mapCustomer(rec: AirtableRecord): Customer {
   const f = rec.fields as AnyFields;
+  console.log("Customer Record Fields:", f);
   return {
     id: rec.id,
     firstName: str(f[CUSTOMER_FIELDS.firstName]),
