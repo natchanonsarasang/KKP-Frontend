@@ -57,6 +57,19 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
 
   const customers = data?.customers ?? [];
 
+  const { data: policiesData } = useQuery({
+    queryKey: ["dhipaya-policies"],
+    queryFn: () => listPolicies({ pageSize: 100 }),
+  });
+
+  const policyMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of policiesData?.policies ?? []) {
+      if (p.customerId && p.expiryDate) map.set(p.customerId, p.expiryDate);
+    }
+    return map;
+  }, [policiesData]);
+
   // Reconcile selection against the latest fetched page — drop ghost IDs.
   useEffect(() => {
     if (!data) return;
