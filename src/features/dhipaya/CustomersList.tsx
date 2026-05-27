@@ -51,6 +51,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [consentFilter, setConsentFilter] = useState<string>("all");
+  const [editing, setEditing] = useState<Customer | null>(null);
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
