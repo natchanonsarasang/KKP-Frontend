@@ -265,6 +265,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Plan Code</TableHead>
                     <TableHead>Notice Sent</TableHead>
                     <TableHead>Payment Date</TableHead>
+                    <TableHead>Expiry Date</TableHead>
                     <TableHead>Policy (Detail)</TableHead>
                     <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
