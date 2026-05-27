@@ -24,6 +24,7 @@ export interface Customer {
   noticeSent?: string;
   paymentDate?: string;
   policy?: string;
+  expiryDate?: string;
 }
 
 export interface Policy {
