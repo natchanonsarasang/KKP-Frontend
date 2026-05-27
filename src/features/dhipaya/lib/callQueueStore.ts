@@ -150,7 +150,7 @@ async function dialOne(rowId: string): Promise<void> {
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
     };
-    const { data: resp, error: invokeErr } = await supabase.functions.invoke("voicebot-make-call", {
+    const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
         phone_number: row.selectedPhone,
         variables,
