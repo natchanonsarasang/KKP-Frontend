@@ -358,8 +358,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>{c.routingGroup || "—"}</TableCell>
-                          <TableCell>{c.campaign || "—"}</TableCell>
+                          <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
                           <TableCell>
                             {c.consentStatus ? (
                               <Badge variant="secondary">{c.consentStatus}</Badge>
@@ -367,6 +366,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               "—"
                             )}
                           </TableCell>
+                          <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
+                          <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
+                          <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
+                          <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
+                          <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
+                          <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
+                          <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
+                          <TableCell>{c.policy ? c.policy : "—"}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
