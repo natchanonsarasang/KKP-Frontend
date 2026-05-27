@@ -57,7 +57,10 @@ const EditCustomerDialog = ({ customer, open, onOpenChange }: Props) => {
       // read-only). Update it first so the relationship is in sync before we
       // touch Customer fields.
       if (nextConsent !== prevConsent) {
-        await setCustomerConsent(customer.id, nextConsent);
+        if (customer.customerId == null) {
+          throw new Error("Customer is missing Customer_ID; cannot update consent.");
+        }
+        await setCustomerConsent(customer.customerId, nextConsent);
       }
 
       // Then update the editable fields on the Customer table.
