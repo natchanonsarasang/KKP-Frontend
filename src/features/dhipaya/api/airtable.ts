@@ -112,7 +112,12 @@ function mapCustomer(rec: AirtableRecord): Customer {
   console.log("Customer Record Fields:", f);
   return {
     id: rec.id,
-    customerId: typeof f[CUSTOMER_FIELDS.customerId] === "number" ? (f[CUSTOMER_FIELDS.customerId] as number) : f[CUSTOMER_FIELDS.customerId] != null ? Number(f[CUSTOMER_FIELDS.customerId]) : undefined,
+    customerId:
+      typeof f[CUSTOMER_FIELDS.customerId] === "number"
+        ? (f[CUSTOMER_FIELDS.customerId] as number)
+        : f[CUSTOMER_FIELDS.customerId] != null
+          ? Number(f[CUSTOMER_FIELDS.customerId])
+          : undefined,
     firstName: str(f[CUSTOMER_FIELDS.firstName]),
     lastName: str(f[CUSTOMER_FIELDS.lastName]),
     phone1: str(f[CUSTOMER_FIELDS.phone1]),
@@ -141,6 +146,16 @@ export async function listPolicies(opts?: {
   const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
   if (opts?.offset) params.offset = opts.offset;
   const res = await call<ListResponse>({ action: "list", table: "Policy", params });
+  test = res.records.map((r) => ({
+    id: r.id,
+    policyNumber: str(r.fields[POLICY_FIELDS.policyNumber]),
+    policyStatus: str(r.fields[POLICY_FIELDS.policyStatus]),
+    renewalPremium: num(r.fields[POLICY_FIELDS.renewalPremium]),
+    outstanding: num(r.fields[POLICY_FIELDS.outstanding]),
+    customerId: firstLinked(r.fields[POLICY_FIELDS.customer]),
+    expiryDate: str(r.fields[POLICY_FIELDS.expiryDate]),
+  }));
+  console.log(test);
   return {
     policies: res.records.map((r) => ({
       id: r.id,
