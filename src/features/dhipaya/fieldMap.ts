@@ -17,8 +17,8 @@ export const CUSTOMER_FIELDS = {
   renewalPremium: "Renewal_Premium (from Policy)",
   outstandingBalance: "Outstanding_Balance (from Policy)",
   planCode: "Plan_Code (from Policy)",
-  noticeSent: "Notice_Sent",
-  paymentDate: "Payment_Date",
+  noticeSent: "Notice_Sent (from Policy)",
+  paymentDate: "Payment_Date (from Policy)",
   policy: "Policy",
 } as const;
 
