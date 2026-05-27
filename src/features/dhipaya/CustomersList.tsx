@@ -262,13 +262,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Routing</TableHead>
                     <TableHead>Campaign</TableHead>
                     <TableHead>Consent</TableHead>
+                    <TableHead className="w-12 text-right">Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="text-center text-muted-foreground py-8"
                       >
                         No customers found.
