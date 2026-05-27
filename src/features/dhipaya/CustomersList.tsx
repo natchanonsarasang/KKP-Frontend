@@ -47,6 +47,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const currentOffset = offsetStack[offsetStack.length - 1];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [consentFilter, setConsentFilter] = useState<string>("all");
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
