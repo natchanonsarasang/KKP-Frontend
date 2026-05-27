@@ -293,8 +293,15 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Name</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Routing</TableHead>
-                    <TableHead>Campaign</TableHead>
                     <TableHead>Consent</TableHead>
+                    <TableHead>Policy</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Premium</TableHead>
+                    <TableHead>Balance</TableHead>
+                    <TableHead>Plan Code</TableHead>
+                    <TableHead>Notice Sent</TableHead>
+                    <TableHead>Payment Date</TableHead>
+                    <TableHead>Policy (Detail)</TableHead>
                     <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
