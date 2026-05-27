@@ -2,6 +2,33 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeThaiPhone } from "./phone";
 import type { Customer } from "../types";
+import { CUSTOMER_FIELDS } from "../fieldMap";
+
+export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
+
+export function checkConditionFlow(customer: Customer): NextIntent {
+  const get = (key: keyof typeof CUSTOMER_FIELDS): string => {
+    const v = (customer as unknown as Record<string, unknown>)[key];
+    return (v == null ? "" : String(v)).trim().toLowerCase();
+  };
+
+  // P1: Policy status
+  const policyStatus = get("policyStatus");
+  if (policyStatus === "active") return "skip";
+  if (policyStatus !== "overdue" && policyStatus !== "prospect") return "skip";
+
+  // P2: Consent
+  const consent = get("consentStatus");
+  if (!consent) return "consent";
+  if (consent === "consent denied") return "skip";
+  if (consent !== "consent given") return "skip";
+
+  // P3: Notice sent
+  const notice = get("noticeSent");
+  if (notice === "yes") return "campaign2";
+  if (notice === "no") return "campaign3";
+  return "skip";
+}
 
 // Concurrency limit applied across the whole page (background-safe).
 export const CONCURRENCY = 5;
@@ -130,6 +157,16 @@ async function dialOne(rowId: string): Promise<void> {
   const row = rows.find((r) => r.id === rowId);
   if (!row || row.status !== "pending") return;
 
+  const nextIntent = checkConditionFlow(row.customer);
+  if (nextIntent === "skip") {
+    updateRow(rowId, {
+      status: "success",
+      finishedAt: Date.now(),
+      callOutcome: "Call skipped",
+    });
+    return;
+  }
+
   updateRow(rowId, { status: "calling", startedAt: Date.now() });
 
   let userId: string | null = null;
@@ -143,12 +180,10 @@ async function dialOne(rowId: string): Promise<void> {
 
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
-    const nextIntent = row.customer.consentStatus === "Consent Given" ? "check_policy" : "consent";
     const variables = {
       name: row.customer.firstName,
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
-      next_intent: nextIntent,
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
