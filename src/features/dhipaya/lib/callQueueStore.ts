@@ -161,6 +161,7 @@ async function dialOne(rowId: string): Promise<void> {
   if (!row || row.status !== "pending") return;
 
   const nextIntent = checkConditionFlow(row.customer);
+  console.log("call intent flow:", nextIntent);
   if (nextIntent === "skip") {
     updateRow(rowId, {
       status: "success",
