@@ -78,8 +78,14 @@ function mapCustomer(rec: AirtableRecord): Customer {
     routingGroup: str(f[CUSTOMER_FIELDS.routingGroup]),
     campaign: str(f[CUSTOMER_FIELDS.campaign]),
     consentStatus: str(f[CUSTOMER_FIELDS.consentStatus]),
+    policyNumber: str(f[CUSTOMER_FIELDS.policyNumber]),
     policyStatus: str(f[CUSTOMER_FIELDS.policyStatus]),
+    renewalPremium: str(f[CUSTOMER_FIELDS.renewalPremium]),
     outstandingBalance: str(f[CUSTOMER_FIELDS.outstandingBalance]),
+    planCode: str(f[CUSTOMER_FIELDS.planCode]),
+    noticeSent: str(f[CUSTOMER_FIELDS.noticeSent]),
+    paymentDate: str(f[CUSTOMER_FIELDS.paymentDate]),
+    policy: str(f[CUSTOMER_FIELDS.policy]),
   };
 }
 
