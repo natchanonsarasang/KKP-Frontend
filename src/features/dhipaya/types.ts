@@ -6,6 +6,7 @@ export interface AirtableRecord<F = Record<string, unknown>> {
 
 export interface Customer {
   id: string;
+  customerId?: number;
   firstName?: string;
   lastName?: string;
   phone1?: string;

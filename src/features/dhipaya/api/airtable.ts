@@ -70,9 +70,9 @@ export async function updateCustomer(
  * If a Consents row already exists for the customer it is patched; otherwise
  * a new row is created and linked.
  */
-export async function setCustomerConsent(customerRecordId: string, consentStatus: string): Promise<void> {
-  // Find an existing Consents row linked to this customer.
-  const formula = `FIND('${customerRecordId}', ARRAYJOIN({${CONSENT_FIELDS.customer}}))`;
+export async function setCustomerConsent(customerId: number, consentStatus: string): Promise<void> {
+  // Find an existing Consents row by Customer_ID (numeric foreign key).
+  const formula = `{${CONSENT_FIELDS.customer}} = ${customerId}`;
   const found = await call<ListResponse>({
     action: "list",
     table: "Consents",
@@ -97,7 +97,7 @@ export async function setCustomerConsent(customerRecordId: string, consentStatus
       table: "Consents",
       fields: {
         ...fields,
-        [CONSENT_FIELDS.customer]: [customerRecordId],
+        [CONSENT_FIELDS.customer]: customerId,
       },
     });
   }
@@ -112,6 +112,7 @@ function mapCustomer(rec: AirtableRecord): Customer {
   console.log("Customer Record Fields:", f);
   return {
     id: rec.id,
+    customerId: typeof f[CUSTOMER_FIELDS.customerId] === "number" ? (f[CUSTOMER_FIELDS.customerId] as number) : f[CUSTOMER_FIELDS.customerId] != null ? Number(f[CUSTOMER_FIELDS.customerId]) : undefined,
     firstName: str(f[CUSTOMER_FIELDS.firstName]),
     lastName: str(f[CUSTOMER_FIELDS.lastName]),
     phone1: str(f[CUSTOMER_FIELDS.phone1]),
