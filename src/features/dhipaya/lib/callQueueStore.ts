@@ -16,14 +16,21 @@ export function formatThaiDate(input?: string | null): string {
   if (!input) return "";
   let d: Date | null = null;
   const s = String(input).trim();
-  // Try M/D/YYYY or D/M/YYYY style (Airtable US default is M/D/YYYY)
-  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slash) {
-    const [, a, b, y] = slash;
-    d = new Date(Number(y), Number(a) - 1, Number(b));
+  // ISO YYYY-MM-DD (Airtable default)
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    const [, y, m, day] = iso;
+    d = new Date(Number(y), Number(m) - 1, Number(day));
   } else {
-    const parsed = new Date(s);
-    if (!isNaN(parsed.getTime())) d = parsed;
+    // Fallback M/D/YYYY
+    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slash) {
+      const [, a, b, y] = slash;
+      d = new Date(Number(y), Number(a) - 1, Number(b));
+    } else {
+      const parsed = new Date(s);
+      if (!isNaN(parsed.getTime())) d = parsed;
+    }
   }
   if (!d || isNaN(d.getTime())) return "";
   return `วัน${THAI_DAYS[d.getDay()]}ที่ ${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
