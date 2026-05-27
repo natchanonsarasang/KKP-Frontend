@@ -23,6 +23,9 @@ export function checkConditionFlow(customer: Customer): NextIntent {
   if (consent === "consent denied") return "skip";
   if (consent !== "consent given") return "skip";
 
+  // Special Condition for Policy : "prospect" and Consent: "consent given".
+  if (policyStatus === "prospect" && consent === "consent given") return "campaign3";
+
   // P3: Notice sent
   const notice = get("noticeSent");
   if (notice === "yes") return "campaign2";
