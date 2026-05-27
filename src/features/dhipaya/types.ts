@@ -17,7 +17,12 @@ export interface Customer {
   consentStatus?: string;
   policyNumber?: string;
   policyStatus?: string;
+  renewalPremium?: string;
   outstandingBalance?: string;
+  planCode?: string;
+  noticeSent?: string;
+  paymentDate?: string;
+  policy?: string;
 }
 
 export interface Policy {

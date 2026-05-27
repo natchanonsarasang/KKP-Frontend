@@ -243,7 +243,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, phone, campaign…"
+                placeholder="Search by name, phone, routing…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -293,8 +293,15 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Name</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Routing</TableHead>
-                    <TableHead>Campaign</TableHead>
                     <TableHead>Consent</TableHead>
+                    <TableHead>Policy</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Premium</TableHead>
+                    <TableHead>Balance</TableHead>
+                    <TableHead>Plan Code</TableHead>
+                    <TableHead>Notice Sent</TableHead>
+                    <TableHead>Payment Date</TableHead>
+                    <TableHead>Policy (Detail)</TableHead>
                     <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -302,7 +309,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={13}
                         className="text-center text-muted-foreground py-8"
                       >
                         No customers found.
@@ -351,8 +358,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>{c.routingGroup || "—"}</TableCell>
-                          <TableCell>{c.campaign || "—"}</TableCell>
+                          <TableCell>{c.routingGroup ? c.routingGroup : "—"}</TableCell>
                           <TableCell>
                             {c.consentStatus ? (
                               <Badge variant="secondary">{c.consentStatus}</Badge>
@@ -360,6 +366,14 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                               "—"
                             )}
                           </TableCell>
+                          <TableCell>{c.policyNumber ? c.policyNumber : "—"}</TableCell>
+                          <TableCell>{c.policyStatus ? c.policyStatus : "—"}</TableCell>
+                          <TableCell>{c.renewalPremium ? c.renewalPremium : "—"}</TableCell>
+                          <TableCell>{c.outstandingBalance ? c.outstandingBalance : "—"}</TableCell>
+                          <TableCell>{c.planCode ? c.planCode : "—"}</TableCell>
+                          <TableCell>{c.noticeSent ? c.noticeSent : "—"}</TableCell>
+                          <TableCell>{c.paymentDate ? c.paymentDate : "—"}</TableCell>
+                          <TableCell>{c.policy ? c.policy : "—"}</TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
