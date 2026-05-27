@@ -59,6 +59,10 @@ export async function updateCustomer(
   return mapCustomer(rec);
 }
 
+export async function deleteCustomer(recordId: string): Promise<void> {
+  await call({ action: "delete", table: "Customer", recordId });
+}
+
 
 
 function mapCustomer(rec: AirtableRecord): Customer {

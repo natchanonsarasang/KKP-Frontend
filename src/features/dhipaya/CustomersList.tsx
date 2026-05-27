@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,8 +25,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { listCustomers } from "./api/airtable";
+import { deleteCustomer, listCustomers } from "./api/airtable";
 import { addToCallQueue, useCallQueue } from "./lib/callQueueStore";
 import { normalizeThaiPhone } from "./lib/phone";
 import EditCustomerDialog from "./EditCustomerDialog";
@@ -39,6 +55,8 @@ import {
   Search,
   Users,
   Pencil,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 
 interface Props {
@@ -52,6 +70,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
   const [search, setSearch] = useState("");
   const [consentFilter, setConsentFilter] = useState<string>("all");
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState<Customer | null>(null);
 
   const queued = useCallQueue();
   const queuedIds = useMemo(() => new Set(queued.map((c) => c.id)), [queued]);
@@ -87,6 +106,20 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
     await queryClient.invalidateQueries({ queryKey: ["dhipaya-customers"] });
     await refetch();
   }
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCustomer(id),
+    onSuccess: () => {
+      toast.success("Customer deleted");
+      queryClient.invalidateQueries({ queryKey: ["dhipaya-customers"] });
+      setDeleting(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to delete customer");
+    },
+  });
+
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -262,7 +295,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                     <TableHead>Routing</TableHead>
                     <TableHead>Campaign</TableHead>
                     <TableHead>Consent</TableHead>
-                    <TableHead className="w-12 text-right">Edit</TableHead>
+                    <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -328,15 +361,31 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setEditing(c)}
-                              aria-label="Edit customer"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="Open actions"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setEditing(c)}>
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setDeleting(c)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -388,6 +437,45 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
       />
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete customer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">
+                {[deleting?.firstName, deleting?.lastName].filter(Boolean).join(" ") ||
+                  "this customer"}
+              </span>{" "}
+              from Airtable. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleting) deleteMutation.mutate(deleting.id);
+              }}
+            >
+              {deleteMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
