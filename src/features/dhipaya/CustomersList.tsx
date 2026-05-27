@@ -88,6 +88,7 @@ const DhipayaCustomersList = ({ onNextStep }: Props) => {
         map.set(p.id, p.name);
       }
     }
+    console.log("Check Plan Map:", Array.from(map.entries()));
     return map;
   }, [plans]);
 
