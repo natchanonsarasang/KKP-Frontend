@@ -13,7 +13,12 @@ export const CUSTOMER_FIELDS = {
   consentStatus: "Consent_Status (from Consents)",
   policyNumber: "Policy_Number",
   policyStatus: "Policy_Status",
+  renewalPremium: "Renewal_Premium",
   outstandingBalance: "Outstanding_Balance",
+  planCode: "Plan_Code",
+  noticeSent: "Notice_Sent",
+  paymentDate: "Payment_Date",
+  policy: "Policy",
 } as const;
 
 export const POLICY_FIELDS = {
