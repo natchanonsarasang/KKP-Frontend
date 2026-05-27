@@ -2,7 +2,6 @@
 // Change a value here when an Airtable column is renamed.
 
 export const CUSTOMER_FIELDS = {
-  customerId: "Customer_ID",
   firstName: "First_Name",
   lastName: "Last_Name",
   phone1: "Phone_Number1",
@@ -10,13 +9,13 @@ export const CUSTOMER_FIELDS = {
   phone3: "Phone_Number3",
   duplicateFlag: "Duplicate_Flag",
   routingGroup: "Routing_Group",
-  campaign: "Campaign",
+  // campaign: "Campaign",
   consentStatus: "Consent_Status (from Consents)",
-  policyNumber: "Policy_Number",
-  policyStatus: "Policy_Status",
-  renewalPremium: "Renewal_Premium",
-  outstandingBalance: "Outstanding_Balance",
-  planCode: "Plan_Code",
+  policyNumber: "Policy_Number (from Policy)",
+  policyStatus: "Policy_Status (from Policy)",
+  renewalPremium: "Renewal_Premium (from Policy)",
+  outstandingBalance: "Outstanding_Balance (from Policy)",
+  planCode: "Plan_Code (from Policy)",
   noticeSent: "Notice_Sent",
   paymentDate: "Payment_Date",
   policy: "Policy",
