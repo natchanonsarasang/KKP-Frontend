@@ -522,10 +522,18 @@ const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
   failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
+// ----------------------------------------------------------------------------
+// Two classifier configs live side-by-side in this unified webhook:
+//   - "default"  → debt-collection 15-status taxonomy (src/lib/callStatuses.ts)
+//   - "dhipaya"  → consent-collection taxonomy (src/features/dhipaya/lib/dhipaya-callStatuses.ts)
+// classifyCall() picks the right one based on the `project` argument.
+// ----------------------------------------------------------------------------
+
+type CategoryDef = { id: number; name: string; thai: string; group: "main" | "sub" };
+
 // 15-status taxonomy — must stay in sync with MAIN_STATUSES + SUB_STATUSES
-// in src/lib/callStatuses.ts. The `name` field is what gets persisted into
-// call_list_items.ai_category and consumed by the Analytics dashboard.
-const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
+// in src/lib/callStatuses.ts.
+const DEFAULT_CATEGORIES: CategoryDef[] = [
   // --- Main outcomes ---
   { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
   { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
@@ -544,6 +552,24 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 13, name: "Silence",               thai: "ลูกค้าเงียบ",                group: "sub"  },
   { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
   { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
+];
+
+// Dhipaya consent-flow taxonomy — must stay in sync with
+// src/features/dhipaya/lib/dhipaya-callStatuses.ts.
+const DHIPAYA_CATEGORIES: CategoryDef[] = [
+  // --- Main outcomes ---
+  { id: 1, name: "Transfer to Agent",   thai: "โอนสายให้เจ้าหน้าที่",   group: "main" },
+  { id: 2, name: "Consent Given",       thai: "ให้ความยินยอม",          group: "main" },
+  { id: 3, name: "Consent Denied",      thai: "ปฏิเสธการให้ความยินยอม", group: "main" },
+  { id: 4, name: "Callback Scheduled",  thai: "นัดติดต่อกลับ",          group: "main" },
+  { id: 5, name: "Not Reached",         thai: "ติดต่อไม่ได้",           group: "main" },
+  { id: 6, name: "Completed",           thai: "สนทนาสำเร็จ",            group: "main" },
+  // --- Conversation behaviors (fallbacks) ---
+  { id: 7,  name: "Not Convenient",   thai: "ไม่สะดวกคุย",            group: "sub" },
+  { id: 8,  name: "Wrong Person",     thai: "ไม่ใช่ผู้เอาประกัน",      group: "sub" },
+  { id: 9,  name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน",   group: "sub" },
+  { id: 10, name: "Silence",          thai: "ลูกค้าเงียบ",            group: "sub" },
+  { id: 11, name: "Dropped Call",     thai: "สายหลุดระหว่างสนทนา",    group: "sub" },
 ];
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
@@ -568,53 +594,14 @@ function detectAudioQualityIssue(log: string): boolean {
   return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
 }
 
-function makeResult(name: string, reason: string): ClassifyResult {
-  const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
+function makeResultFrom(categories: CategoryDef[], name: string, reason: string): ClassifyResult {
+  const cat = categories.find((c) => c.name === name)!;
   return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
 }
 
-async function classifyCall(
-  payload: Record<string, unknown>,
-  log: string,
-  apiKey: string | undefined,
-): Promise<ClassifyResult> {
-  // STEP 1: System-level status check (telephony layer)
-  const rawStatus = String(payload.status || "").toLowerCase().trim();
-  const sys = SYSTEM_STATUS_MAP[rawStatus];
-  if (sys) {
-    return makeResult(sys.name, `System status: ${rawStatus} → ${sys.thai}`);
-  }
-
-  // STEP 2: No / empty conversation → Not Reached
-  if (!log || log.trim().length < 5) {
-    return makeResult("Not Reached", "No conversation log present");
-  }
-
-  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
-  const userTurns = log.split("User:").slice(1);
-  const hasRealSpeech = userTurns.some((t) => {
-    const text = t.trim().toUpperCase();
-    return text.length > 0 && !text.includes("TIMEOUT");
-  });
-  if (userTurns.length > 0 && !hasRealSpeech) {
-    return makeResult("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
-  }
-
-  // STEP 4: Rule-based audio-quality detection (runs before AI)
-  if (detectAudioQualityIssue(log)) {
-    return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
-  }
-
-  if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, defaulting to Not Reached");
-    return makeResult("Not Reached", "AI key missing");
-  }
-
-  const categoryList = CONVERSATION_CATEGORIES.map(
-    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
-  ).join("\n");
-
-  const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
+// ---- Default (debt-collection) prompt --------------------------------------
+function defaultSystemPrompt(categoryList: string): string {
+  return `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
 Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
@@ -686,6 +673,108 @@ Output format (STRICT JSON, no markdown, no commentary):
   "confidence": <number between 0 and 1>,
   "reason": "<short explanation focused on the FINAL outcome>"
 }`;
+}
+
+// ---- Dhipaya (consent-collection) prompt -----------------------------------
+function dhipayaSystemPrompt(categoryList: string): string {
+  return `You classify Thai outbound consent-collection call transcripts for Dhipaya. Return STRICT JSON only.
+Choose exactly ONE category (use the EXACT English label) from this list:
+${categoryList}
+
+CONTEXT
+The bot is calling customers to ask CONSENT to retrieve and analyze their data in order to offer (sell) an insurance product. Your job is to classify the FINAL outcome of the call.
+
+DECISION ORDER (apply in this exact order — first match wins):
+
+1. TRANSFER → If the customer at any point asks to speak with a human agent / staff
+   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "transfer to agent", "speak to a person"),
+   classify as "Transfer to Agent".
+
+2. NOT CONVENIENT → If the customer says they are not convenient / not available
+   to talk right now ("ไม่สะดวกคุย", "ไม่ว่าง", "ติดประชุม", "not a good time"),
+   AND no consent decision was reached, classify as "Not Convenient".
+
+3. CALLBACK SCHEDULED → If the customer asks to be called back at a specific or
+   vague later time ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า", "call me back later"),
+   classify as "Callback Scheduled".
+
+4. CONSENT DECISION → If the Bot actually asked the consent question (about
+   retrieving / analyzing the customer's data to offer a product) AND the
+   customer gave a clear answer:
+   - Affirmative ("ยินยอม", "ตกลง", "ได้ครับ", "yes / agree") → "Consent Given"
+   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "no / don't agree", clear refusal of consent) → "Consent Denied"
+
+5. COMPLETED → For any other topic where a real exchange happened and the call
+   ended normally (general questions, off-topic but resolved, etc.) with no
+   consent decision and no callback agreement, classify as "Completed".
+
+STRICT RULE — TARGET THE FINAL OUTCOME:
+"Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
+in the transcript that the relevant question was actually reached. If the call
+hangs up BEFORE these points (no real exchange, or cut off mid-greeting), use:
+  - "Dropped Call" if the customer engaged briefly then the line cut, or
+  - "Not Reached" if there was effectively no customer interaction.
+
+Other behaviors ("Wrong Person", "Background Noise", "Silence") should only be
+chosen when no main outcome above applies.
+
+Output format (STRICT JSON, no markdown, no commentary):
+{
+  "status_name": "<exact English label from the list>",
+  "confidence": <number between 0 and 1>,
+  "reason": "<short explanation focused on the FINAL outcome>"
+}`;
+}
+
+async function classifyCall(
+  payload: Record<string, unknown>,
+  log: string,
+  apiKey: string | undefined,
+  project: "default" | "dhipaya" = "default",
+): Promise<ClassifyResult> {
+  const categories = project === "dhipaya" ? DHIPAYA_CATEGORIES : DEFAULT_CATEGORIES;
+  const unmatchedFallback = project === "dhipaya" ? "Completed" : "Planned More Than 3";
+  const make = (name: string, reason: string) => makeResultFrom(categories, name, reason);
+
+  // STEP 1: System-level status check (telephony layer)
+  const rawStatus = String(payload.status || "").toLowerCase().trim();
+  const sys = SYSTEM_STATUS_MAP[rawStatus];
+  if (sys) {
+    return make(sys.name, `System status: ${rawStatus} → ${sys.thai}`);
+  }
+
+  // STEP 2: No / empty conversation → Not Reached
+  if (!log || log.trim().length < 5) {
+    return make("Not Reached", "No conversation log present");
+  }
+
+  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
+  const userTurns = log.split("User:").slice(1);
+  const hasRealSpeech = userTurns.some((t) => {
+    const text = t.trim().toUpperCase();
+    return text.length > 0 && !text.includes("TIMEOUT");
+  });
+  if (userTurns.length > 0 && !hasRealSpeech) {
+    return make("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
+  }
+
+  // STEP 4: Rule-based audio-quality detection (runs before AI)
+  if (detectAudioQualityIssue(log)) {
+    return make("Background Noise", "Detected audio-quality keywords in transcript");
+  }
+
+  if (!apiKey) {
+    console.warn("LOVABLE_API_KEY not found, defaulting to Not Reached");
+    return make("Not Reached", "AI key missing");
+  }
+
+  const categoryList = categories.map(
+    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
+  ).join("\n");
+
+  const systemPrompt = project === "dhipaya"
+    ? dhipayaSystemPrompt(categoryList)
+    : defaultSystemPrompt(categoryList);
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -704,7 +793,7 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return makeResult("Not Reached", "AI request failed");
+      return make("Not Reached", "AI request failed");
     }
 
     const result = await response.json();
@@ -713,14 +802,23 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
     const normalized = String(aiName).trim().toLowerCase();
-    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
-    const aliased =
-      normalized === "acknowledged" || normalized === "acknowledge"
+
+    // Project-specific label aliasing.
+    let aliased = normalized;
+    if (project === "dhipaya") {
+      aliased =
+        normalized === "transfer" ? "transfer to agent" :
+        normalized === "consent" || normalized === "agree" ? "consent given" :
+        normalized === "refused" || normalized === "decline" || normalized === "declined" ? "consent denied" :
+        normalized === "call later" || normalized === "scheduled callback" ? "callback scheduled" :
+        normalized;
+    } else {
+      aliased = (normalized === "acknowledged" || normalized === "acknowledge")
         ? "planned more than 3"
         : normalized;
-    const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === aliased,
-    );
+    }
+
+    const match = categories.find((c) => c.name.toLowerCase() === aliased);
 
     if (match) {
       return {
@@ -731,13 +829,14 @@ Output format (STRICT JSON, no markdown, no commentary):
       };
     }
 
-    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
-    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
+    console.warn(`Unmatched AI category, defaulting to ${unmatchedFallback}:`, aiName);
+    return make(unmatchedFallback, `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return makeResult("Planned More Than 3", "Classifier exception");
+    return make(unmatchedFallback, "Classifier exception");
   }
 }
+
 
 // ============================================================================
 // CALLBACK DATE EXTRACTION
