@@ -178,6 +178,55 @@ export function updateRow(id: string, patch: Partial<QueueRow>) {
   if (changed) emit();
 }
 
+export function requeueRow(id: string) {
+  let changed = false;
+  rows = rows.map((r) => {
+    if (r.id !== id) return r;
+    if (r.status === "pending" || r.status === "calling") return r;
+    changed = true;
+    return {
+      ...r,
+      status: "pending",
+      outboundId: undefined,
+      startedAt: undefined,
+      finishedAt: undefined,
+      errorMessage: undefined,
+      callOutcome: undefined,
+      callDuration: undefined,
+      conversationLog: null,
+      audioUrl: null,
+      appointmentDate: null,
+      appointmentTime: null,
+      aiCategory: null,
+    };
+  });
+  if (changed) emit();
+}
+
+export function requeueAllCompleted() {
+  let changed = false;
+  rows = rows.map((r) => {
+    if (r.status !== "success" && r.status !== "failed" && r.status !== "no_answer") return r;
+    changed = true;
+    return {
+      ...r,
+      status: "pending",
+      outboundId: undefined,
+      startedAt: undefined,
+      finishedAt: undefined,
+      errorMessage: undefined,
+      callOutcome: undefined,
+      callDuration: undefined,
+      conversationLog: null,
+      audioUrl: null,
+      appointmentDate: null,
+      appointmentTime: null,
+      aiCategory: null,
+    };
+  });
+  if (changed) emit();
+}
+
 export function setSelectedPhone(id: string, phone: string) {
   updateRow(id, { selectedPhone: phone });
 }

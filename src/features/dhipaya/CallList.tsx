@@ -51,6 +51,7 @@ import {
   RefreshCw,
   ListChecks,
   Users,
+  RotateCcw,
 } from "lucide-react";
 import {
   useQueueRows,
@@ -60,6 +61,8 @@ import {
   clearCallQueue,
   clearCompleted,
   removeFromCallQueue,
+  requeueRow,
+  requeueAllCompleted,
   setSelectedPhone,
   applyCallRecordUpdate,
   reconcileCallingRows,
@@ -268,6 +271,19 @@ const DhipayaCallList = () => {
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const n = rowsByTab.completed.length;
+              requeueAllCompleted();
+              if (n > 0) toast.success(`Re-queued ${n} call${n > 1 ? "s" : ""}`);
+            }}
+            disabled={counts.completed === 0}
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Re-queue completed
           </Button>
           <Button
             variant="outline"
@@ -496,22 +512,38 @@ const DhipayaCallList = () => {
                               )}
                               {(r.status === "success" ||
                                 r.status === "failed" ||
-                                r.status === "no_answer") &&
-                                (r.conversationLog || r.audioUrl) && (
+                                r.status === "no_answer") && (
+                                <div className="flex items-center justify-end gap-1">
+                                  {(r.conversationLog || r.audioUrl) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setTranscript({
+                                          conversationLog: r.conversationLog ?? null,
+                                          audioUrl: r.audioUrl ?? null,
+                                        })
+                                      }
+                                    >
+                                      <FileText className="w-4 h-4 mr-1" />
+                                      Transcript
+                                    </Button>
+                                  )}
                                   <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={() =>
-                                      setTranscript({
-                                        conversationLog: r.conversationLog ?? null,
-                                        audioUrl: r.audioUrl ?? null,
-                                      })
-                                    }
+                                    onClick={() => {
+                                      requeueRow(r.id);
+                                      toast.success("Moved back to Pending");
+                                      setActiveTab("pending");
+                                    }}
+                                    title="Re-queue this call"
                                   >
-                                    <FileText className="w-4 h-4 mr-1" />
-                                    Transcript
+                                    <RotateCcw className="w-4 h-4 mr-1" />
+                                    Re-queue
                                   </Button>
-                                )}
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
