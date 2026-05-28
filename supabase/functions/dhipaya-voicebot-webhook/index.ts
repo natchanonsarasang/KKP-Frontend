@@ -981,7 +981,48 @@ async function syncConsentToAirtable(
       pat,
     );
     console.log(`Airtable consent created for Customer_ID ${customerId} (rec ${customerRec.id}): ${aiCategory}`);
+}
+
+async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("Airtable credentials missing; skipping notice sync");
+    return;
   }
+
+  const normalized = normalizePhone(phone);
+  if (!normalized) return;
+
+  const phoneFormula =
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `)`;
+
+  const customerRes = await airtableFetch(
+    `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
+    { method: "GET" },
+    pat,
+  );
+  const customerRec = customerRes?.records?.[0];
+  if (!customerRec) {
+    console.warn(`Airtable: no Customer found for phone ${normalized} (notice sync)`);
+    return;
+  }
+
+  await airtableFetch(
+    `${baseId}/Customer/${customerRec.id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ fields: { notice_received: value } }),
+    },
+    pat,
+  );
+  console.log(`Airtable notice_received updated for Customer ${customerRec.id}: ${value}`);
+}
+
 
 }
 
