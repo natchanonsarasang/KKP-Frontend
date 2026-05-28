@@ -147,13 +147,11 @@ serve(async (req) => {
         : {}) as Record<string, unknown>;
     const nextIntent = String(callVariables.next_intent || "").toLowerCase();
     const consentStatusVar = String(callVariables.consent_status || "").toLowerCase();
-    const airtableCustomerRecordId = callVariables.airtable_customer_id
-      ? String(callVariables.airtable_customer_id)
-      : null;
     const airtableCustomerNumericId =
       callVariables.customer_id != null && callVariables.customer_id !== ""
         ? Number(callVariables.customer_id)
         : null;
+
 
 
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
