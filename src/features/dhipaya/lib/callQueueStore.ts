@@ -90,6 +90,7 @@ export interface QueueRow {
   audioUrl?: string | null;
   appointmentDate?: string | null;
   appointmentTime?: string | null;
+  aiCategory?: string | null;
 }
 
 // ---------- module state (persists across component mounts) ----------
