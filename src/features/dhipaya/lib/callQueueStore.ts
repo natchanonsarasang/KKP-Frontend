@@ -369,6 +369,7 @@ export function applyCallRecordUpdate(record: {
     audioUrl: rd.audio_url ?? null,
     appointmentDate: record.appointment_date ?? null,
     appointmentTime: record.appointment_time ?? null,
+    aiCategory: rd.ai_category ?? null,
   });
 }
 
