@@ -68,6 +68,39 @@ import {
   type QueueRow,
   type QueueStatus,
 } from "./lib/callQueueStore";
+import {
+  resolveMainStatus,
+  type CallStatusTone,
+} from "./lib/dhipaya-callStatuses";
+
+const mainToneClass: Record<CallStatusTone, string> = {
+  done: "bg-success/10 text-success border-success/30",
+  skip: "bg-destructive/10 text-destructive border-destructive/30",
+  callback: "bg-warning/10 text-warning border-warning/30",
+  "soft-callback": "bg-warning/10 text-warning border-warning/30",
+  transfer: "bg-primary/10 text-primary border-primary/30",
+  other: "bg-muted text-muted-foreground border-border",
+  none: "bg-muted text-muted-foreground border-border",
+};
+
+function ResultBadge({ row }: { row: QueueRow }) {
+  if (row.status === "pending" || row.status === "calling") {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const main = resolveMainStatus(row.aiCategory, {
+    picked_up: row.status === "success",
+    status: row.status,
+    call_outcome: row.callOutcome,
+  });
+  if (!main) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  return (
+    <Badge variant="outline" className={mainToneClass[main.tone]}>
+      {main.label}
+    </Badge>
+  );
+}
 
 const statusConfig: Record<
   QueueStatus,
@@ -368,6 +401,7 @@ const DhipayaCallList = () => {
                         <TableHead>Phone</TableHead>
                         <TableHead>Policy</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Result</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead className="w-[140px] text-right">Actions</TableHead>
                       </TableRow>
@@ -376,7 +410,7 @@ const DhipayaCallList = () => {
                       {rowsByTab[tab].length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={6}
+                            colSpan={7}
                             className="text-center text-muted-foreground py-10"
                           >
                             <div className="flex flex-col items-center gap-2">
@@ -442,6 +476,9 @@ const DhipayaCallList = () => {
                                   {r.errorMessage}
                                 </p>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <ResultBadge row={r} />
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground font-mono">
                               {formatDuration(r.callDuration)}

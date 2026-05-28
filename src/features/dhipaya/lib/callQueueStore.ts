@@ -90,6 +90,7 @@ export interface QueueRow {
   audioUrl?: string | null;
   appointmentDate?: string | null;
   appointmentTime?: string | null;
+  aiCategory?: string | null;
 }
 
 // ---------- module state (persists across component mounts) ----------
@@ -368,6 +369,7 @@ export function applyCallRecordUpdate(record: {
     audioUrl: rd.audio_url ?? null,
     appointmentDate: record.appointment_date ?? null,
     appointmentTime: record.appointment_time ?? null,
+    aiCategory: rd.ai_category ?? null,
   });
 }
 

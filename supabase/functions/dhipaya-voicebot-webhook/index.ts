@@ -219,7 +219,7 @@ serve(async (req) => {
           .from("call_records")
           .update({
             status: mappedStatus,
-            result_data: payload,
+            result_data: { ...payload, ai_category: aiCategory },
             call_duration: callDuration ? Math.round(Number(callDuration)) : null,
             user_id: resolvedUserId,
             workspace_id: resolvedWorkspaceId,
@@ -509,28 +509,22 @@ const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
   failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
-// 15-status taxonomy — must stay in sync with MAIN_STATUSES + SUB_STATUSES
-// in src/lib/callStatuses.ts. The `name` field is what gets persisted into
-// call_list_items.ai_category and consumed by the Analytics dashboard.
+// Dhipaya consent-flow taxonomy — must stay in sync with MAIN_STATUSES +
+// SUB_STATUSES in src/features/dhipaya/lib/dhipaya-callStatuses.ts.
 const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
   // --- Main outcomes ---
-  { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
-  { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
-  { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
-  { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
-  { id: 16, name: "Inconvenient (Without Date)", thai: "ไม่สะดวก (ไม่มีนัดหมาย)",    group: "main" },
-  { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
-  { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
-  { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
-  // --- Conversation behaviors ---
-  { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
-  { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
-  { id: 10, name: "Call Later",            thai: "นัดหมายให้ติดต่อใหม่",        group: "sub"  },
-  { id: 11, name: "Transfer",              thai: "ขอคุยกับเจ้าหน้าที่",         group: "sub"  },
-  { id: 12, name: "Background Noise",      thai: "เสียงแทรก/เสียงรบกวน",       group: "sub"  },
-  { id: 13, name: "Silence",               thai: "ลูกค้าเงียบ",                group: "sub"  },
-  { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
-  { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
+  { id: 1, name: "Transfer to Agent",   thai: "โอนสายให้เจ้าหน้าที่",   group: "main" },
+  { id: 2, name: "Consent Given",       thai: "ให้ความยินยอม",          group: "main" },
+  { id: 3, name: "Consent Denied",      thai: "ปฏิเสธการให้ความยินยอม", group: "main" },
+  { id: 4, name: "Callback Scheduled",  thai: "นัดติดต่อกลับ",          group: "main" },
+  { id: 5, name: "Not Reached",         thai: "ติดต่อไม่ได้",           group: "main" },
+  { id: 6, name: "Completed",           thai: "สนทนาสำเร็จ",            group: "main" },
+  // --- Conversation behaviors (fallbacks) ---
+  { id: 7,  name: "Not Convenient",   thai: "ไม่สะดวกคุย",            group: "sub" },
+  { id: 8,  name: "Wrong Person",     thai: "ไม่ใช่ผู้เอาประกัน",      group: "sub" },
+  { id: 9,  name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน",   group: "sub" },
+  { id: 10, name: "Silence",          thai: "ลูกค้าเงียบ",            group: "sub" },
+  { id: 11, name: "Dropped Call",     thai: "สายหลุดระหว่างสนทนา",    group: "sub" },
 ];
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
@@ -601,71 +595,46 @@ async function classifyCall(
     (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
   ).join("\n");
 
-  const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
+  const systemPrompt = `You classify Thai outbound consent-collection call transcripts for Dhipaya. Return STRICT JSON only.
 Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
-CATEGORY DEFINITIONS
+CONTEXT
+The bot is calling customers to ask CONSENT to retrieve and analyze their data in order to offer (sell) an insurance product. Your job is to classify the FINAL outcome of the call.
 
-Main Outcomes (business result of the call — ALWAYS PREFER THESE):
-- Planned More Than 3     → Customer indicates a payment plan / will pay, but the agreed date is MORE THAN 3 days from the call date (e.g. "อาทิตย์หน้า", "เกิน 3 วัน", "เดือนหน้า", "อีก 5 วัน", or any specific date > 3 days away). Also use for vague acknowledgement of the debt with no clear near-term commitment.
-- Promised to Pay        → Customer explicitly confirms payment WITHIN 3 days from the call date (today, tomorrow, "พรุ่งนี้", "มะรืน", "อีก 2 วัน", or any specific date ≤ 3 days away).
-- Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
-- Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
-- Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
-- Already Paid           → Customer states the payment has already been completed/settled.
-- Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
-- Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
+DECISION ORDER (apply in this exact order — first match wins):
 
-Conversation Behaviors (use ONLY when no clear business outcome above exists):
-- Not Convenient   → Customer says it is not a convenient time but did not commit to a callback time.
-- Wrong Person     → Customer says this is not the policyholder / wrong number.
-- Call Later       → Customer vaguely asks to be called another time without a fixed schedule.
-- Transfer         → Customer asks to speak to a human agent / staff.
-- Background Noise → Audio quality issues, loud background, customer cannot hear clearly, transcript dominated by noise.
-- Silence          → Customer remained silent throughout / no verbal response.
-- Dropped Call     → Call disconnected with no meaningful customer interaction (pure cutoff).
-- Out of Topic     → Customer kept talking about unrelated topics with no resolution.
+1. TRANSFER → If the customer at any point asks to speak with a human agent / staff
+   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "transfer to agent", "speak to a person"),
+   classify as "Transfer to Agent".
 
-CRITICAL CLASSIFICATION RULES
+2. NOT CONVENIENT → If the customer says they are not convenient / not available
+   to talk right now ("ไม่สะดวกคุย", "ไม่ว่าง", "ติดประชุม", "not a good time"),
+   AND no consent decision was reached, classify as "Not Convenient".
 
-1. MANDATORY DEBT DISCLOSURE CHECK (HIGHEST PRIORITY):
-   Before classifying as ANY payment outcome ("Promised to Pay" or "Planned More Than 3"), you MUST verify in the conversation_log that the Bot has already DISCLOSED the "Debt Details" to the customer (e.g. license plate, installment number, outstanding balance, due date).
-   - If the Bot has NOT yet disclosed these details, it is IMPOSSIBLE for the interaction to be a payment outcome. You MUST NOT choose "Promised to Pay" or "Planned More Than 3" under any circumstance.
+3. CALLBACK SCHEDULED → If the customer asks to be called back at a specific or
+   vague later time ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า", "call me back later"),
+   classify as "Callback Scheduled".
 
-2. HANDLING "NOT CONVENIENT" & CALLBACK REQUESTS:
-   If the customer indicates they are "not convenient" (ไม่สะดวก), "busy" (ไม่ว่าง), or asks for a callback / to reschedule / to postpone:
-   - If the customer specifies a date/time (e.g. "พรุ่งนี้"/"tomorrow", "อาทิตย์หน้า"/"next week", "เดือนหน้า"/"next month", a specific clock time or date) → classify STRICTLY as "Inconvenient (With Date)".
-   - If no specific date/time is mentioned → classify as "Inconvenient (Without Date)".
-   - STRICT RULE: As long as the debt details have NOT been disclosed, ANY customer request to reschedule or postpone the conversation MUST be classified as "Inconvenient" (With or Without Date), EVEN IF they mention future dates like "tomorrow" or "next week". Never interpret such date mentions as a payment commitment.
+4. CONSENT DECISION → If the Bot actually asked the consent question (about
+   retrieving / analyzing the customer's data to offer a product) AND the
+   customer gave a clear answer:
+   - Affirmative ("ยินยอม", "ตกลง", "ได้ครับ", "yes / agree") → "Consent Given"
+   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "no / don't agree", clear refusal of consent) → "Consent Denied"
 
-3. PAYMENT CLASSIFICATION (ONLY AFTER DISCLOSURE):
-   "Promised to Pay" and "Planned More Than 3" are permitted ONLY if BOTH conditions are true:
-   (a) The Bot has disclosed the debt details in the conversation_log, AND
-   (b) The customer then provides a clear payment commitment tied to that disclosed debt.
-   Then decide:
-   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date (inclusive of exactly 3 days).
-   - "Planned More Than 3" → commitment is STRICTLY > 3 days from the call date (i.e. 4 or more days).
-   If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+5. COMPLETED → For any other topic where a real exchange happened and the call
+   ended normally (general questions, off-topic but resolved, etc.) with no
+   consent decision and no callback agreement, classify as "Completed".
 
-   3-DAY BOUNDARY RULE (STRICT):
-   The following Thai phrasings MUST be treated as ≤ 3 days and classified as "Promised to Pay" (assuming debt details were disclosed and a commitment was made). They MUST NEVER be classified as "Planned More Than 3":
-   - "อีก 3 วัน"
-   - "3 วัน"
-   - "ภายใน 3 วัน"
-   - "ไม่เกิน 3 วัน"
-   - any equivalent phrasing meaning "within / no more than / up to 3 days"
-   Only choose "Planned More Than 3" when the customer explicitly commits to a date that is 4 or more days after the call date (e.g. "อีก 5 วัน", "อาทิตย์หน้า", "สิ้นเดือน", a specific date > 3 days out).
+STRICT RULE — TARGET THE FINAL OUTCOME:
+"Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
+in the transcript that the relevant question was actually reached. If the call
+hangs up BEFORE these points (no real exchange, or cut off mid-greeting), use:
+  - "Dropped Call" if the customer engaged briefly then the line cut, or
+  - "Not Reached" if there was effectively no customer interaction.
 
-4. CLASSIFICATION LOGIC SUMMARY:
-   - IF (Debt details NOT disclosed) → MUST be "Inconvenient (With Date)" or "Inconvenient (Without Date)" (regardless of any time/date mentioned), or another non-payment category if more appropriate (e.g. Wrong Person, Refused, Not Reached).
-   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days, inclusive) or "Planned More Than 3" (> 3 days, i.e. ≥ 4 days).
-
-5. ADDITIONAL GUIDELINES:
-   - Conversation Behavior categories should ONLY be chosen when no clear business outcome above applies.
-   - Decide based on the FINAL state of the call, not transient mid-call events.
-   - "Refused" requires a clear refusal — not mere reluctance or "not convenient".
-
+Other behaviors ("Wrong Person", "Background Noise", "Silence") should only be
+chosen when no main outcome above applies.
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
@@ -700,11 +669,13 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
     const normalized = String(aiName).trim().toLowerCase();
-    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
+    // Alias legacy / shorthand labels into the new Dhipaya taxonomy.
     const aliased =
-      normalized === "acknowledged" || normalized === "acknowledge"
-        ? "planned more than 3"
-        : normalized;
+      normalized === "transfer" ? "transfer to agent" :
+      normalized === "consent" || normalized === "agree" ? "consent given" :
+      normalized === "refused" || normalized === "decline" || normalized === "declined" ? "consent denied" :
+      normalized === "call later" || normalized === "scheduled callback" ? "callback scheduled" :
+      normalized;
     const match = CONVERSATION_CATEGORIES.find(
       (c) => c.name.toLowerCase() === aliased,
     );
@@ -718,11 +689,11 @@ Output format (STRICT JSON, no markdown, no commentary):
       };
     }
 
-    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
-    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
+    console.warn("Unmatched AI category, defaulting to Completed:", aiName);
+    return makeResult("Completed", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return makeResult("Planned More Than 3", "Classifier exception");
+    return makeResult("Completed", "Classifier exception");
   }
 }
 
