@@ -20,6 +20,19 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Webhook received:", JSON.stringify(payload, null, 2));
 
+    // ---- Project routing ----------------------------------------------------
+    // The unified webhook serves two product flows: default (debt collection)
+    // and Dhipaya (consent collection). Detect via query string, header, or
+    // the bot_id present in the payload.
+    const DHIPAYA_BOT_ID = "69d7214db875327d960ef7ac";
+    const url = new URL(req.url);
+    const projectParam = (url.searchParams.get("project") || req.headers.get("x-project") || "").toLowerCase();
+    const project: "dhipaya" | "default" =
+      projectParam === "dhipaya" || String(payload.bot_id || "") === DHIPAYA_BOT_ID
+        ? "dhipaya"
+        : "default";
+    console.log("Project routing:", project);
+
     // CRITICAL FIX: Ignore the initiation "Success" message if it's sent to the webhook
     // This message only means the call was requested, not that it's finished.
     if (payload.message && payload.message.includes("Success Create Outbound call")) {
