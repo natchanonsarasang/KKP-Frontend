@@ -327,6 +327,7 @@ async function dialOne(rowId: string): Promise<void> {
           name: fullName,
           policy_number: row.customer.policyNumber || null,
           campaign_determined: checkConditionFlow(row.customer),
+          customer_rec_id: row.customer.id,
           next_intent: nextIntent,
         } as any,
       });

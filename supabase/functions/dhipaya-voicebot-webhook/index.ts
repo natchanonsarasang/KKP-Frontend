@@ -1075,9 +1075,40 @@ async function syncCallLogToAirtable(
     return;
   }
 
-  // Step A: find Customer (best-effort)
+  // Step A: load result_data from call_records (single lookup; reused for customer + campaign)
+  let resultData: any = null;
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseUrl && supabaseKey) {
+      const sb = createClient(supabaseUrl, supabaseKey);
+      const { data } = await sb
+        .from("call_records")
+        .select("result_data")
+        .eq("botnoi_call_id", String(callLogId))
+        .maybeSingle();
+      resultData = data?.result_data ?? null;
+      console.log("Result data from call_records: ", resultData);
+    }
+  } catch (e) {
+    console.warn("Airtable call log: call_records lookup failed", e);
+  }
+
+  // Step B: find Customer — try customer_rec_id from result_data first, then phone
   let customerRec: any = null;
-  if (phone) {
+  const customerRecId: string | undefined = resultData?.customer_rec_id;
+  if (customerRecId && typeof customerRecId === "string" && customerRecId.startsWith("rec")) {
+    try {
+      customerRec = await airtableFetch(
+        `${baseId}/Customer/${customerRecId}`,
+        { method: "GET" },
+        pat,
+      );
+    } catch (e) {
+      console.warn(`Airtable call log: direct Customer fetch failed for ${customerRecId}`, e);
+    }
+  }
+  if (!customerRec && phone) {
     const normalized = normalizePhone(phone);
     if (normalized) {
       const phoneFormula =
@@ -1094,15 +1125,15 @@ async function syncCallLogToAirtable(
         );
         customerRec = customerRes?.records?.[0] ?? null;
       } catch (e) {
-        console.warn("Airtable call log: customer lookup failed", e);
+        console.warn("Airtable call log: customer lookup by phone failed", e);
       }
     }
   }
   if (!customerRec) {
-    console.warn(`Airtable call log: no Customer match for phone ${phone ?? "unknown"}`);
+    console.warn(`Airtable call log: no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`);
   }
 
-  // Step B: search Call Logs for existing record linked to this Customer
+  // Step C: search Call Logs for existing record linked to this Customer
   const tablePath = "Call%20Logs";
   let existing: any = null;
   const customerLinkId = customerRec?.fields?.["Customer_ID"];
@@ -1120,37 +1151,18 @@ async function syncCallLogToAirtable(
     }
   }
 
-  // Determine campaign header from payload.variables or call_records.bot_type
+  // Determine campaign header from payload.variables or result_data
   let botType: string | undefined =
     payload?.variables?.campaign_determined ||
     payload?.variables?.bot_type ||
     payload?.variables?.next_intent ||
     payload?.bot_type ||
-    payload?.next_intent;
-  if (!botType) {
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      if (supabaseUrl && supabaseKey) {
-        const sb = createClient(supabaseUrl, supabaseKey);
-        const { data } = await sb
-          .from("call_records")
-          .select("result_data")
-          .eq("botnoi_call_id", String(callLogId))
-          .maybeSingle();
-        const rd: any = data?.result_data;
-        console.log("Result data from call_records: ", rd);
-        botType =
-          rd?.campaign_determined ||
-          rd?.bot_type ||
-          rd?.next_intent ||
-          rd?.variables?.bot_type ||
-          rd?.variables?.next_intent;
-      }
-    } catch (e) {
-      console.warn("Airtable call log: bot_type lookup failed", e);
-    }
-  }
+    payload?.next_intent ||
+    resultData?.campaign_determined ||
+    resultData?.bot_type ||
+    resultData?.next_intent ||
+    resultData?.variables?.bot_type ||
+    resultData?.variables?.next_intent;
   const campaignHeader =
     botType === "consent"
       ? "Campaign 1"
@@ -1159,6 +1171,7 @@ async function syncCallLogToAirtable(
         : botType === "campaign3"
           ? "Campaign 3"
           : "Campaign Unknown";
+
 
   // Build fields
   const fields: Record<string, unknown> = {
