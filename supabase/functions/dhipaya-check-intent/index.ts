@@ -98,7 +98,9 @@ Deno.serve(async (req) => {
       `https://api.airtable.com/v0/${baseId}/Customer` +
       `?filterByFormula=${encodeURIComponent(formula)}` +
       `&maxRecords=1` +
-      `&fields%5B%5D=CheckCall&fields%5B%5D=Phone_Number1`;
+      `&fields%5B%5D=Phone_Number1` +
+      `&fields%5B%5D=${encodeURIComponent("Policy_Status (from Policy)")}` +
+      `&fields%5B%5D=${encodeURIComponent("Consent_Status (from Consents)")}`;
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${pat}` },
@@ -129,13 +131,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const checkCall = record.fields?.CheckCall;
-    const intent = routeIntent(checkCall);
+    const policyStatus = record.fields?.["Policy_Status (from Policy)"];
+    const consentStatus = record.fields?.["Consent_Status (from Consents)"];
+    const intent = routeIntent(policyStatus, consentStatus);
 
     return json({
       intent,
       phone: normalized,
-      checkCall: checkCall ?? null,
+      policyStatus: policyStatus ?? null,
+      consentStatus: consentStatus ?? null,
       matched: true,
     });
   } catch (err) {
