@@ -35,7 +35,7 @@ function normalizeThaiPhone(input?: string | null): string | undefined {
   return digits;
 }
 
-type Intent = "consent" | "campaign2" | "campaign3" | "เคยได้รับconsentแล้ว";
+type Intent = string;
 
 function firstString(v: unknown): string {
   if (Array.isArray(v)) return String(v[0] ?? "").trim();
@@ -43,23 +43,34 @@ function firstString(v: unknown): string {
   return String(v).trim();
 }
 
-function routeIntent(policyStatus: unknown, consentStatus: unknown): Intent {
-  const policy = firstString(policyStatus).toLowerCase();
-  const consent = firstString(consentStatus).toLowerCase();
-
-  // Highest priority: already received consent — short-circuit regardless of policy status
-  if (consent === "consent received") return "เคยได้รับconsentแล้ว";
-
-  if (policy === "overdue") {
-    if (consent === "consent given") return "campaign2";
-    return "consent";
-  }
-  if (policy === "prospect") {
-    if (consent === "consent given") return "campaign3";
-    return "consent";
-  }
-  return "consent";
+function detectSuffix(policy: string): "" | "_ISAN" | "_EN" {
+  const up = policy.toUpperCase();
+  if (up.endsWith("_ISAN")) return "_ISAN";
+  if (up.endsWith("_EN")) return "_EN";
+  return "";
 }
+
+function routeIntent(policyStatus: unknown, consentStatus: unknown): { intent: Intent; suffix: string } {
+  const policyRaw = firstString(policyStatus);
+  const consent = firstString(consentStatus).toLowerCase();
+  const suffix = detectSuffix(policyRaw);
+  const base = suffix ? policyRaw.slice(0, policyRaw.length - suffix.length) : policyRaw;
+  const baseLower = base.toLowerCase();
+
+  // Priority 1: Already received consent
+  if (consent === "consent received") return { intent: "เคยได้รับconsentแล้ว", suffix };
+
+  if (baseLower === "overdue") {
+    if (consent === "consent given") return { intent: `campaign2${suffix}`, suffix };
+    if (!consent) return { intent: `consent${suffix}`, suffix };
+  }
+  if (baseLower === "prospect") {
+    if (consent === "consent given") return { intent: `campaign3${suffix}`, suffix };
+    if (!consent) return { intent: `consent${suffix}`, suffix };
+  }
+  return { intent: `consent${suffix}`, suffix };
+}
+
 
 function emptyPayload(intent: Intent, extras: Record<string, unknown> = {}) {
   return {
@@ -245,8 +256,9 @@ Deno.serve(async (req) => {
     console.log("dhipaya-check-intent Plan_Code:", planCode, "Condition_TH:", condition);
 
     console.log("dhipaya-check-intent Consent_Status:", firstString(consentStatus), "Policy_Status:", firstString(policyStatus));
-    const intent = routeIntent(policyStatus, consentStatus);
-    console.log("dhipaya-check-intent selected intent:", intent);
+    const { intent, suffix } = routeIntent(policyStatus, consentStatus);
+    console.log("dhipaya-check-intent suffix:", suffix || "(none)", "selected intent:", intent);
+
 
     return json({
       intent,
