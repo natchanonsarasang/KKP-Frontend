@@ -604,52 +604,58 @@ async function classifyCall(
     (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
   ).join("\n");
 
-  const systemPrompt = `You classify Thai outbound consent-collection call transcripts for Dhipaya. Return STRICT JSON only.
+  const systemPrompt = `You classify Thai outbound PDPA consent-collection call transcripts for Dhipaya Insurance. Return STRICT JSON only.
+
 Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
-CONTEXT
-The bot is calling customers to ask CONSENT to retrieve and analyze their data in order to offer (sell) an insurance product. Your job is to classify the FINAL outcome of the call.
+SCOPE
+The bot's ONLY purpose is to obtain PDPA consent — permission for Dhipaya and its
+business partners to process the customer's personal data in order to present
+insurance products, promotions, or benefits via phone.
 
-DECISION ORDER (apply in this exact order — first match wins):
+This is NOT a debt-collection call. IGNORE any mention of debt, loans, overdue
+payments, policy premiums owed, balances, installments, or money owed. Even if
+such topics appear in the transcript (customer confusion, off-topic remarks),
+they MUST NOT influence the classification. Your only job is to determine
+whether PDPA consent was given, denied, deferred, transferred, or never reached.
 
-1. TRANSFER → If the customer at any point asks to speak with a human agent / staff
-   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "transfer to agent", "speak to a person"),
-   classify as "Transfer to Agent".
+DECISION ORDER (first match wins):
 
-2. NOT CONVENIENT → If the customer says they are not convenient / not available
-   to talk right now ("ไม่สะดวกคุย", "ไม่ว่าง", "ติดประชุม", "not a good time"),
-   AND no consent decision was reached, classify as "Not Convenient".
+1. TRANSFER → Customer asks to speak with a human agent / staff
+   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "speak to a person") → "Transfer to Agent".
 
-3. CALLBACK SCHEDULED → If the customer asks to be called back at a specific or
-   vague later time ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า", "call me back later"),
-   classify as "Callback Scheduled".
+2. NOT CONVENIENT → Customer says they cannot talk now ("ไม่สะดวกคุย", "ไม่ว่าง",
+   "ติดประชุม") AND no consent decision was reached → "Not Convenient".
 
-4. CONSENT DECISION → If the Bot actually asked the consent question (about
-   retrieving / analyzing the customer's data to offer a product) AND the
-   customer gave a clear answer:
+3. CALLBACK SCHEDULED → Customer asks to be called back later
+   ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า") → "Callback Scheduled".
+
+4. CONSENT DECISION → The bot actually asked the PDPA consent question AND the
+   customer gave a clear answer about consenting to data processing / marketing:
    - Affirmative ("ยินยอม", "ตกลง", "ได้ครับ", "yes / agree") → "Consent Given"
-   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "no / don't agree", clear refusal of consent) → "Consent Denied"
+   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "ไม่อนุญาต", "no / don't agree")
+     → "Consent Denied"
 
-5. COMPLETED → For any other topic where a real exchange happened and the call
-   ended normally (general questions, off-topic but resolved, etc.) with no
-   consent decision and no callback agreement, classify as "Completed".
+5. COMPLETED → A real exchange happened and the call ended normally but none of
+   the above applies (off-topic resolved, general question answered, etc.)
+   → "Completed".
 
-STRICT RULE — TARGET THE FINAL OUTCOME:
+STRICT RULE — TARGET THE FINAL OUTCOME
 "Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
-in the transcript that the relevant question was actually reached. If the call
-hangs up BEFORE these points (no real exchange, or cut off mid-greeting), use:
+that the relevant question was actually reached and answered. If the line drops
+before that point use:
   - "Dropped Call" if the customer engaged briefly then the line cut, or
   - "Not Reached" if there was effectively no customer interaction.
 
-Other behaviors ("Wrong Person", "Background Noise", "Silence") should only be
-chosen when no main outcome above applies.
+"Wrong Person", "Background Noise", and "Silence" are only chosen when no main
+outcome above applies.
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
-  "reason": "<short explanation focused on the FINAL outcome>"
+  "reason": "<short explanation focused on the PDPA consent outcome>"
 }`;
 
   try {
@@ -745,7 +751,7 @@ async function extractCallbackDate(
   const referenceDate = parseLogReferenceDate(conversationLog);
   const refIso = bangkokIsoDate(referenceDate);
 
-  const systemPrompt = `You extract a callback date from a Thai debt-collection call transcript.
+  const systemPrompt = `You extract a callback date from a Thai PDPA consent-collection call transcript.
 
 Reference (call) date in Asia/Bangkok timezone: ${refIso}
 
