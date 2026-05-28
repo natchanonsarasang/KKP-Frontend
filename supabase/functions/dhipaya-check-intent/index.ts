@@ -211,23 +211,27 @@ Deno.serve(async (req) => {
 
     const expiryDate = toThaiBEDate(expiryDateRaw);
 
-    // Lookup Condition_TH from INSTALLMENT_KB by Plan_Code
+    // Lookup Condition_TH from INSTALLMENT_KB by Plan_Code.
+    // On the Policy table, Plan_Code is a linked-record array of INSTALLMENT_KB ids,
+    // so we fetch the linked record directly when it looks like an Airtable record id.
     let condition = "";
     if (planCode) {
       try {
-        const kbFormula = `{Plan_Code}='${planCode.replace(/'/g, "\\'")}'`;
-        const kbUrl =
-          `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB` +
-          `?filterByFormula=${encodeURIComponent(kbFormula)}` +
-          `&maxRecords=1` +
-          `&fields%5B%5D=${encodeURIComponent("Plan_Code")}` +
-          `&fields%5B%5D=${encodeURIComponent("Condition_TH")}`;
+        const isRecordId = /^rec[A-Za-z0-9]{14}$/.test(planCode);
+        const kbUrl = isRecordId
+          ? `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB/${planCode}`
+          : `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB` +
+            `?filterByFormula=${encodeURIComponent(`{Plan_Code}='${planCode.replace(/'/g, "\\'")}'`)}` +
+            `&maxRecords=1` +
+            `&fields%5B%5D=${encodeURIComponent("Plan_Code")}` +
+            `&fields%5B%5D=${encodeURIComponent("Condition_TH")}`;
         const kbRes = await fetch(kbUrl, {
           headers: { Authorization: `Bearer ${pat}` },
         });
         if (kbRes.ok) {
           const kbData = await kbRes.json();
-          condition = firstString(kbData?.records?.[0]?.fields?.["Condition_TH"]);
+          const fields = isRecordId ? kbData?.fields : kbData?.records?.[0]?.fields;
+          condition = firstString(fields?.["Condition_TH"]);
         } else {
           console.error("INSTALLMENT_KB lookup failed", kbRes.status, await kbRes.text().catch(() => ""));
         }
