@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeThaiPhone } from "./phone";
-import type { Customer } from "../types";
+import { normalizeConsentStatus, type Customer } from "../types";
 import { CUSTOMER_FIELDS } from "../fieldMap";
 
-export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
+export type NextIntent =
+  | "skip"
+  | "consent_request" // Consent Needed branch — request PDPA consent
+  | "pdpa_then_renewal" // Consent Obtained branch — recording disclosure + renewal
+  | "campaign2"
+  | "campaign3";
+
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const THAI_MONTHS = [
@@ -42,26 +48,25 @@ export function checkConditionFlow(customer: Customer): NextIntent {
     return (v == null ? "" : String(v)).trim().toLowerCase();
   };
 
-  // P1: Policy status
+  // P1: Policy status — only call overdue / prospect customers
   const policyStatus = get("policyStatus");
   if (policyStatus === "active") return "skip";
   if (policyStatus !== "overdue" && policyStatus !== "prospect") return "skip";
 
-  // P2: Consent
-  const consent = get("consentStatus");
-  if (!consent) return "consent";
-  if (consent === "consent denied") return "skip";
-  if (consent !== "consent given") return "skip";
+  // P2: Consent — drives the top-level branch
+  const consent = normalizeConsentStatus(customer.consentStatus);
+  if (consent === "denied") return "skip";
+  if (consent === "needed") return "consent_request";
 
-  // Special Condition for Policy : "prospect" and Consent: "consent given".
-  if (policyStatus === "prospect" && consent === "consent given") return "campaign3";
-
-  // P3: Notice sent
+  // consent === "obtained" → PDPA recording disclosure → Fire Insurance Renewal
+  // Legacy campaign sub-routing preserved for backward compat with the bot config.
+  if (policyStatus === "prospect") return "pdpa_then_renewal";
   const notice = get("noticeSent");
   if (notice === "yes") return "campaign2";
   if (notice === "no") return "campaign3";
-  return "skip";
+  return "pdpa_then_renewal";
 }
+
 
 // Concurrency limit applied across the whole page (background-safe).
 export const CONCURRENCY = 5;
@@ -219,9 +224,13 @@ async function dialOne(rowId: string): Promise<void> {
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
+      consent_status: normalizeConsentStatus(row.customer.consentStatus),
+      airtable_customer_id: row.customer.id,
+      customer_id: row.customer.customerId ?? null,
       renewal_premium: row.customer.renewalPremium,
       expiry_date: formatThaiDate(row.customer.expiryDate),
     };
+
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
         phone_number: row.selectedPhone,
