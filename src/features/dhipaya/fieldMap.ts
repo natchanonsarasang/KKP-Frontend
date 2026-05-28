@@ -20,7 +20,6 @@ export const CUSTOMER_FIELDS = {
   noticeSent: "Notice_Sent (from Policy)",
   paymentDate: "Payment_Date (from Policy)",
   policy: "Policy",
-  conditionTh: "Condition_TH (from Plan_Code)",
 } as const;
 
 export const CONSENT_FIELDS = {
