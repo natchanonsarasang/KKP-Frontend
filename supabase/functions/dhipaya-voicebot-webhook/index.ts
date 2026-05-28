@@ -509,28 +509,22 @@ const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
   failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
-// 15-status taxonomy — must stay in sync with MAIN_STATUSES + SUB_STATUSES
-// in src/lib/callStatuses.ts. The `name` field is what gets persisted into
-// call_list_items.ai_category and consumed by the Analytics dashboard.
+// Dhipaya consent-flow taxonomy — must stay in sync with MAIN_STATUSES +
+// SUB_STATUSES in src/features/dhipaya/lib/dhipaya-callStatuses.ts.
 const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
   // --- Main outcomes ---
-  { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
-  { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
-  { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
-  { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
-  { id: 16, name: "Inconvenient (Without Date)", thai: "ไม่สะดวก (ไม่มีนัดหมาย)",    group: "main" },
-  { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
-  { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
-  { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
-  // --- Conversation behaviors ---
-  { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
-  { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
-  { id: 10, name: "Call Later",            thai: "นัดหมายให้ติดต่อใหม่",        group: "sub"  },
-  { id: 11, name: "Transfer",              thai: "ขอคุยกับเจ้าหน้าที่",         group: "sub"  },
-  { id: 12, name: "Background Noise",      thai: "เสียงแทรก/เสียงรบกวน",       group: "sub"  },
-  { id: 13, name: "Silence",               thai: "ลูกค้าเงียบ",                group: "sub"  },
-  { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
-  { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
+  { id: 1, name: "Transfer to Agent",   thai: "โอนสายให้เจ้าหน้าที่",   group: "main" },
+  { id: 2, name: "Consent Given",       thai: "ให้ความยินยอม",          group: "main" },
+  { id: 3, name: "Consent Denied",      thai: "ปฏิเสธการให้ความยินยอม", group: "main" },
+  { id: 4, name: "Callback Scheduled",  thai: "นัดติดต่อกลับ",          group: "main" },
+  { id: 5, name: "Not Reached",         thai: "ติดต่อไม่ได้",           group: "main" },
+  { id: 6, name: "Completed",           thai: "สนทนาสำเร็จ",            group: "main" },
+  // --- Conversation behaviors (fallbacks) ---
+  { id: 7,  name: "Not Convenient",   thai: "ไม่สะดวกคุย",            group: "sub" },
+  { id: 8,  name: "Wrong Person",     thai: "ไม่ใช่ผู้เอาประกัน",      group: "sub" },
+  { id: 9,  name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน",   group: "sub" },
+  { id: 10, name: "Silence",          thai: "ลูกค้าเงียบ",            group: "sub" },
+  { id: 11, name: "Dropped Call",     thai: "สายหลุดระหว่างสนทนา",    group: "sub" },
 ];
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
