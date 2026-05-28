@@ -18,6 +18,7 @@ export const CUSTOMER_FIELDS = {
   outstandingBalance: "Outstanding_Balance (from Policy)",
   planCode: "Plan_Code (from Policy)",
   noticeSent: "Notice_Sent (from Policy)",
+  noticeRecieved: "notice_received",
   paymentDate: "Payment_Date (from Policy)",
   policy: "Policy",
 } as const;

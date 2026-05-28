@@ -22,6 +22,7 @@ export interface Customer {
   outstandingBalance?: string;
   planCodeId?: string;
   noticeSent?: string;
+  noticeRecieved?: string;
   paymentDate?: string;
   policy?: string;
   expiryDate?: string;
