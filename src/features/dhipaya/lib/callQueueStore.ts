@@ -224,9 +224,13 @@ async function dialOne(rowId: string): Promise<void> {
       customer_name: fullName,
       policy_no: row.customer.policyNumber || "",
       next_intent: nextIntent,
+      consent_status: normalizeConsentStatus(row.customer.consentStatus),
+      airtable_customer_id: row.customer.id,
+      customer_id: row.customer.customerId ?? null,
       renewal_premium: row.customer.renewalPremium,
       expiry_date: formatThaiDate(row.customer.expiryDate),
     };
+
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
         phone_number: row.selectedPhone,
