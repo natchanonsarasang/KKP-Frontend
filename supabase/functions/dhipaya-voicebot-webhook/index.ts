@@ -64,12 +64,7 @@ serve(async (req) => {
     const userParts = conversationLog ? conversationLog.split("User:") : [];
     const hasUserSpoken =
       userParts.length > 1 &&
-      userParts.some(
-        (p, i) =>
-          i > 0 &&
-          p.trim().length > 0 &&
-          !p.toUpperCase().includes("TIMEOUT"),
-      );
+      userParts.some((p, i) => i > 0 && p.trim().length > 0 && !p.toUpperCase().includes("TIMEOUT"));
     const isSilence = userParts.length > 1 && !hasUserSpoken;
 
     // Map Botnoi status to our internal status
@@ -86,10 +81,7 @@ serve(async (req) => {
       mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
-      mappedStatus =
-        (hasUserSpoken || isSilence)
-          ? "completed"
-          : "no_answer";
+      mappedStatus = hasUserSpoken || isSilence ? "completed" : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
     } else if (rawStatus === "busy") {
@@ -109,22 +101,39 @@ serve(async (req) => {
       const lastBotMsg = (botParts[botParts.length - 1] || "").toLowerCase();
       const allBotText = botParts.join(" ").toLowerCase();
       const callbackKeywords = [
-        "convenient", "callback", "call back", "call you back",
-        "what day", "what time", "which day", "which time",
-        "when would", "when can", "when is", "available",
-        "สะดวก", "นัด", "วันไหน", "เวลาไหน", "ติดต่อใหม่", "โทรกลับ",
+        "convenient",
+        "callback",
+        "call back",
+        "call you back",
+        "what day",
+        "what time",
+        "which day",
+        "which time",
+        "when would",
+        "when can",
+        "when is",
+        "available",
+        "สะดวก",
+        "นัด",
+        "วันไหน",
+        "เวลาไหน",
+        "ติดต่อใหม่",
+        "โทรกลับ",
       ];
       const askedAboutCallback =
-        callbackKeywords.some((k) => lastBotMsg.includes(k)) ||
-        callbackKeywords.some((k) => allBotText.includes(k));
+        callbackKeywords.some((k) => lastBotMsg.includes(k)) || callbackKeywords.some((k) => allBotText.includes(k));
       if (askedAboutCallback) {
         mappedStatus = "not_convenient";
       }
     }
 
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
-    let finalStatus: string = mappedStatus === "hanged_up" ? "failed" : (pickedUp ? "success" : "failed");
+    const pickedUp =
+      hasUserSpoken ||
+      isSilence ||
+      amdHuman ||
+      ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    let finalStatus: string = mappedStatus === "hanged_up" ? "failed" : pickedUp ? "success" : "failed";
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -171,9 +180,7 @@ serve(async (req) => {
 
     // --- Airtable notice_received sync (Dhipaya) ---
     const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
-    const noticeValue =
-      aiCategory === "Notice Received" ? "Yes" :
-      aiCategory === "Notice Not Received" ? "No" : null;
+    const noticeValue = aiCategory === "Notice Received" ? "Yes" : aiCategory === "Notice Not Received" ? "No" : null;
     if (phoneNumber && noticeOutcomeOk && noticeValue) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
       const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
@@ -192,8 +199,13 @@ serve(async (req) => {
 
     // --- Airtable Call Logs sync (Dhipaya) ---
     if (callId) {
-      const callLogPromise = syncCallLogToAirtable(payload, conversationLog || "", phoneNumber, callOutcome, callDuration)
-        .catch((err) => console.error("Airtable call log sync failed:", err));
+      const callLogPromise = syncCallLogToAirtable(
+        payload,
+        conversationLog || "",
+        phoneNumber,
+        callOutcome,
+        callDuration,
+      ).catch((err) => console.error("Airtable call log sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
         // @ts-ignore
@@ -204,10 +216,6 @@ serve(async (req) => {
     } else {
       console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
     }
-
-
-
-
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -289,7 +297,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", record.id);
-        
+
         if (updateError) {
           console.error(`Error updating call record ${record.id}:`, updateError);
         } else {
@@ -305,11 +313,11 @@ serve(async (req) => {
             picked_up: pickedUp,
             notes: JSON.stringify({
               audio_url: audioUrl,
-              conversation_log: conversationLog
-            })
+              conversation_log: conversationLog,
+            }),
           })
           .eq("call_record_id", record.id);
-        
+
         if (cliError) console.error("Error updating call_list_items:", cliError);
         else console.log("Call list item updated via record_id");
       }
@@ -378,7 +386,7 @@ serve(async (req) => {
 
         // Retry logic disabled: failed/no_response calls are marked failed immediately.
         // No pending_retry, no automatic re-call. Manual retry only via the UI.
-        finalStatus = mappedStatus === "hanged_up" ? "failed" : (pickedUp ? "success" : "failed");
+        finalStatus = mappedStatus === "hanged_up" ? "failed" : pickedUp ? "success" : "failed";
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
@@ -525,10 +533,10 @@ serve(async (req) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${supabaseKey}`
+              Authorization: `Bearer ${supabaseKey}`,
             },
-            body: JSON.stringify({ session_id: session.id, action: "continue" })
-          }).catch(err => console.error("Error triggering session processor:", err));
+            body: JSON.stringify({ session_id: session.id, action: "continue" }),
+          }).catch((err) => console.error("Error triggering session processor:", err));
         }
       }
     }
@@ -561,34 +569,34 @@ type ClassifyResult = {
 // System-level statuses from the telephony layer all collapse to "Not Reached"
 // in the new taxonomy (the customer could not actually be contacted).
 const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
-  no_answer:   { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
+  no_answer: { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
   "no answer": { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
   unreachable: { name: "Not Reached", thai: "ติดต่อไม่ได้" },
-  rejected:    { name: "Not Reached", thai: "ลูกค้าตัดสาย" },
-  busy:        { name: "Not Reached", thai: "ลูกค้าสายไม่ว่าง" },
-  voicemail:   { name: "Not Reached", thai: "เข้าสู่ระบบฝากข้อความ" },
-  failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
+  rejected: { name: "Not Reached", thai: "ลูกค้าตัดสาย" },
+  busy: { name: "Not Reached", thai: "ลูกค้าสายไม่ว่าง" },
+  voicemail: { name: "Not Reached", thai: "เข้าสู่ระบบฝากข้อความ" },
+  failed: { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
 // Dhipaya consent-flow taxonomy — must stay in sync with MAIN_STATUSES +
 // SUB_STATUSES in src/features/dhipaya/lib/dhipaya-callStatuses.ts.
 const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
   // --- Main outcomes ---
-  { id: 1, name: "Transfer to Agent",   thai: "โอนสายให้เจ้าหน้าที่",   group: "main" },
-  { id: 2, name: "Consent Given",       thai: "ให้ความยินยอม",          group: "main" },
-  { id: 3, name: "Consent Denied",      thai: "ปฏิเสธการให้ความยินยอม", group: "main" },
-  { id: 4, name: "Callback Scheduled",  thai: "นัดติดต่อกลับ",          group: "main" },
-  { id: 5, name: "Not Reached",         thai: "ติดต่อไม่ได้",           group: "main" },
-  { id: 6, name: "Completed",           thai: "สนทนาสำเร็จ",            group: "main" },
-  { id: 12, name: "Notice Received",     thai: "ได้รับเอกสารแจ้งเตือนแล้ว", group: "main" },
+  { id: 1, name: "Transfer to Agent", thai: "โอนสายให้เจ้าหน้าที่", group: "main" },
+  { id: 2, name: "Consent Given", thai: "ให้ความยินยอม", group: "main" },
+  { id: 3, name: "Consent Denied", thai: "ปฏิเสธการให้ความยินยอม", group: "main" },
+  { id: 4, name: "Callback Scheduled", thai: "นัดติดต่อกลับ", group: "main" },
+  { id: 5, name: "Not Reached", thai: "ติดต่อไม่ได้", group: "main" },
+  { id: 6, name: "Completed", thai: "สนทนาสำเร็จ", group: "main" },
+  { id: 12, name: "Notice Received", thai: "ได้รับเอกสารแจ้งเตือนแล้ว", group: "main" },
   { id: 13, name: "Notice Not Received", thai: "ยังไม่ได้รับเอกสารแจ้งเตือน", group: "main" },
 
   // --- Conversation behaviors (fallbacks) ---
-  { id: 7,  name: "Not Convenient",   thai: "ไม่สะดวกคุย",            group: "sub" },
-  { id: 8,  name: "Wrong Person",     thai: "ไม่ใช่ผู้เอาประกัน",      group: "sub" },
-  { id: 9,  name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน",   group: "sub" },
-  { id: 10, name: "Silence",          thai: "ลูกค้าเงียบ",            group: "sub" },
-  { id: 11, name: "Dropped Call",     thai: "สายหลุดระหว่างสนทนา",    group: "sub" },
+  { id: 7, name: "Not Convenient", thai: "ไม่สะดวกคุย", group: "sub" },
+  { id: 8, name: "Wrong Person", thai: "ไม่ใช่ผู้เอาประกัน", group: "sub" },
+  { id: 9, name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน", group: "sub" },
+  { id: 10, name: "Silence", thai: "ลูกค้าเงียบ", group: "sub" },
+  { id: 11, name: "Dropped Call", thai: "สายหลุดระหว่างสนทนา", group: "sub" },
 ];
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
@@ -624,7 +632,9 @@ async function classifyCall(
   apiKey: string | undefined,
 ): Promise<ClassifyResult> {
   // STEP 1: System-level status check (telephony layer)
-  const rawStatus = String(payload.status || "").toLowerCase().trim();
+  const rawStatus = String(payload.status || "")
+    .toLowerCase()
+    .trim();
   const sys = SYSTEM_STATUS_MAP[rawStatus];
   if (sys) {
     return makeResult(sys.name, `System status: ${rawStatus} → ${sys.thai}`);
@@ -655,9 +665,7 @@ async function classifyCall(
     return makeResult("Not Reached", "AI key missing");
   }
 
-  const categoryList = CONVERSATION_CATEGORIES.map(
-    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
-  ).join("\n");
+  const categoryList = CONVERSATION_CATEGORIES.map((c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`).join("\n");
 
   const systemPrompt = `You classify Thai outbound PDPA consent-collection call transcripts for Dhipaya Insurance. Return STRICT JSON only.
 
@@ -745,7 +753,6 @@ Output format (STRICT JSON, no markdown, no commentary):
   "reason": "<short explanation focused on the PDPA consent or notice outcome>"
 }`;
 
-
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -774,14 +781,16 @@ Output format (STRICT JSON, no markdown, no commentary):
     const normalized = String(aiName).trim().toLowerCase();
     // Alias legacy / shorthand labels into the new Dhipaya taxonomy.
     const aliased =
-      normalized === "transfer" ? "transfer to agent" :
-      normalized === "consent" || normalized === "agree" ? "consent given" :
-      normalized === "refused" || normalized === "decline" || normalized === "declined" ? "consent denied" :
-      normalized === "call later" || normalized === "scheduled callback" ? "callback scheduled" :
-      normalized;
-    const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === aliased,
-    );
+      normalized === "transfer"
+        ? "transfer to agent"
+        : normalized === "consent" || normalized === "agree"
+          ? "consent given"
+          : normalized === "refused" || normalized === "decline" || normalized === "declined"
+            ? "consent denied"
+            : normalized === "call later" || normalized === "scheduled callback"
+              ? "callback scheduled"
+              : normalized;
+    const match = CONVERSATION_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
 
     if (match) {
       return {
@@ -829,10 +838,7 @@ function bangkokIsoDate(d: Date): string {
   return parts; // en-CA → YYYY-MM-DD
 }
 
-async function extractCallbackDate(
-  conversationLog: string | null,
-  apiKey: string | undefined,
-): Promise<string | null> {
+async function extractCallbackDate(conversationLog: string | null, apiKey: string | undefined): Promise<string | null> {
   if (!conversationLog || conversationLog.trim().length < 5) return null;
   if (!apiKey) return null;
 
@@ -913,11 +919,7 @@ function normalizePhone(p: string): string {
   return digits;
 }
 
-async function airtableFetch(
-  path: string,
-  init: RequestInit,
-  pat: string,
-): Promise<any> {
+async function airtableFetch(path: string, init: RequestInit, pat: string): Promise<any> {
   const res = await fetch(`${AIRTABLE_API_BASE}/${path}`, {
     ...init,
     headers: {
@@ -933,10 +935,7 @@ async function airtableFetch(
   return text ? JSON.parse(text) : {};
 }
 
-async function syncConsentToAirtable(
-  phone: string,
-  aiCategory: "Consent Given" | "Consent Denied",
-): Promise<void> {
+async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" | "Consent Denied"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1001,8 +1000,6 @@ async function syncConsentToAirtable(
   }
 }
 
-
-
 async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
@@ -1045,7 +1042,10 @@ async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise
 
 function mapCallStatus(raw: unknown): string | null {
   if (raw == null) return null;
-  const s = String(raw).trim().toLowerCase().replace(/[-_\s]+/g, "");
+  const s = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, "");
   if (["completed", "confirmed", "success"].includes(s)) return "Completed";
   if (["noanswer", "noresponse"].includes(s)) return "No Answer";
   if (["busy"].includes(s)) return "Busy";
@@ -1121,6 +1121,7 @@ async function syncCallLogToAirtable(
 
   // Determine campaign header from payload.variables or call_records.bot_type
   let botType: string | undefined =
+    payload?.variables?.campaign_determined ||
     payload?.variables?.bot_type ||
     payload?.variables?.next_intent ||
     payload?.bot_type ||
@@ -1137,7 +1138,12 @@ async function syncCallLogToAirtable(
           .eq("botnoi_call_id", String(callLogId))
           .maybeSingle();
         const rd: any = data?.result_data;
-        botType = rd?.bot_type || rd?.next_intent || rd?.variables?.bot_type || rd?.variables?.next_intent;
+        botType =
+          rd?.campaign_determined ||
+          rd?.bot_type ||
+          rd?.next_intent ||
+          rd?.variables?.bot_type ||
+          rd?.variables?.next_intent;
       }
     } catch (e) {
       console.warn("Airtable call log: bot_type lookup failed", e);
@@ -1188,9 +1194,3 @@ async function syncCallLogToAirtable(
     console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogId})`);
   }
 }
-
-
-
-
-
-
