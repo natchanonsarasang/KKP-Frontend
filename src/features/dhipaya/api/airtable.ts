@@ -219,6 +219,16 @@ export async function listInstallmentKb(opts?: {
   };
 }
 
+export async function getInstallmentKbConditionTh(recordId: string): Promise<string | undefined> {
+  try {
+    const rec = await call<AirtableRecord>({ action: "get", table: "INSTALLMENT_KB", recordId });
+    return str(rec.fields[INSTALLMENT_KB_FIELDS.conditionTh]);
+  } catch (e) {
+    console.warn("getInstallmentKbConditionTh failed:", e);
+    return undefined;
+  }
+}
+
 // -------- helpers --------
 function str(v: unknown): string | undefined {
   if (v === null || v === undefined) return undefined;
