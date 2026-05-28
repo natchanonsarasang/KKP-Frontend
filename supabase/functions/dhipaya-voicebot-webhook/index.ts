@@ -559,6 +559,12 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
   { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
   { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
+  // --- Dhipaya consent / PDPA / renewal outcomes ---
+  { id: 17, name: "Consent Granted",       thai: "ให้ความยินยอม PDPA",         group: "main" },
+  { id: 18, name: "Consent Refused",       thai: "ปฏิเสธความยินยอม PDPA",      group: "main" },
+  { id: 19, name: "Recording Refused",     thai: "ปฏิเสธการบันทึกเสียง",        group: "main" },
+  { id: 20, name: "Transfer Requested",    thai: "ขอโอนสายให้เจ้าหน้าที่",      group: "main" },
+  { id: 21, name: "Renewal Not Convenient", thai: "ไม่สะดวกต่ออายุกรมธรรม์",    group: "main" },
   // --- Conversation behaviors ---
   { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
   { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
@@ -569,6 +575,7 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
   { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
 ];
+
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
 const AUDIO_QUALITY_PATTERNS: RegExp[] = [
