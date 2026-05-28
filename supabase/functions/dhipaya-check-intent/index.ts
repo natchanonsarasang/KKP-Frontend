@@ -50,26 +50,34 @@ function detectSuffix(policy: string): "" | "_ISAN" | "_EN" {
   return "";
 }
 
+function suffixLabel(suffix: "" | "_ISAN" | "_EN"): string {
+  if (suffix === "_EN") return "[ENG]";
+  if (suffix === "_ISAN") return "[ภาษาถิ่นอีสาน]";
+  return "";
+}
+
 function routeIntent(policyStatus: unknown, consentStatus: unknown): { intent: Intent; suffix: string } {
   const policyRaw = firstString(policyStatus);
   const consent = firstString(consentStatus).toLowerCase();
   const suffix = detectSuffix(policyRaw);
+  const label = suffixLabel(suffix);
   const base = suffix ? policyRaw.slice(0, policyRaw.length - suffix.length) : policyRaw;
   const baseLower = base.toLowerCase();
 
-  // Priority 1: Already received consent
+  // Priority 1: Already received consent — no suffix label
   if (consent === "consent received") return { intent: "เคยได้รับconsentแล้ว", suffix };
 
   if (baseLower === "overdue") {
-    if (consent === "consent given") return { intent: `campaign2${suffix}`, suffix };
-    if (!consent) return { intent: `consent${suffix}`, suffix };
+    if (consent === "consent given") return { intent: `campaign2${label}`, suffix };
+    if (!consent) return { intent: `consent${label}`, suffix };
   }
   if (baseLower === "prospect") {
-    if (consent === "consent given") return { intent: `campaign3${suffix}`, suffix };
-    if (!consent) return { intent: `consent${suffix}`, suffix };
+    if (consent === "consent given") return { intent: `campaign3${label}`, suffix };
+    if (!consent) return { intent: `consent${label}`, suffix };
   }
-  return { intent: `consent${suffix}`, suffix };
+  return { intent: `consent${label}`, suffix };
 }
+
 
 
 function emptyPayload(intent: Intent, extras: Record<string, unknown> = {}) {
