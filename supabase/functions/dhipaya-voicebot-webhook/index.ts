@@ -1137,10 +1137,14 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
   } else {
-    const callLogIdNum = Number(callLogId);
+    const callLogIdNum = Number(String(callLogId).replace(/[^0-9.-]/g, ""));
+    if (!Number.isFinite(callLogIdNum)) {
+      console.warn(`Airtable call log: Call_Log_ID '${callLogId}' is not numeric; skipping create`);
+      return;
+    }
     const createFields: Record<string, unknown> = {
       ...fields,
-      Call_Log_ID: Number.isFinite(callLogIdNum) ? callLogIdNum : String(callLogId),
+      Call_Log_ID: callLogIdNum,
     };
     if (customerRec?.id) createFields.Customer = [customerRec.id];
     await airtableFetch(
