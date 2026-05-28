@@ -326,6 +326,7 @@ async function dialOne(rowId: string): Promise<void> {
           airtable_id: row.customer.id,
           name: fullName,
           policy_number: row.customer.policyNumber || null,
+          next_intent: nextIntent,
         } as any,
       });
     }
