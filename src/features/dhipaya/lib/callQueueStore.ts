@@ -4,7 +4,7 @@ import { normalizeThaiPhone } from "./phone";
 import type { Customer } from "../types";
 import { CUSTOMER_FIELDS } from "../fieldMap";
 
-export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
+export type NextIntent = "skip" | "consent" | "เคยได้รับconsentแล้ว" | "campaign2" | "campaign3";
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const THAI_MONTHS = [
