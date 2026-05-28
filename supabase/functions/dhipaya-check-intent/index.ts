@@ -188,7 +188,8 @@ Deno.serve(async (req) => {
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
 
     // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
-    let expiryDate = "";
+    let expiryDateRaw = "";
+    let planCode = "";
     const policyIds: string[] = Array.isArray(f["Policy"]) ? f["Policy"] : [];
     if (policyIds.length > 0) {
       try {
@@ -198,7 +199,8 @@ Deno.serve(async (req) => {
         );
         if (polRes.ok) {
           const polData = await polRes.json();
-          expiryDate = firstString(polData?.fields?.["Expiry_Date"]);
+          expiryDateRaw = firstString(polData?.fields?.["Expiry_Date"]);
+          planCode = firstString(polData?.fields?.["Plan_Code"]);
         } else {
           console.error("Policy lookup failed", polRes.status);
         }
@@ -206,6 +208,34 @@ Deno.serve(async (req) => {
         console.error("Policy fetch error", e);
       }
     }
+
+    const expiryDate = toThaiBEDate(expiryDateRaw);
+
+    // Lookup Condition_TH from INSTALLMENT_KB by Plan_Code
+    let condition = "";
+    if (planCode) {
+      try {
+        const kbFormula = `{Plan_Code}='${planCode.replace(/'/g, "\\'")}'`;
+        const kbUrl =
+          `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB` +
+          `?filterByFormula=${encodeURIComponent(kbFormula)}` +
+          `&maxRecords=1` +
+          `&fields%5B%5D=${encodeURIComponent("Plan_Code")}` +
+          `&fields%5B%5D=${encodeURIComponent("Condition_TH")}`;
+        const kbRes = await fetch(kbUrl, {
+          headers: { Authorization: `Bearer ${pat}` },
+        });
+        if (kbRes.ok) {
+          const kbData = await kbRes.json();
+          condition = firstString(kbData?.records?.[0]?.fields?.["Condition_TH"]);
+        } else {
+          console.error("INSTALLMENT_KB lookup failed", kbRes.status, await kbRes.text().catch(() => ""));
+        }
+      } catch (e) {
+        console.error("INSTALLMENT_KB fetch error", e);
+      }
+    }
+    console.log("dhipaya-check-intent Plan_Code:", planCode, "Condition_TH:", condition);
 
     const intent = routeIntent(policyStatus, consentStatus);
 
@@ -215,6 +245,7 @@ Deno.serve(async (req) => {
       name: firstName,
       renewal_premium: renewalPremium,
       expiry_date: expiryDate,
+      condition,
     });
   } catch (err) {
     console.error("dhipaya-check-intent error", err);
