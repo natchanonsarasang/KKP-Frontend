@@ -981,7 +981,10 @@ async function syncConsentToAirtable(
       pat,
     );
     console.log(`Airtable consent created for Customer_ID ${customerId} (rec ${customerRec.id}): ${aiCategory}`);
+  }
 }
+
+
 
 async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
