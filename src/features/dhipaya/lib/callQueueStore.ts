@@ -42,18 +42,21 @@ export function checkConditionFlow(customer: Customer): NextIntent {
     return (v == null ? "" : String(v)).trim().toLowerCase();
   };
 
+  const consent = get("consentStatus");
+
+  // Priority: blank/null consent -> always request consent first
+  if (!consent) return "consent";
+
   const policyStatus = get("policyStatus");
 
   // P1: Policy 'active' -> always skip
   if (policyStatus === "active") return "skip";
 
-  // P2: Policy 'overdue' -> always campaign2 (consent ignored)
+  // P2: Policy 'overdue' -> always campaign2
   if (policyStatus === "overdue") return "campaign2";
 
-  // P3: Policy 'prospect' -> branch by consent
+  // P3: Policy 'prospect' -> branch by consent value
   if (policyStatus === "prospect") {
-    const consent = get("consentStatus");
-    if (!consent) return "consent";
     if (consent === "consent given") return "campaign3";
     if (consent === "consent denied") return "skip";
     return "skip";
