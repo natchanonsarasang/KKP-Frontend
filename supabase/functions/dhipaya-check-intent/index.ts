@@ -119,10 +119,10 @@ Deno.serve(async (req) => {
       "Phone_Number1",
       "First_Name",
       "Last_Name",
+      "Policy",
       "Policy_Status (from Policy)",
       "Consent_Status (from Consents)",
       "Renewal_Premium (from Policy)",
-      "Expiry_Date (from Policy)",
     ];
     const url =
       `https://api.airtable.com/v0/${baseId}/Customer` +
@@ -165,7 +165,27 @@ Deno.serve(async (req) => {
     const firstName = firstString(f["First_Name"]);
     const lastName = firstString(f["Last_Name"]);
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
-    const expiryDate = firstString(f["Expiry_Date (from Policy)"]);
+
+    // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
+    let expiryDate = "";
+    const policyIds: string[] = Array.isArray(f["Policy"]) ? f["Policy"] : [];
+    if (policyIds.length > 0) {
+      try {
+        const polRes = await fetch(
+          `https://api.airtable.com/v0/${baseId}/Policy/${policyIds[0]}`,
+          { headers: { Authorization: `Bearer ${pat}` } },
+        );
+        if (polRes.ok) {
+          const polData = await polRes.json();
+          expiryDate = firstString(polData?.fields?.["Expiry_Date"]);
+        } else {
+          console.error("Policy lookup failed", polRes.status);
+        }
+      } catch (e) {
+        console.error("Policy fetch error", e);
+      }
+    }
+
     const intent = routeIntent(policyStatus, consentStatus);
 
     return json({
