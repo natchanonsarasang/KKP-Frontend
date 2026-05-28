@@ -140,48 +140,13 @@ serve(async (req) => {
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
-    // Branch hints from the call initiation (round-tripped via Botnoi)
-    const callVariables =
-      (payload.variables && typeof payload.variables === "object"
-        ? (payload.variables as Record<string, unknown>)
-        : {}) as Record<string, unknown>;
-    const nextIntent = String(callVariables.next_intent || "").toLowerCase();
-    const consentStatusVar = String(callVariables.consent_status || "").toLowerCase();
-    const airtableCustomerNumericId =
-      callVariables.customer_id != null && callVariables.customer_id !== ""
-        ? Number(callVariables.customer_id)
-        : null;
-
-
-
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
-    // --- AI Categorization (strict status classifier, branch-aware) ---
+    // --- AI Categorization (strict status classifier) ---
     let aiCategory: string | null = null;
-    const aiResult = await classifyCall(
-      payload,
-      conversationLog || "",
-      LOVABLE_API_KEY,
-      { nextIntent, consentStatus: consentStatusVar },
-    );
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
-
-    // --- Side-effects: persist consent changes back to Airtable ---
-    if (
-      airtableCustomerNumericId != null &&
-      Number.isFinite(airtableCustomerNumericId) &&
-      (aiCategory === "Consent Granted" || aiCategory === "Consent Refused")
-    ) {
-      const newConsent = aiCategory === "Consent Granted" ? "Consent Given" : "Consent Denied";
-      try {
-        await writeAirtableConsent(airtableCustomerNumericId, newConsent);
-        console.log("Airtable consent updated:", { airtableCustomerNumericId, newConsent });
-      } catch (e) {
-        console.error("Failed to update Airtable consent:", e);
-      }
-    }
-
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -557,12 +522,6 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
   { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
   { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
-  // --- Dhipaya consent / PDPA / renewal outcomes ---
-  { id: 17, name: "Consent Granted",       thai: "ให้ความยินยอม PDPA",         group: "main" },
-  { id: 18, name: "Consent Refused",       thai: "ปฏิเสธความยินยอม PDPA",      group: "main" },
-  { id: 19, name: "Recording Refused",     thai: "ปฏิเสธการบันทึกเสียง",        group: "main" },
-  { id: 20, name: "Transfer Requested",    thai: "ขอโอนสายให้เจ้าหน้าที่",      group: "main" },
-  { id: 21, name: "Renewal Not Convenient", thai: "ไม่สะดวกต่ออายุกรมธรรม์",    group: "main" },
   // --- Conversation behaviors ---
   { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
   { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
@@ -573,7 +532,6 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
   { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
 ];
-
 
 // Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
 const AUDIO_QUALITY_PATTERNS: RegExp[] = [
@@ -606,9 +564,7 @@ async function classifyCall(
   payload: Record<string, unknown>,
   log: string,
   apiKey: string | undefined,
-  branch?: { nextIntent?: string; consentStatus?: string },
 ): Promise<ClassifyResult> {
-
   // STEP 1: System-level status check (telephony layer)
   const rawStatus = String(payload.status || "").toLowerCase().trim();
   const sys = SYSTEM_STATUS_MAP[rawStatus];
@@ -716,29 +672,7 @@ Output format (STRICT JSON, no markdown, no commentary):
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
   "reason": "<short explanation focused on the FINAL outcome>"
-}
-
-DHIPAYA CONSENT / PDPA / RENEWAL BRANCHES — STRICT PRIORITY OVER GENERIC OUTCOMES
-
-Branch context for THIS call:
-- next_intent   = ${branch?.nextIntent || "(unspecified)"}
-- consent_status = ${branch?.consentStatus || "(unspecified)"}
-
-Branch A — next_intent = "consent_request" (Consent Needed flow):
-  Bot greets the customer by name and asks for PDPA consent.
-  - If the customer agrees (e.g. "ยินยอม", "ตกลง", "ให้ความยินยอม", "ok", "agree", "yes I agree") → "Consent Granted".
-  - If the customer refuses (e.g. "ไม่ยินยอม", "ไม่ตกลง", "ปฏิเสธ", "no", "do not agree", "ไม่ขอ") → "Consent Refused".
-  - Wrong person / not convenient / silence → use the matching behavior category. Never choose "Promised to Pay" / "Planned More Than 3" / "Already Paid" / "Refused" in this branch.
-
-Branch B — next_intent = "pdpa_then_renewal" (or "campaign2" / "campaign3" — Consent Obtained flow):
-  Bot first delivers a PDPA recording-disclosure ("we are recording this call, ok?"), then if accepted moves on to a Fire Insurance Renewal pitch and asks if it is convenient.
-  - If the customer refuses the recording disclosure (e.g. "ไม่ยินยอมให้บันทึก", "ไม่อนุญาตให้บันทึก", "do not record", "no recording") → "Recording Refused".
-  - If the customer accepts the recording AND then asks to speak to a human / transfer / wants to renew via an agent ("สะดวก", "convenient", "โอนสาย", "ขอคุยกับเจ้าหน้าที่", "transfer me") → "Transfer Requested".
-  - If the customer accepts the recording but declines the renewal as "not convenient" ("ไม่สะดวก", "not convenient", "ไม่สะดวกต่ออายุ", "ขอไม่ต่อ") → "Renewal Not Convenient".
-  - Promised to Pay / Planned More Than 3 / Already Paid / Refused remain valid IFF the renewal/debt details were disclosed and the customer committed accordingly.
-
-PRIORITY RULE: When the branch above clearly applies based on the bot's prompts and the customer's reply, prefer the branch-specific category over a generic one (e.g. prefer "Transfer Requested" over "Transfer"; prefer "Renewal Not Convenient" over "Not Convenient" or "Inconvenient (Without Date)"; prefer "Consent Granted/Refused" over "Refused").`;
-
+}`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -879,57 +813,6 @@ Return STRICT JSON only:
   } catch (err) {
     console.error("extractCallbackDate exception:", err);
     return null;
-  }
-}
-
-// ============================================================================
-// AIRTABLE CONSENT WRITE-BACK
-// Updates (or creates) the linked Consents row for a Dhipaya customer when the
-// classifier resolves the call to "Consent Granted" or "Consent Refused".
-// Uses the AIRTABLE_PAT secret directly — does NOT go through dhipaya-airtable
-// because that proxy requires an end-user JWT, which the webhook does not have.
-// ============================================================================
-async function writeAirtableConsent(customerNumericId: number, consentStatus: string): Promise<void> {
-  const pat = Deno.env.get("AIRTABLE_PAT");
-  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
-  if (!pat || !baseId) {
-    throw new Error("AIRTABLE_PAT or AIRTABLE_BASE_ID not configured");
-  }
-  const headers = {
-    Authorization: `Bearer ${pat}`,
-    "Content-Type": "application/json",
-  };
-  const baseUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent("Consents")}`;
-
-  // Look up existing Consents row by Customer link (numeric Customer_ID).
-  const formula = encodeURIComponent(`{Customer} = ${customerNumericId}`);
-  const listRes = await fetch(`${baseUrl}?filterByFormula=${formula}&maxRecords=1`, { headers });
-  if (!listRes.ok) {
-    throw new Error(`Airtable list failed: ${listRes.status} ${await listRes.text()}`);
-  }
-  const listData = await listRes.json();
-  const existing = listData.records?.[0];
-
-  const fields: Record<string, unknown> = { Consent_Status: consentStatus };
-
-  if (existing) {
-    const patchRes = await fetch(`${baseUrl}/${existing.id}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ fields }),
-    });
-    if (!patchRes.ok) {
-      throw new Error(`Airtable patch failed: ${patchRes.status} ${await patchRes.text()}`);
-    }
-  } else {
-    const createRes = await fetch(baseUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ fields: { ...fields, Customer: customerNumericId } }),
-    });
-    if (!createRes.ok) {
-      throw new Error(`Airtable create failed: ${createRes.status} ${await createRes.text()}`);
-    }
   }
 }
 

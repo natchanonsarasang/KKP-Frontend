@@ -135,49 +135,6 @@ export const MAIN_STATUSES: StatusDef[] = [
     tone: "skip",
     match: (c) => c.includes("refuse") || c.includes("declined") || c.includes("rejected") || c.includes("ปฏิเสธ"),
   },
-  // --- Dhipaya consent / PDPA / renewal-specific outcomes ---
-  {
-    key: "consent_granted",
-    label: "Consent Granted",
-    thai: "ให้ความยินยอม PDPA",
-    color: "#22c55e",
-    tone: "done",
-    match: (c) => c.includes("consent granted") || c.includes("ให้ความยินยอม"),
-  },
-  {
-    key: "consent_refused",
-    label: "Consent Refused",
-    thai: "ปฏิเสธความยินยอม PDPA",
-    color: "#dc2626",
-    tone: "skip",
-    match: (c) => c.includes("consent refused") || c.includes("ปฏิเสธความยินยอม"),
-  },
-  {
-    key: "recording_refused",
-    label: "Recording Refused",
-    thai: "ปฏิเสธการบันทึกเสียง",
-    color: "#e11d48",
-    tone: "skip",
-    match: (c) => c.includes("recording refused") || c.includes("ปฏิเสธการบันทึก"),
-  },
-  {
-    key: "transfer_requested",
-    label: "Transfer Requested",
-    thai: "ขอโอนสายให้เจ้าหน้าที่",
-    color: "#a855f7",
-    tone: "transfer",
-    match: (c) => c.includes("transfer requested") || c.includes("ขอโอนสาย"),
-  },
-  {
-    key: "renewal_not_convenient",
-    label: "Renewal Not Convenient",
-    thai: "ไม่สะดวกต่ออายุกรมธรรม์",
-    color: "#fb923c",
-    tone: "soft-callback",
-    match: (c) =>
-      c.includes("renewal not convenient") ||
-      c.includes("ไม่สะดวกต่ออายุ"),
-  },
 ];
 
 // ---------------------------------------------------------------------
