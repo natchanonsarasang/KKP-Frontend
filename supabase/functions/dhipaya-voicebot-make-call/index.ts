@@ -82,8 +82,8 @@ serve(async (req) => {
     const { phone_number, variables, interruptible, next_intent, outbound_id, event_id } = await req.json();
     const preparedVariables = prepareVoicebotVariables(variables);
     const nextIntent = String(next_intent || preparedVariables.next_intent || "{{consent}}").trim();
-    const outboundId = String(outbound_id || `dhipaya_${Date.now()}`);
-    const eventId = String(event_id || `dhipaya_event_${Date.now()}`);
+    const outboundId = String(outbound_id || `outbound_${Date.now()}`);
+    const eventId = String(event_id || `event_${Date.now()}`);
 
     const callPayload = {
       outbound_id: outboundId,
