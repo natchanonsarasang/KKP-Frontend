@@ -1102,7 +1102,10 @@ async function syncCallLogToAirtable(
   }
 
   // Step B: search Call Logs for existing record
-  const callLogFormula = `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
+  const callLogIdNumLookup = Number(callLogId);
+  const callLogFormula = Number.isFinite(callLogIdNumLookup)
+    ? `{Call_Log_ID}=${callLogIdNumLookup}`
+    : `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
   const tablePath = "Call%20Logs";
   let existing: any = null;
   try {
@@ -1134,9 +1137,10 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
   } else {
+    const callLogIdNum = Number(callLogId);
     const createFields: Record<string, unknown> = {
       ...fields,
-      Call_Log_ID: String(callLogId),
+      Call_Log_ID: Number.isFinite(callLogIdNum) ? callLogIdNum : String(callLogId),
     };
     if (customerRec?.id) createFields.Customer = [customerRec.id];
     await airtableFetch(
