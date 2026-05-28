@@ -78,24 +78,18 @@ Deno.serve(async (req) => {
     let phoneRaw: string | undefined;
     if (req.method === "GET") {
       const url = new URL(req.url);
-      phoneRaw =
-        url.searchParams.get("customer_id") ??
-        url.searchParams.get("phone") ??
-        undefined;
+      phoneRaw = url.searchParams.get("phone") ?? undefined;
     } else {
       const body = await req.json().catch(() => ({}));
-      phoneRaw =
-        body?.customer_id ??
-        body?.phone ??
-        body?.phone_number ??
-        body?.Phone_Number1;
+      phoneRaw = body?.phone;
     }
 
     if (!phoneRaw || typeof phoneRaw !== "string") {
-      return json({ error: "Missing 'customer_id' in request" }, 400);
+      return json({ error: "Missing 'phone' in request" }, 400);
     }
 
     const normalized = normalizeThaiPhone(phoneRaw);
+    console.log("dhipaya-check-intent phone:", phoneRaw, "→", normalized);
     if (!normalized) {
       return json(
         emptyPayload("consent", {
