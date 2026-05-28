@@ -20,6 +20,42 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Webhook received:", JSON.stringify(payload, null, 2));
 
+    // ---- Dhipaya routing ----
+    // Dhipaya outbound calls use an outbound_id / event_id prefixed with "dhipaya"
+    // (see supabase/functions/dhipaya-voicebot-make-call). Forward those payloads
+    // to the dedicated dhipaya-voicebot-webhook so the generic handler doesn't
+    // process PDPA-consent calls as debt-collection calls.
+    const routingId = String(
+      payload.outbound_id || payload.call_id || payload.event_id || "",
+    ).toLowerCase();
+    if (routingId.startsWith("dhipaya")) {
+      const forwardUrl = `${supabaseUrl}/functions/v1/dhipaya-voicebot-webhook`;
+      console.log(`Forwarding Dhipaya webhook (id=${routingId}) -> ${forwardUrl}`);
+      try {
+        const forwardRes = await fetch(forwardUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseKey}`,
+            apikey: supabaseKey,
+          },
+          body: JSON.stringify(payload),
+        });
+        const text = await forwardRes.text();
+        console.log(`Dhipaya forward status=${forwardRes.status} body=${text.slice(0, 300)}`);
+        return new Response(text || JSON.stringify({ success: forwardRes.ok, forwarded: true }), {
+          status: forwardRes.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        console.error("Failed to forward Dhipaya webhook:", err);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to forward to dhipaya-voicebot-webhook" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // CRITICAL FIX: Ignore the initiation "Success" message if it's sent to the webhook
     // This message only means the call was requested, not that it's finished.
     if (payload.message && payload.message.includes("Success Create Outbound call")) {
