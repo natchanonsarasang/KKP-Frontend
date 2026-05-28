@@ -157,7 +157,7 @@ serve(async (req) => {
 
     // --- AI Categorization (strict status classifier) ---
     let aiCategory: string | null = null;
-    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY, project);
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
 
