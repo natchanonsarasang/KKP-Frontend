@@ -1,42 +1,65 @@
 ## Goal
-Sync the conversation log + minimal call metadata to the Airtable `Call Logs` table on every Dhipaya webhook hit, keyed by `outbound_id`.
 
-## Scope
-Edge function only: `supabase/functions/dhipaya-voicebot-webhook/index.ts`. No DB migration, no front-end changes.
+Add an API that, given a phone number, looks up the matching Customer row in Airtable, reads the `CheckCall` column, and returns the intent the caller should run next.
 
-## Changes
+## New edge function: `dhipaya-check-intent`
 
-### 1. New helper `syncCallLogToAirtable(payload, conversationLog, phone, callOutcome)`
-Placed next to `syncNoticeToAirtable`. Reuses `airtableFetch`, `normalizePhone`, env `AIRTABLE_PAT` / `AIRTABLE_BASE_ID`.
+Path: `supabase/functions/dhipaya-check-intent/index.ts`
 
-Flow:
-1. Resolve `callLogId = payload.outbound_id || payload.call_id`. Skip + warn if missing.
-2. **Find Customer** by phone (same `OR(REGEX_REPLACE({Phone_Number1/2/3}...))` formula used by consent / notice sync). Capture `customerRec.id`. If no customer found, still create/update the log without the `Customer` link (warning logged).
-3. **Search Call Logs** via `filterByFormula={Call_Log_ID}='<callLogId>'&maxRecords=1` (table name URL-encoded as `Call%20Logs`).
-4. Build `fields`:
-   - `Conversation_Logs`: full `conversationLog`
-   - `Call_Duration`: numeric from `payload.duration || payload.call_duration` when present
-   - `Call_Status`: mapped value from the **fixed enum** `Busy | No Answer | Voicemail | Completed | Transferred`. Mapping from existing `callOutcome` / payload status:
-     - `Completed`, `Confirmed` → `Completed`
-     - `No Answer`, `no_answer`, `no-response`, `noresponse` → `No Answer`
-     - `Busy`, `busy` → `Busy`
-     - `Voicemail`, `voicemail`, `machine` → `Voicemail`
-     - `Transferred`, `transferred`, `transfer` → `Transferred`
-     - anything else → omit `Call_Status` (don't send an invalid enum to Airtable)
-5. **Update or Create**
-   - If existing → `PATCH /Call%20Logs/{id}` with `fields` (do NOT overwrite `Call_Log_ID` / `Customer`). Log `Airtable call log updated for Call_Log_ID <id>`.
-   - Else → `POST /Call%20Logs` with `fields + { Call_Log_ID: callLogId, Customer: customerRec ? [customerRec.id] : undefined }`. Log `Airtable call log created for Customer <customerRec.id ?? 'unknown'>`.
+- POST (also accept GET via `?phone=`) with JSON body `{ "phone": "+6690862213438" }`
+- CORS enabled, `verify_jwt = false` (matches existing dhipaya functions).
+- Uses existing secrets `AIRTABLE_PAT` and `AIRTABLE_BASE_ID`.
 
-### 2. Trigger in `serve` handler
-After the consent + notice sync blocks, gated only by presence of `callLogId`, wrapped in `EdgeRuntime.waitUntil(...)` (with fallback to `await`). Runs on every webhook so create-then-patch works.
+### Flow
 
-### 3. Out of scope
-- No change to consent / notice sync, AI prompt, retry, token, or Supabase storage logic.
-- No new Airtable fields beyond `Call_Log_ID`, `Customer`, `Conversation_Logs`, `Call_Duration`, `Call_Status`.
+1. Validate input with Zod (`phone: string, min 6`).
+2. Normalize phone via the same logic as `normalizeThaiPhone` (`+66` / `66` → `0`, strip non-digits, expect 10 digits). On failure → fallback response.
+3. Query Airtable `Customer` table:
+   ```
+   filterByFormula = REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='<normalized>'
+   maxRecords=1
+   fields[]=CheckCall, Phone_Number1
+   ```
+4. Read `record.fields.CheckCall` (string, trimmed, case-insensitive compare).
+
+### Intent routing
+
+```ts
+switch (check) {
+  case "N":          return { intent: "consent" };          // Do Not Call → run consent flow
+  case "Y":                                                  // generic “OK to call” → default consent
+  case "CAMPAIGN2":
+  case "2":          return { intent: "campaign2" };
+  case "CAMPAIGN3":
+  case "3":          return { intent: "campaign3" };
+  default:           return { intent: "consent" };           // unknown value → safest default
+}
+```
+
+Not found / Airtable error:
+```json
+{ "intent": "consent", "fallback": true, "reason": "not_found" | "airtable_error" }
+```
+HTTP 200 in all matched cases; 400 only for missing/invalid `phone` input.
+
+### Response shape
+
+```json
+{
+  "intent": "consent" | "campaign2" | "campaign3",
+  "phone": "0908622134",
+  "checkCall": "N",
+  "matched": true
+}
+```
+
+## Notes / assumptions
+
+- The exact `CheckCall` values for Campaign 2 / Campaign 3 weren't specified; the switch above accepts the most likely formats (`"campaign2"`, `"2"`, etc.). Easy to tweak once confirmed — single switch block.
+- Fallback intent is `consent` (safe: starts with PDPA consent flow) rather than erroring, so the calling client always gets a usable intent.
+- No DB migrations; no frontend changes. Pure new edge function.
 
 ## Verification
-- Redeploy `dhipaya-voicebot-webhook`.
-- First webhook for a new `outbound_id` → new `Call Logs` row appears, linked to matching Customer, transcript in `Conversation_Logs`, `Call_Status` set only when it maps to one of the 5 allowed enum values.
-- Subsequent webhook for same `outbound_id` → same row patched in-place, no duplicates.
-- Webhook with unknown phone → row still created/patched without the `Customer` link (warning logged).
-- Webhook with an unmapped outcome → row created/patched with `Call_Status` omitted (no Airtable enum error).
+
+- Deploy `dhipaya-check-intent`.
+- `curl_edge_functions` with a known phone to confirm `{ intent: "consent" }` for `CheckCall=N`, and fallback path for an unknown number.

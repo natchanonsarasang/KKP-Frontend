@@ -1,0 +1,147 @@
+// Dhipaya: Check intent by phone number
+// Looks up Airtable Customer.Phone_Number1 and returns the next intent based on CheckCall.
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+function normalizeThaiPhone(input?: string | null): string | undefined {
+  if (!input) return undefined;
+  let digits = String(input).replace(/\D/g, "");
+  if (!digits) return undefined;
+  if (digits.startsWith("66")) digits = "0" + digits.slice(2);
+  if (digits.length === 9 && !digits.startsWith("0")) digits = "0" + digits;
+  if (digits.length !== 10 || !digits.startsWith("0")) return undefined;
+  return digits;
+}
+
+type Intent = "consent" | "campaign2" | "campaign3";
+
+function routeIntent(checkCall: unknown): Intent {
+  const v = String(checkCall ?? "").trim().toUpperCase();
+  switch (v) {
+    case "N":
+      return "consent"; // Do Not Call → run consent flow first
+    case "CAMPAIGN2":
+    case "C2":
+    case "2":
+      return "campaign2";
+    case "CAMPAIGN3":
+    case "C3":
+    case "3":
+      return "campaign3";
+    case "Y":
+    case "":
+    default:
+      return "consent";
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    let phoneRaw: string | undefined;
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      phoneRaw = url.searchParams.get("phone") ?? undefined;
+    } else {
+      const body = await req.json().catch(() => ({}));
+      phoneRaw = body?.phone ?? body?.phone_number ?? body?.Phone_Number1;
+    }
+
+    if (!phoneRaw || typeof phoneRaw !== "string") {
+      return json({ error: "Missing 'phone' in request" }, 400);
+    }
+
+    const normalized = normalizeThaiPhone(phoneRaw);
+    if (!normalized) {
+      return json({
+        intent: "consent",
+        fallback: true,
+        reason: "invalid_phone",
+        phone: phoneRaw,
+        matched: false,
+      });
+    }
+
+    const pat = Deno.env.get("AIRTABLE_PAT");
+    const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+    if (!pat || !baseId) {
+      console.error("Airtable credentials missing");
+      return json({
+        intent: "consent",
+        fallback: true,
+        reason: "airtable_not_configured",
+        phone: normalized,
+        matched: false,
+      });
+    }
+
+    const formula =
+      `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}'`;
+    const url =
+      `https://api.airtable.com/v0/${baseId}/Customer` +
+      `?filterByFormula=${encodeURIComponent(formula)}` +
+      `&maxRecords=1` +
+      `&fields%5B%5D=CheckCall&fields%5B%5D=Phone_Number1`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${pat}` },
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error("Airtable lookup failed", res.status, text);
+      return json({
+        intent: "consent",
+        fallback: true,
+        reason: "airtable_error",
+        phone: normalized,
+        matched: false,
+      });
+    }
+
+    const data = await res.json();
+    const record = data?.records?.[0];
+
+    if (!record) {
+      return json({
+        intent: "consent",
+        fallback: true,
+        reason: "not_found",
+        phone: normalized,
+        matched: false,
+      });
+    }
+
+    const checkCall = record.fields?.CheckCall;
+    const intent = routeIntent(checkCall);
+
+    return json({
+      intent,
+      phone: normalized,
+      checkCall: checkCall ?? null,
+      matched: true,
+    });
+  } catch (err) {
+    console.error("dhipaya-check-intent error", err);
+    return json({
+      intent: "consent",
+      fallback: true,
+      reason: "internal_error",
+      matched: false,
+    }, 200);
+  }
+});
