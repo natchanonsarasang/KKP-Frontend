@@ -1101,22 +1101,22 @@ async function syncCallLogToAirtable(
     console.warn(`Airtable call log: no Customer match for phone ${phone ?? "unknown"}`);
   }
 
-  // Step B: search Call Logs for existing record
-  const callLogIdNumLookup = Number(callLogId);
-  const callLogFormula = Number.isFinite(callLogIdNumLookup)
-    ? `{Call_Log_ID}=${callLogIdNumLookup}`
-    : `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
+  // Step B: search Call Logs for existing record linked to this Customer
   const tablePath = "Call%20Logs";
   let existing: any = null;
-  try {
-    const callLogRes = await airtableFetch(
-      `${baseId}/${tablePath}?filterByFormula=${encodeURIComponent(callLogFormula)}&maxRecords=1`,
-      { method: "GET" },
-      pat,
-    );
-    existing = callLogRes?.records?.[0] ?? null;
-  } catch (e) {
-    console.warn("Airtable call log: lookup failed", e);
+  const customerLinkId = customerRec?.fields?.["Customer_ID"];
+  if (customerLinkId != null) {
+    const callLogFormula = `{Customer}=${typeof customerLinkId === "number" ? customerLinkId : `'${String(customerLinkId).replace(/'/g, "\\'")}'`}`;
+    try {
+      const callLogRes = await airtableFetch(
+        `${baseId}/${tablePath}?filterByFormula=${encodeURIComponent(callLogFormula)}&maxRecords=1`,
+        { method: "GET" },
+        pat,
+      );
+      existing = callLogRes?.records?.[0] ?? null;
+    } catch (e) {
+      console.warn("Airtable call log: lookup failed", e);
+    }
   }
 
   // Determine campaign header from payload.variables or call_records.bot_type
