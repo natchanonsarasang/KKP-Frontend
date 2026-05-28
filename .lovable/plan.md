@@ -1,62 +1,40 @@
-
 ## Goal
+Extend the Dhipaya webhook AI classifier with a "Notice Received / Not Received" decision step after the Consent Decision, plus an INSURANCE RENEWAL CONTEXT block clarifying renewal/payment talk must NOT affect PDPA consent.
 
-Give Dhipaya its own status taxonomy focused on a consent-collection flow (not debt collection), update the webhook AI classifier to match, and surface the AI result as a new "Result" column in the Dhipaya Call List.
+## Scope
+Edge function only: `supabase/functions/dhipaya-voicebot-webhook/index.ts`. Front-end taxonomy file `src/features/dhipaya/lib/dhipaya-callStatuses.ts` is updated so the new categories render correctly in the Result column. No DB migration (log-only).
 
-## 1. New file: `src/features/dhipaya/lib/dhipaya-callStatuses.ts`
+## Changes
 
-Copy the shape of `src/lib/callStatuses.ts` (`StatusDef`, `CallStatusTone`, resolvers) but replace `MAIN_STATUSES` with the Dhipaya-specific set:
+### 1. `CONVERSATION_CATEGORIES` (webhook)
+Add two new `main` categories after `Consent Denied`:
+- `Notice Received` — `ได้รับเอกสารแจ้งเตือนแล้ว` — tone `done`
+- `Notice Not Received` — `ยังไม่ได้รับเอกสารแจ้งเตือน` — tone `other`
 
-| key | label | thai | tone |
-|---|---|---|---|
-| `transfer` | Transfer to Agent | โอนสายให้เจ้าหน้าที่ | transfer |
-| `consent_given` | Consent Given | ให้ความยินยอม | done |
-| `consent_denied` | Consent Denied | ปฏิเสธการให้ความยินยอม | skip |
-| `callback_scheduled` | Callback Scheduled | นัดติดต่อกลับ | callback |
-| `not_reached` | Not Reached | ติดต่อไม่ได้ | other |
-| `completed` | Completed | สนทนาสำเร็จ | done |
+IDs assigned at the end (12, 13) to avoid disturbing existing 1–11 ordering.
 
-Keep `SUB_STATUSES` minimal (reuse: `not_convenient`, `dropped_call`, `silence`, `wrong_person`, `background_noise`) so `Dropped Call` / `Not Reached` fallback rules still work.
+### 2. System prompt rewrite (`classifyCall`)
+- Insert a new **INSURANCE RENEWAL CONTEXT** section before DECISION ORDER, copied from the user's text: bot may inform about expiry, confirm notice received, explain premium, payment channels (GSB, QR, MyMo, bank apps, Dhipaya Insure), installments, thank-yous. State explicitly: these renewal/payment discussions are informational only and MUST NOT be treated as debt collection, consent approval, or consent denial unless the customer explicitly answers the PDPA consent question.
+- Insert a new decision step **5. NOTICE CHECK** (between current "4. CONSENT DECISION" and "5. COMPLETED" → renumber Completed to 6):
+  - If the bot asked whether the renewal/notice document was received AND the customer answered:
+    - Affirmative ("ได้รับแล้ว", "ได้รับเอกสารแล้ว", "yes received") → `Notice Received`
+    - Negative ("ยังไม่ได้รับ", "ไม่ได้รับ", "haven't got it") → `Notice Not Received`
+  - Only choose Notice Received/Not Received when no Consent Decision (step 4) was reached — Consent always wins.
+- Keep "Completed" as the final fallback (becomes step 6).
+- Update alias map to keep current behavior; no new aliases needed.
 
-Re-export `resolveMainStatus`, `resolveSubStatus`, `resolveLatestStatusLabel`, `resolveLatestStatusTone`, `ALL_STATUSES` — same signatures as the original, just using the new arrays. `resolveMainStatus` keeps the "picked_up=false / no_answer / busy / failed → not_reached" short-circuit.
+### 3. Fallback labels
+Both fallback sites (`Unmatched AI category`, `Classifier exception`) stay at `Completed`.
 
-## 2. Webhook: `supabase/functions/dhipaya-voicebot-webhook/index.ts`
+### 4. Front-end taxonomy `src/features/dhipaya/lib/dhipaya-callStatuses.ts`
+Append the two new entries to `MAIN_STATUSES` so the Result badge in `src/features/dhipaya/CallList.tsx` resolves their Thai label and tone correctly. No other UI change.
 
-**Sync `CONVERSATION_CATEGORIES`** to exactly the 6 main statuses above + the kept sub statuses (Not Convenient, Wrong Person, Background Noise, Silence, Dropped Call). Remove debt-collection categories (Promised to Pay, Planned More Than 3, Restructure, Inconvenient With/Without Date, Already Paid, Refused, Call Later, Out of Topic).
+## Out of scope
+- No DB columns / migration (storage is log-only via `ai_category`).
+- No change to `outcomeMap`, token deduction, retry logic, Airtable consent sync (consent sync stays gated to `Consent Given` / `Consent Denied` only).
+- No change to silence/audio-quality rule-based pre-checks.
 
-**Update `SYSTEM_STATUS_MAP`** so all telephony-level statuses still map to `Not Reached` (label stays the same).
-
-**Rewrite `classifyCall` prompt** around the new consent flow:
-
-Decision tree the prompt enforces (in order):
-1. System status (no_answer/busy/voicemail/failed/unreachable/rejected) → `Not Reached`.
-2. Empty/too-short log → `Not Reached`.
-3. All User turns are TIMEOUT → `Silence` (kept) → still maps to `Not Reached` at the main-status level via `resolveMainStatus`.
-4. Customer asks to be transferred to a human agent → `Transfer to Agent`.
-5. Customer says it is not convenient to talk (no consent ask reached, or before/after consent ask without consent decision) → `Not Convenient` (sub) — main resolver falls back to `Not Reached`. Per the user's note: "if user said they is not convenient to talk → not_convenient".
-6. The bot actually asked the consent question (retrieve data / analyze / offer product) AND the customer responded:
-   - Affirmative → `Consent Given`
-   - Refusal → `Consent Denied`
-7. Customer agrees to a callback at a specific or vague later time → `Callback Scheduled`.
-8. Any other topic with a normal hang-up after a real exchange → `Completed`.
-
-**Strict rule baked into the prompt**: `Consent Given` / `Consent Denied` / `Callback Scheduled` require evidence in the transcript that the relevant question was reached. Hang-ups or silence before the consent ask must fall back to `Dropped Call` (sub) or `Not Reached`.
-
-`makeResult` default fallback changes from `"Planned More Than 3"` to `"Completed"`. Update both fallback sites (`Unmatched AI category` and `Classifier exception`).
-
-Outcome map / mappedStatus logic, debtor stats updates, token deduction, session updates — **unchanged** (still business-agnostic).
-
-## 3. UI: `src/features/dhipaya/CallList.tsx`
-
-- Import `resolveMainStatus` and `MAIN_STATUSES` from `./lib/dhipaya-callStatuses`.
-- Extend `QueueRow` consumption to show `aiCategory` (already on call_list_items / call_attempts — verify it surfaces via the queue store; if missing, add it to the store row in a minimal pass).
-- Add a new **Result** column between `Status` and `Duration` in the Completed tab table:
-  - Empty `—` for pending/calling.
-  - Otherwise render a badge using `resolveMainStatus(aiCategory, { picked_up, status, call_outcome })`, label from the matched `StatusDef`, color via `tone` mapped through existing `statusConfig`-style tone class (add a small `mainToneClass` map: done → success, skip → destructive, callback → warning, transfer → primary, other → muted).
-- Header column label: `Result`.
-
-## Technical notes
-
-- No DB migrations: `ai_category` already lives on `call_list_items` and `call_attempts` as free-text.
-- `src/lib/callStatuses.ts` and the global botnoi webhook are **not** modified — Dhipaya gets its own parallel taxonomy.
-- `callQueueStore.ts` must expose `aiCategory` on `QueueRow` for the new column to work; will be confirmed and patched if needed during implementation.
+## Verification
+- Redeploy `dhipaya-voicebot-webhook`.
+- Spot-check with a sample transcript containing "ได้รับเอกสารแล้ว" (no consent answer) → should classify as `Notice Received`.
+- Spot-check with a transcript where customer both confirms notice AND gives consent → should still classify as `Consent Given` (step 4 wins).
