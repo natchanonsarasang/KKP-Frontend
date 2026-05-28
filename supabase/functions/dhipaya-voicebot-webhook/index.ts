@@ -219,7 +219,7 @@ serve(async (req) => {
           .from("call_records")
           .update({
             status: mappedStatus,
-            result_data: payload,
+            result_data: { ...payload, ai_category: aiCategory },
             call_duration: callDuration ? Math.round(Number(callDuration)) : null,
             user_id: resolvedUserId,
             workspace_id: resolvedWorkspaceId,
