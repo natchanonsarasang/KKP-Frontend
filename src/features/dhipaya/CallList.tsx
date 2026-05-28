@@ -477,6 +477,9 @@ const DhipayaCallList = () => {
                                 </p>
                               )}
                             </TableCell>
+                            <TableCell>
+                              <ResultBadge row={r} />
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground font-mono">
                               {formatDuration(r.callDuration)}
                             </TableCell>
