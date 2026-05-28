@@ -1,3 +1,13 @@
+export type ConsentStatus = "obtained" | "needed" | "denied";
+
+/** Normalize the raw Airtable Consent_Status string to a stable enum. */
+export function normalizeConsentStatus(raw?: string | null): ConsentStatus {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (s === "consent given" || s === "consent obtained" || s === "obtained") return "obtained";
+  if (s === "consent denied" || s === "denied" || s === "refused") return "denied";
+  return "needed";
+}
+
 export interface AirtableRecord<F = Record<string, unknown>> {
   id: string;
   createdTime: string;
