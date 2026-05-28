@@ -26,24 +26,27 @@ function normalizeThaiPhone(input?: string | null): string | undefined {
 
 type Intent = "consent" | "campaign2" | "campaign3";
 
-function routeIntent(checkCall: unknown): Intent {
-  const v = String(checkCall ?? "").trim().toUpperCase();
-  switch (v) {
-    case "N":
-      return "consent"; // Do Not Call → run consent flow first
-    case "CAMPAIGN2":
-    case "C2":
-    case "2":
-      return "campaign2";
-    case "CAMPAIGN3":
-    case "C3":
-    case "3":
-      return "campaign3";
-    case "Y":
-    case "":
-    default:
-      return "consent";
+function firstString(v: unknown): string {
+  if (Array.isArray(v)) return String(v[0] ?? "").trim();
+  return String(v ?? "").trim();
+}
+
+function routeIntent(policyStatus: unknown, consentStatus: unknown): Intent {
+  const policy = firstString(policyStatus).toLowerCase();
+  const consent = firstString(consentStatus).toLowerCase();
+
+  // Priority 1: Policy_Status
+  if (policy === "overdue") {
+    if (consent === "consent given") return "campaign2";
+    if (consent === "") return "consent";
+    return "consent"; // Consent Denied or any other → fallback
   }
+  if (policy === "prospect") {
+    if (consent === "consent given") return "campaign3";
+    if (consent === "") return "consent";
+    return "consent";
+  }
+  return "consent";
 }
 
 Deno.serve(async (req) => {
