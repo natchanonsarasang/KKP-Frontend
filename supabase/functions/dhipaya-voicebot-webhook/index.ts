@@ -140,6 +140,22 @@ serve(async (req) => {
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
+    // Branch hints from the call initiation (round-tripped via Botnoi)
+    const callVariables =
+      (payload.variables && typeof payload.variables === "object"
+        ? (payload.variables as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+    const nextIntent = String(callVariables.next_intent || "").toLowerCase();
+    const consentStatusVar = String(callVariables.consent_status || "").toLowerCase();
+    const airtableCustomerRecordId = callVariables.airtable_customer_id
+      ? String(callVariables.airtable_customer_id)
+      : null;
+    const airtableCustomerNumericId =
+      callVariables.customer_id != null && callVariables.customer_id !== ""
+        ? Number(callVariables.customer_id)
+        : null;
+
+
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
     // --- AI Categorization (strict status classifier) ---
