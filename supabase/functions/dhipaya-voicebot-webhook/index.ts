@@ -1102,7 +1102,10 @@ async function syncCallLogToAirtable(
   }
 
   // Step B: search Call Logs for existing record
-  const callLogFormula = `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
+  const callLogIdNumLookup = Number(callLogId);
+  const callLogFormula = Number.isFinite(callLogIdNumLookup)
+    ? `{Call_Log_ID}=${callLogIdNumLookup}`
+    : `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
   const tablePath = "Call%20Logs";
   let existing: any = null;
   try {
