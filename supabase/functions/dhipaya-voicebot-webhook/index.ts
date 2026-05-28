@@ -718,7 +718,29 @@ Output format (STRICT JSON, no markdown, no commentary):
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
   "reason": "<short explanation focused on the FINAL outcome>"
-}`;
+}
+
+DHIPAYA CONSENT / PDPA / RENEWAL BRANCHES — STRICT PRIORITY OVER GENERIC OUTCOMES
+
+Branch context for THIS call:
+- next_intent   = ${branch?.nextIntent || "(unspecified)"}
+- consent_status = ${branch?.consentStatus || "(unspecified)"}
+
+Branch A — next_intent = "consent_request" (Consent Needed flow):
+  Bot greets the customer by name and asks for PDPA consent.
+  - If the customer agrees (e.g. "ยินยอม", "ตกลง", "ให้ความยินยอม", "ok", "agree", "yes I agree") → "Consent Granted".
+  - If the customer refuses (e.g. "ไม่ยินยอม", "ไม่ตกลง", "ปฏิเสธ", "no", "do not agree", "ไม่ขอ") → "Consent Refused".
+  - Wrong person / not convenient / silence → use the matching behavior category. Never choose "Promised to Pay" / "Planned More Than 3" / "Already Paid" / "Refused" in this branch.
+
+Branch B — next_intent = "pdpa_then_renewal" (or "campaign2" / "campaign3" — Consent Obtained flow):
+  Bot first delivers a PDPA recording-disclosure ("we are recording this call, ok?"), then if accepted moves on to a Fire Insurance Renewal pitch and asks if it is convenient.
+  - If the customer refuses the recording disclosure (e.g. "ไม่ยินยอมให้บันทึก", "ไม่อนุญาตให้บันทึก", "do not record", "no recording") → "Recording Refused".
+  - If the customer accepts the recording AND then asks to speak to a human / transfer / wants to renew via an agent ("สะดวก", "convenient", "โอนสาย", "ขอคุยกับเจ้าหน้าที่", "transfer me") → "Transfer Requested".
+  - If the customer accepts the recording but declines the renewal as "not convenient" ("ไม่สะดวก", "not convenient", "ไม่สะดวกต่ออายุ", "ขอไม่ต่อ") → "Renewal Not Convenient".
+  - Promised to Pay / Planned More Than 3 / Already Paid / Refused remain valid IFF the renewal/debt details were disclosed and the customer committed accordingly.
+
+PRIORITY RULE: When the branch above clearly applies based on the bot's prompts and the customer's reply, prefer the branch-specific category over a generic one (e.g. prefer "Transfer Requested" over "Transfer"; prefer "Renewal Not Convenient" over "Not Convenient" or "Inconvenient (Without Date)"; prefer "Consent Granted/Refused" over "Refused").`;
+
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
