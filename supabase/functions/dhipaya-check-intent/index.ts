@@ -1,5 +1,5 @@
 // Dhipaya: Check intent by phone number
-// Looks up Airtable Customer.Phone_Number1 and returns the next intent based on CheckCall.
+// Looks up Airtable Customer.Phone_Number1 and returns the next intent + customer info.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,25 +28,34 @@ type Intent = "consent" | "campaign2" | "campaign3";
 
 function firstString(v: unknown): string {
   if (Array.isArray(v)) return String(v[0] ?? "").trim();
-  return String(v ?? "").trim();
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
 }
 
 function routeIntent(policyStatus: unknown, consentStatus: unknown): Intent {
   const policy = firstString(policyStatus).toLowerCase();
   const consent = firstString(consentStatus).toLowerCase();
 
-  // Priority 1: Policy_Status
   if (policy === "overdue") {
     if (consent === "consent given") return "campaign2";
-    if (consent === "") return "consent";
-    return "consent"; // Consent Denied or any other → fallback
+    return "consent";
   }
   if (policy === "prospect") {
     if (consent === "consent given") return "campaign3";
-    if (consent === "") return "consent";
     return "consent";
   }
   return "consent";
+}
+
+function emptyPayload(intent: Intent, extras: Record<string, unknown> = {}) {
+  return {
+    intent,
+    customer_name: "",
+    name: "",
+    renewal_premium: "",
+    expiry_date: "",
+    ...extras,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -58,49 +67,63 @@ Deno.serve(async (req) => {
     let phoneRaw: string | undefined;
     if (req.method === "GET") {
       const url = new URL(req.url);
-      phoneRaw = url.searchParams.get("phone") ?? undefined;
+      phoneRaw =
+        url.searchParams.get("customer_id") ??
+        url.searchParams.get("phone") ??
+        undefined;
     } else {
       const body = await req.json().catch(() => ({}));
-      phoneRaw = body?.phone ?? body?.phone_number ?? body?.Phone_Number1;
+      phoneRaw =
+        body?.customer_id ??
+        body?.phone ??
+        body?.phone_number ??
+        body?.Phone_Number1;
     }
 
     if (!phoneRaw || typeof phoneRaw !== "string") {
-      return json({ error: "Missing 'phone' in request" }, 400);
+      return json({ error: "Missing 'customer_id' in request" }, 400);
     }
 
     const normalized = normalizeThaiPhone(phoneRaw);
     if (!normalized) {
-      return json({
-        intent: "consent",
-        fallback: true,
-        reason: "invalid_phone",
-        phone: phoneRaw,
-        matched: false,
-      });
+      return json(
+        emptyPayload("consent", {
+          fallback: true,
+          reason: "invalid_phone",
+          matched: false,
+        }),
+      );
     }
 
     const pat = Deno.env.get("AIRTABLE_PAT");
     const baseId = Deno.env.get("AIRTABLE_BASE_ID");
     if (!pat || !baseId) {
       console.error("Airtable credentials missing");
-      return json({
-        intent: "consent",
-        fallback: true,
-        reason: "airtable_not_configured",
-        phone: normalized,
-        matched: false,
-      });
+      return json(
+        emptyPayload("consent", {
+          fallback: true,
+          reason: "airtable_not_configured",
+          matched: false,
+        }),
+      );
     }
 
     const formula =
       `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}'`;
+    const fields = [
+      "Phone_Number1",
+      "First_Name",
+      "Last_Name",
+      "Policy_Status (from Policy)",
+      "Consent_Status (from Consents)",
+      "Renewal_Premium (from Policy)",
+      "Expiry_Date (from Policy)",
+    ];
     const url =
       `https://api.airtable.com/v0/${baseId}/Customer` +
       `?filterByFormula=${encodeURIComponent(formula)}` +
       `&maxRecords=1` +
-      `&fields%5B%5D=Phone_Number1` +
-      `&fields%5B%5D=${encodeURIComponent("Policy_Status (from Policy)")}` +
-      `&fields%5B%5D=${encodeURIComponent("Consent_Status (from Consents)")}`;
+      fields.map((f) => `&fields%5B%5D=${encodeURIComponent(f)}`).join("");
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${pat}` },
@@ -109,46 +132,52 @@ Deno.serve(async (req) => {
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.error("Airtable lookup failed", res.status, text);
-      return json({
-        intent: "consent",
-        fallback: true,
-        reason: "airtable_error",
-        phone: normalized,
-        matched: false,
-      });
+      return json(
+        emptyPayload("consent", {
+          fallback: true,
+          reason: "airtable_error",
+          matched: false,
+        }),
+      );
     }
 
     const data = await res.json();
     const record = data?.records?.[0];
 
     if (!record) {
-      return json({
-        intent: "consent",
-        fallback: true,
-        reason: "not_found",
-        phone: normalized,
-        matched: false,
-      });
+      return json(
+        emptyPayload("consent", {
+          fallback: true,
+          reason: "not_found",
+          matched: false,
+        }),
+      );
     }
 
-    const policyStatus = record.fields?.["Policy_Status (from Policy)"];
-    const consentStatus = record.fields?.["Consent_Status (from Consents)"];
+    const f = record.fields ?? {};
+    const policyStatus = f["Policy_Status (from Policy)"];
+    const consentStatus = f["Consent_Status (from Consents)"];
+    const firstName = firstString(f["First_Name"]);
+    const lastName = firstString(f["Last_Name"]);
+    const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
+    const expiryDate = firstString(f["Expiry_Date (from Policy)"]);
     const intent = routeIntent(policyStatus, consentStatus);
 
     return json({
       intent,
-      phone: normalized,
-      policyStatus: policyStatus ?? null,
-      consentStatus: consentStatus ?? null,
-      matched: true,
+      customer_name: [firstName, lastName].filter(Boolean).join(" "),
+      name: firstName,
+      renewal_premium: renewalPremium,
+      expiry_date: expiryDate,
     });
   } catch (err) {
     console.error("dhipaya-check-intent error", err);
-    return json({
-      intent: "consent",
-      fallback: true,
-      reason: "internal_error",
-      matched: false,
-    }, 200);
+    return json(
+      emptyPayload("consent", {
+        fallback: true,
+        reason: "internal_error",
+        matched: false,
+      }),
+    );
   }
 });
