@@ -1024,7 +1024,6 @@ async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise
 }
 
 
-}
 
 
 
