@@ -65,8 +65,29 @@ function emptyPayload(intent: Intent, extras: Record<string, unknown> = {}) {
     name: "",
     renewal_premium: "",
     expiry_date: "",
+    condition: "",
     ...extras,
   };
+}
+
+// Convert various Gregorian date strings into Thai Buddhist-Era DD/MM/YYYY (BE).
+function toThaiBEDate(input: string): string {
+  const s = (input || "").trim();
+  if (!s) return "";
+  let d: number | undefined, m: number | undefined, y: number | undefined;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    y = Number(iso[1]); m = Number(iso[2]); d = Number(iso[3]);
+  } else {
+    const parts = s.split(/[\/\-.]/).map((p) => p.trim());
+    if (parts.length >= 3) {
+      d = Number(parts[0]); m = Number(parts[1]); y = Number(parts[2]);
+    }
+  }
+  if (!d || !m || !y) return s;
+  if (y < 2500) y += 543;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d)}/${pad(m)}/${y}`;
 }
 
 Deno.serve(async (req) => {
