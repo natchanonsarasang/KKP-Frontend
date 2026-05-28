@@ -275,6 +275,19 @@ const DhipayaCallList = () => {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              const n = rowsByTab.completed.length;
+              requeueAllCompleted();
+              if (n > 0) toast.success(`Re-queued ${n} call${n > 1 ? "s" : ""}`);
+            }}
+            disabled={counts.completed === 0}
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Re-queue completed
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={clearCompleted}
             disabled={counts.completed === 0}
           >
