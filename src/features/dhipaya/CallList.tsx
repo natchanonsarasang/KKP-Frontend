@@ -401,6 +401,7 @@ const DhipayaCallList = () => {
                         <TableHead>Phone</TableHead>
                         <TableHead>Policy</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Result</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead className="w-[140px] text-right">Actions</TableHead>
                       </TableRow>
