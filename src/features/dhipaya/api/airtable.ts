@@ -135,7 +135,6 @@ function mapCustomer(rec: AirtableRecord): Customer {
     noticeSent: str(f[CUSTOMER_FIELDS.noticeSent]),
     paymentDate: str(f[CUSTOMER_FIELDS.paymentDate]),
     policy: firstLinked(f[CUSTOMER_FIELDS.policy]),
-    conditionTh: str(f[CUSTOMER_FIELDS.conditionTh]),
   };
 }
 
@@ -218,6 +217,16 @@ export async function listInstallmentKb(opts?: {
     }),
     offset: res.offset,
   };
+}
+
+export async function getInstallmentKbConditionTh(recordId: string): Promise<string | undefined> {
+  try {
+    const rec = await call<AirtableRecord>({ action: "get", table: "INSTALLMENT_KB", recordId });
+    return str(rec.fields[INSTALLMENT_KB_FIELDS.conditionTh]);
+  } catch (e) {
+    console.warn("getInstallmentKbConditionTh failed:", e);
+    return undefined;
+  }
 }
 
 // -------- helpers --------

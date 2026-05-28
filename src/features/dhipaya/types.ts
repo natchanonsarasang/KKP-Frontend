@@ -25,7 +25,6 @@ export interface Customer {
   paymentDate?: string;
   policy?: string;
   expiryDate?: string;
-  conditionTh?: string;
 }
 
 export interface Policy {
