@@ -1119,9 +1119,42 @@ async function syncCallLogToAirtable(
     console.warn("Airtable call log: lookup failed", e);
   }
 
+  // Determine campaign header from payload.variables or call_records.bot_type
+  let botType: string | undefined =
+    payload?.variables?.bot_type ||
+    payload?.variables?.next_intent ||
+    payload?.bot_type ||
+    payload?.next_intent;
+  if (!botType) {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && supabaseKey) {
+        const sb = createClient(supabaseUrl, supabaseKey);
+        const { data } = await sb
+          .from("call_records")
+          .select("result_data")
+          .eq("botnoi_call_id", String(callLogId))
+          .maybeSingle();
+        const rd: any = data?.result_data;
+        botType = rd?.bot_type || rd?.next_intent || rd?.variables?.bot_type || rd?.variables?.next_intent;
+      }
+    } catch (e) {
+      console.warn("Airtable call log: bot_type lookup failed", e);
+    }
+  }
+  const campaignHeader =
+    botType === "consent"
+      ? "Campaign 1"
+      : botType === "campaign2"
+        ? "Campaign 2"
+        : botType === "campaign3"
+          ? "Campaign 3"
+          : "Campaign Unknown";
+
   // Build fields
   const fields: Record<string, unknown> = {
-    Conversation_Logs: conversationLog,
+    Conversation_Logs: `${campaignHeader}\n\n${conversationLog}`,
   };
   const durationNum = callDuration != null ? Number(callDuration) : NaN;
   if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
