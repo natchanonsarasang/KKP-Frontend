@@ -158,11 +158,32 @@ serve(async (req) => {
 
     console.log("Mapped:", { mappedStatus, pickedUp, callOutcome });
 
-    // --- AI Categorization (strict status classifier) ---
+    // --- AI Categorization (strict status classifier, branch-aware) ---
     let aiCategory: string | null = null;
-    const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
+    const aiResult = await classifyCall(
+      payload,
+      conversationLog || "",
+      LOVABLE_API_KEY,
+      { nextIntent, consentStatus: consentStatusVar },
+    );
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
+
+    // --- Side-effects: persist consent changes back to Airtable ---
+    if (
+      airtableCustomerNumericId != null &&
+      Number.isFinite(airtableCustomerNumericId) &&
+      (aiCategory === "Consent Granted" || aiCategory === "Consent Refused")
+    ) {
+      const newConsent = aiCategory === "Consent Granted" ? "Consent Given" : "Consent Denied";
+      try {
+        await writeAirtableConsent(airtableCustomerNumericId, newConsent);
+        console.log("Airtable consent updated:", { airtableCustomerNumericId, newConsent });
+      } catch (e) {
+        console.error("Failed to update Airtable consent:", e);
+      }
+    }
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
