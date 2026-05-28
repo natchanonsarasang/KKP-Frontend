@@ -53,6 +53,8 @@ export function checkConditionFlow(customer: Customer): NextIntent {
   };
 
   const consent = get("consentStatus");
+
+  if (consent === "consent received") return "เคยได้รับconsentแล้ว";
   if (consent === "consent denied") return "skip";
   // Priority: blank/null consent -> always request consent first
   if (!consent) return "consent";
