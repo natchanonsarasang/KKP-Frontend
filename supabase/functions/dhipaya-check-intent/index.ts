@@ -35,7 +35,7 @@ function normalizeThaiPhone(input?: string | null): string | undefined {
   return digits;
 }
 
-type Intent = "consent" | "campaign2" | "campaign3";
+type Intent = "consent" | "campaign2" | "campaign3" | "เคยได้รับconsentแล้ว";
 
 function firstString(v: unknown): string {
   if (Array.isArray(v)) return String(v[0] ?? "").trim();
@@ -46,6 +46,9 @@ function firstString(v: unknown): string {
 function routeIntent(policyStatus: unknown, consentStatus: unknown): Intent {
   const policy = firstString(policyStatus).toLowerCase();
   const consent = firstString(consentStatus).toLowerCase();
+
+  // Highest priority: already received consent — short-circuit regardless of policy status
+  if (consent === "consent received") return "เคยได้รับconsentแล้ว";
 
   if (policy === "overdue") {
     if (consent === "consent given") return "campaign2";
@@ -241,7 +244,9 @@ Deno.serve(async (req) => {
     }
     console.log("dhipaya-check-intent Plan_Code:", planCode, "Condition_TH:", condition);
 
+    console.log("dhipaya-check-intent Consent_Status:", firstString(consentStatus), "Policy_Status:", firstString(policyStatus));
     const intent = routeIntent(policyStatus, consentStatus);
+    console.log("dhipaya-check-intent selected intent:", intent);
 
     return json({
       intent,
