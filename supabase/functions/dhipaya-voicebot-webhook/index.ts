@@ -918,13 +918,14 @@ async function syncConsentToAirtable(
       {
         method: "POST",
         body: JSON.stringify({
-          fields: { ...fields, Customer: customerId },
+          fields: { ...fields, Customer: [customerRec.id] },
         }),
       },
       pat,
     );
-    console.log(`Airtable consent created for Customer_ID ${customerId}: ${aiCategory}`);
+    console.log(`Airtable consent created for Customer_ID ${customerId} (rec ${customerRec.id}): ${aiCategory}`);
   }
+
 }
 
 
