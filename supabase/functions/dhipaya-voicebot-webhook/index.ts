@@ -600,60 +600,69 @@ async function classifyCall(
     return makeResult("Not Reached", "AI key missing");
   }
 
-  const categoryList = CONVERSATION_CATEGORIES.map(
-    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
-  ).join("\n");
+  // The AI classifier ONLY chooses from PDPA consent outcomes. Telephony-level
+  // outcomes (Not Reached, Silence, Background Noise, Dropped Call, Wrong
+  // Person) are handled by the rule-based checks above before we reach the AI.
+  const PDPA_STATUSES = [
+    "Consent Given",
+    "Consent Denied",
+    "Transfer to Agent",
+    "Callback Scheduled",
+    "Not Convenient",
+    "Completed",
+  ] as const;
+
+  const pdpaList = PDPA_STATUSES.map((name) => {
+    const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name);
+    return cat ? `- ${cat.name} (${cat.thai})` : `- ${name}`;
+  }).join("\n");
 
   const systemPrompt = `You classify Thai outbound PDPA consent-collection call transcripts for Dhipaya Insurance. Return STRICT JSON only.
 
-Choose exactly ONE category (use the EXACT English label) from this list:
-${categoryList}
+CONTEXT
+The bot's ONLY purpose is to obtain PDPA consent — the customer's permission for
+Dhipaya and its business partners to process their personal data in order to
+present insurance products, promotions, or benefits via phone.
 
-SCOPE
-The bot's ONLY purpose is to obtain PDPA consent — permission for Dhipaya and its
-business partners to process the customer's personal data in order to present
-insurance products, promotions, or benefits via phone.
+This is a PDPA consent call. It is NOT a debt-collection call. The transcript
+will NEVER be about debt, loans, installments, balances, overdue amounts, or
+money owed. If the customer says anything off-topic, ignore it for classification
+purposes and still pick one of the PDPA statuses below.
 
-This is NOT a debt-collection call. IGNORE any mention of debt, loans, overdue
-payments, policy premiums owed, balances, installments, or money owed. Even if
-such topics appear in the transcript (customer confusion, off-topic remarks),
-they MUST NOT influence the classification. Your only job is to determine
-whether PDPA consent was given, denied, deferred, transferred, or never reached.
+ALLOWED STATUSES — choose EXACTLY ONE (use the EXACT English label):
+${pdpaList}
 
 DECISION ORDER (first match wins):
 
-1. TRANSFER → Customer asks to speak with a human agent / staff
-   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "speak to a person") → "Transfer to Agent".
+1. Transfer to Agent — Customer asks to speak with a human / staff
+   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "speak to a person").
 
-2. NOT CONVENIENT → Customer says they cannot talk now ("ไม่สะดวกคุย", "ไม่ว่าง",
-   "ติดประชุม") AND no consent decision was reached → "Not Convenient".
+2. Not Convenient — Customer says they cannot talk now ("ไม่สะดวกคุย",
+   "ไม่ว่าง", "ติดประชุม") AND no consent decision was reached AND no callback
+   time was agreed.
 
-3. CALLBACK SCHEDULED → Customer asks to be called back later
-   ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า") → "Callback Scheduled".
+3. Callback Scheduled — Customer asks to be called back later
+   ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า", any specific future time).
 
-4. CONSENT DECISION → The bot actually asked the PDPA consent question AND the
-   customer gave a clear answer about consenting to data processing / marketing:
-   - Affirmative ("ยินยอม", "ตกลง", "ได้ครับ", "yes / agree") → "Consent Given"
-   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "ไม่อนุญาต", "no / don't agree")
-     → "Consent Denied"
+4. Consent Given — The bot asked the PDPA consent question AND the customer
+   answered affirmatively ("ยินยอม", "ตกลง", "ได้ค่ะ/ครับ", "yes", "agree").
 
-5. COMPLETED → A real exchange happened and the call ended normally but none of
-   the above applies (off-topic resolved, general question answered, etc.)
-   → "Completed".
+5. Consent Denied — The bot asked the PDPA consent question AND the customer
+   refused ("ไม่ยินยอม", "ไม่อนุญาต", "ไม่สะดวกให้ข้อมูล", "no", "don't agree").
 
-STRICT RULE — TARGET THE FINAL OUTCOME
-"Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
-that the relevant question was actually reached and answered. If the line drops
-before that point use:
-  - "Dropped Call" if the customer engaged briefly then the line cut, or
-  - "Not Reached" if there was effectively no customer interaction.
+6. Completed — Default fallback. Use this whenever a real exchange happened but
+   none of the rules above clearly apply, OR when you are unsure.
 
-"Wrong Person", "Background Noise", and "Silence" are only chosen when no main
-outcome above applies.
+HARD RULES
+- You MUST return one of the six labels above. Nothing else.
+- NEVER return "Out of Topic", "Unknown", "Other", "Debt Disclosure",
+  "Installment", "Balance", "Debt", or any label that is not in the list.
+- NEVER mention or reason about debt, loans, premiums, or money owed.
+- If unsure, return "Completed".
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
-  "status_name": "<exact English label from the list>",
+  "status_name": "<exact English label from the allowed list>",
   "confidence": <number between 0 and 1>,
   "reason": "<short explanation focused on the PDPA consent outcome>"
 }`;
