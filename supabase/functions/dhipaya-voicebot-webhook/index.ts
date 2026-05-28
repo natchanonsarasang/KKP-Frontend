@@ -608,7 +608,9 @@ async function classifyCall(
   payload: Record<string, unknown>,
   log: string,
   apiKey: string | undefined,
+  branch?: { nextIntent?: string; consentStatus?: string },
 ): Promise<ClassifyResult> {
+
   // STEP 1: System-level status check (telephony layer)
   const rawStatus = String(payload.status || "").toLowerCase().trim();
   const sys = SYSTEM_STATUS_MAP[rawStatus];
