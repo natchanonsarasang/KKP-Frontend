@@ -278,17 +278,18 @@ serve(async (req) => {
     if (callId) {
       const { data: record } = await supabase
         .from("call_records")
-        .select("id")
+        .select("id, result_data")
         .eq("botnoi_call_id", callId)
         .maybeSingle();
 
       if (record) {
         callRecordId = record.id;
+        const prevResultData = (record.result_data as Record<string, unknown> | null) ?? {};
         const { error: updateError } = await supabase
           .from("call_records")
           .update({
             status: mappedStatus,
-            result_data: { ...payload, ai_category: aiCategory },
+            result_data: { ...prevResultData, ...payload, ai_category: aiCategory },
             call_duration: callDuration ? Math.round(Number(callDuration)) : null,
             user_id: resolvedUserId,
             workspace_id: resolvedWorkspaceId,
