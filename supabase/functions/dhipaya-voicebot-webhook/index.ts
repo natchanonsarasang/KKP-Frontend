@@ -169,6 +169,28 @@ serve(async (req) => {
       console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
 
+    // --- Airtable notice_received sync (Dhipaya) ---
+    const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
+    const noticeValue =
+      aiCategory === "Notice Received" ? "Yes" :
+      aiCategory === "Notice Not Received" ? "No" : null;
+    if (phoneNumber && noticeOutcomeOk && noticeValue) {
+      console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
+      const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
+        .then(() => console.log("Airtable notice sync finished"))
+        .catch((err) => console.error("Airtable notice sync failed:", err));
+      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(noticePromise);
+      } else {
+        await noticePromise;
+      }
+    } else {
+      console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
+    }
+
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -960,8 +982,51 @@ async function syncConsentToAirtable(
     );
     console.log(`Airtable consent created for Customer_ID ${customerId} (rec ${customerRec.id}): ${aiCategory}`);
   }
-
 }
+
+
+
+async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("Airtable credentials missing; skipping notice sync");
+    return;
+  }
+
+  const normalized = normalizePhone(phone);
+  if (!normalized) return;
+
+  const phoneFormula =
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `)`;
+
+  const customerRes = await airtableFetch(
+    `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
+    { method: "GET" },
+    pat,
+  );
+  const customerRec = customerRes?.records?.[0];
+  if (!customerRec) {
+    console.warn(`Airtable: no Customer found for phone ${normalized} (notice sync)`);
+    return;
+  }
+
+  await airtableFetch(
+    `${baseId}/Customer/${customerRec.id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ fields: { notice_received: value } }),
+    },
+    pat,
+  );
+  console.log(`Airtable notice_received updated for Customer ${customerRec.id}: ${value}`);
+}
+
+
 
 
 
