@@ -751,7 +751,7 @@ async function extractCallbackDate(
   const referenceDate = parseLogReferenceDate(conversationLog);
   const refIso = bangkokIsoDate(referenceDate);
 
-  const systemPrompt = `You extract a callback date from a Thai debt-collection call transcript.
+  const systemPrompt = `You extract a callback date from a Thai PDPA consent-collection call transcript.
 
 Reference (call) date in Asia/Bangkok timezone: ${refIso}
 
