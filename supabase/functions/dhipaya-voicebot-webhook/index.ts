@@ -190,6 +190,23 @@ serve(async (req) => {
       console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
 
+    // --- Airtable Call Logs sync (Dhipaya) ---
+    if (callId) {
+      const callLogPromise = syncCallLogToAirtable(payload, conversationLog || "", phoneNumber, callOutcome, callDuration)
+        .catch((err) => console.error("Airtable call log sync failed:", err));
+      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(callLogPromise);
+      } else {
+        await callLogPromise;
+      }
+    } else {
+      console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
+    }
+
+
+
 
 
     // --- Resolve user_id and workspace_id ---
@@ -1025,6 +1042,112 @@ async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise
   );
   console.log(`Airtable notice_received updated for Customer ${customerRec.id}: ${value}`);
 }
+
+function mapCallStatus(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim().toLowerCase().replace(/[-_\s]+/g, "");
+  if (["completed", "confirmed", "success"].includes(s)) return "Completed";
+  if (["noanswer", "noresponse"].includes(s)) return "No Answer";
+  if (["busy"].includes(s)) return "Busy";
+  if (["voicemail", "machine", "answeringmachine"].includes(s)) return "Voicemail";
+  if (["transferred", "transfer"].includes(s)) return "Transferred";
+  return null;
+}
+
+async function syncCallLogToAirtable(
+  payload: any,
+  conversationLog: string,
+  phone: string | null,
+  callOutcome: string | null,
+  callDuration: any,
+): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("Airtable credentials missing; skipping call log sync");
+    return;
+  }
+
+  const callLogId = payload?.outbound_id || payload?.call_id;
+  if (!callLogId) {
+    console.warn("Airtable call log sync: missing Call_Log_ID");
+    return;
+  }
+
+  // Step A: find Customer (best-effort)
+  let customerRec: any = null;
+  if (phone) {
+    const normalized = normalizePhone(phone);
+    if (normalized) {
+      const phoneFormula =
+        `OR(` +
+        `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+        `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+        `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+        `)`;
+      try {
+        const customerRes = await airtableFetch(
+          `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
+          { method: "GET" },
+          pat,
+        );
+        customerRec = customerRes?.records?.[0] ?? null;
+      } catch (e) {
+        console.warn("Airtable call log: customer lookup failed", e);
+      }
+    }
+  }
+  if (!customerRec) {
+    console.warn(`Airtable call log: no Customer match for phone ${phone ?? "unknown"}`);
+  }
+
+  // Step B: search Call Logs for existing record
+  const callLogFormula = `{Call_Log_ID}='${String(callLogId).replace(/'/g, "\\'")}'`;
+  const tablePath = "Call%20Logs";
+  let existing: any = null;
+  try {
+    const callLogRes = await airtableFetch(
+      `${baseId}/${tablePath}?filterByFormula=${encodeURIComponent(callLogFormula)}&maxRecords=1`,
+      { method: "GET" },
+      pat,
+    );
+    existing = callLogRes?.records?.[0] ?? null;
+  } catch (e) {
+    console.warn("Airtable call log: lookup failed", e);
+  }
+
+  // Build fields
+  const fields: Record<string, unknown> = {
+    Conversation_Logs: conversationLog,
+  };
+  const durationNum = callDuration != null ? Number(callDuration) : NaN;
+  if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
+  const mappedStatus = mapCallStatus(callOutcome) ?? mapCallStatus(payload?.status);
+  if (mappedStatus) fields.Call_Status = mappedStatus;
+
+  // Step C: update or create
+  if (existing) {
+    await airtableFetch(
+      `${baseId}/${tablePath}/${existing.id}`,
+      { method: "PATCH", body: JSON.stringify({ fields }) },
+      pat,
+    );
+    console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
+  } else {
+    const createFields: Record<string, unknown> = {
+      ...fields,
+      Call_Log_ID: String(callLogId),
+    };
+    if (customerRec?.id) createFields.Customer = [customerRec.id];
+    await airtableFetch(
+      `${baseId}/${tablePath}`,
+      { method: "POST", body: JSON.stringify({ fields: createFields }) },
+      pat,
+    );
+    console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogId})`);
+  }
+}
+
 
 
 
