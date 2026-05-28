@@ -169,6 +169,28 @@ serve(async (req) => {
       console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
 
+    // --- Airtable notice_received sync (Dhipaya) ---
+    const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
+    const noticeValue =
+      aiCategory === "Notice Received" ? "Yes" :
+      aiCategory === "Notice Not Received" ? "No" : null;
+    if (phoneNumber && noticeOutcomeOk && noticeValue) {
+      console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
+      const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
+        .then(() => console.log("Airtable notice sync finished"))
+        .catch((err) => console.error("Airtable notice sync failed:", err));
+      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(noticePromise);
+      } else {
+        await noticePromise;
+      }
+    } else {
+      console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
+    }
+
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
