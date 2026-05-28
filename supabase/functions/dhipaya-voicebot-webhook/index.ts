@@ -148,6 +148,15 @@ serve(async (req) => {
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
 
+    // --- Airtable consent sync (Dhipaya) ---
+    // Only when the AI determined a definitive consent outcome and we have a phone number.
+    if (phoneNumber && (aiCategory === "Consent Given" || aiCategory === "Consent Denied")) {
+      syncConsentToAirtable(phoneNumber, aiCategory).catch((err) =>
+        console.error("Airtable consent sync failed:", err),
+      );
+    }
+
+
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
     let resolvedWorkspaceId: string | null = null;
