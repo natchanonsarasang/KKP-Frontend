@@ -271,6 +271,7 @@ async function dialOne(rowId: string): Promise<void> {
       next_intent: nextIntent,
       renewal_premium: row.customer.renewalPremium,
       expiry_date: formatThaiDate(row.customer.expiryDate),
+      condition: row.customer.conditionTh || "",
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
