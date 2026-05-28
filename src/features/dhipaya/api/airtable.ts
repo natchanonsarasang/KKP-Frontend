@@ -133,7 +133,7 @@ function mapCustomer(rec: AirtableRecord): Customer {
     outstandingBalance: str(f[CUSTOMER_FIELDS.outstandingBalance]),
     planCodeId: firstLinked(f[CUSTOMER_FIELDS.planCode]),
     noticeSent: str(f[CUSTOMER_FIELDS.noticeSent]),
-    noticeRecieved: str(f[CUSTOMER_FIELDS.noticeRecieved])
+    noticeRecieved: str(f[CUSTOMER_FIELDS.noticeRecieved]),
     paymentDate: str(f[CUSTOMER_FIELDS.paymentDate]),
     policy: firstLinked(f[CUSTOMER_FIELDS.policy]),
   };
