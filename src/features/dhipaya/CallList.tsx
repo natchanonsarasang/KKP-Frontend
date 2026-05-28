@@ -410,7 +410,7 @@ const DhipayaCallList = () => {
                       {rowsByTab[tab].length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={6}
+                            colSpan={7}
                             className="text-center text-muted-foreground py-10"
                           >
                             <div className="flex flex-col items-center gap-2">
