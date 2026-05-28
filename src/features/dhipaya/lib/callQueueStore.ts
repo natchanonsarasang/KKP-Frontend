@@ -8,18 +8,8 @@ export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const THAI_MONTHS = [
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ];
 
 export function formatThaiDate(input?: string | null): string {
@@ -274,7 +264,6 @@ async function dialOne(rowId: string): Promise<void> {
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
     let conditionTh = "";
-    console.log(row.customer.planCodeId);
     if (row.customer.planCodeId) {
       const { getInstallmentKbConditionTh } = await import("../api/airtable");
       conditionTh = (await getInstallmentKbConditionTh(row.customer.planCodeId)) || "";

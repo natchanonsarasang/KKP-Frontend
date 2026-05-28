@@ -219,35 +219,12 @@ export async function listInstallmentKb(opts?: {
   };
 }
 
-export async function getInstallmentKbConditionTh(planCodeOrId: string): Promise<string | undefined> {
-  if (!planCodeOrId) return undefined;
-  // If it looks like an Airtable record ID, try direct get first.
-  if (/^rec[A-Za-z0-9]{14}$/.test(planCodeOrId)) {
-    try {
-      const rec = await call<AirtableRecord>({ action: "get", table: "INSTALLMENT_KB", recordId: planCodeOrId });
-      const v = str(rec.fields[INSTALLMENT_KB_FIELDS.conditionTh]);
-      if (v) return v;
-    } catch (e) {
-      console.warn("getInstallmentKbConditionTh direct get failed, falling back to filter:", e);
-    }
-  }
-  // Otherwise (or as fallback), look it up by Plan_Code value.
+export async function getInstallmentKbConditionTh(recordId: string): Promise<string | undefined> {
   try {
-    const escaped = planCodeOrId.replace(/"/g, '\\"');
-    const formula = `{${INSTALLMENT_KB_FIELDS.planCode}} = "${escaped}"`;
-    const res = await call<ListResponse>({
-      action: "list",
-      table: "INSTALLMENT_KB",
-      params: { filterByFormula: formula, maxRecords: 1 },
-    });
-    const rec = res.records?.[0];
-    if (!rec) {
-      console.warn("getInstallmentKbConditionTh: no INSTALLMENT_KB row for", planCodeOrId);
-      return undefined;
-    }
+    const rec = await call<AirtableRecord>({ action: "get", table: "INSTALLMENT_KB", recordId });
     return str(rec.fields[INSTALLMENT_KB_FIELDS.conditionTh]);
   } catch (e) {
-    console.warn("getInstallmentKbConditionTh filter failed:", e);
+    console.warn("getInstallmentKbConditionTh failed:", e);
     return undefined;
   }
 }
