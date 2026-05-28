@@ -39,10 +39,12 @@ serve(async (req) => {
     const appointmentDate = payload.appointment_date || null;
     const appointmentTime = payload.appointment_time || null;
 
-    // Extract phone number from audio_url (format: ..._PHONE.wav)
+    // Extract phone number from audio_url (format: ..._PHONE.wav[?query])
     let phoneNumber = payload.phone_number || null;
     if (!phoneNumber && audioUrl) {
-      const match = audioUrl.match(/_(\d+)\.wav$/);
+      // Strip query string before matching so signed-URL params don't break it
+      const pathOnly = String(audioUrl).split("?")[0];
+      const match = pathOnly.match(/_(\d+)\.wav$/i);
       if (match) phoneNumber = match[1];
     }
 
