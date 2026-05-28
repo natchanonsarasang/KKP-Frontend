@@ -101,6 +101,9 @@ function ResultBadge({ row }: { row: QueueRow }) {
     </Badge>
   );
 }
+
+const statusConfig: Record<
+  QueueStatus,
   { label: string; className: string; icon: typeof CheckCircle }
 > = {
   pending: { label: "Pending", className: "bg-muted text-muted-foreground", icon: Clock },
