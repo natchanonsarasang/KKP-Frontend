@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeThaiPhone } from "./phone";
-import type { Customer } from "../types";
+import { normalizeConsentStatus, type Customer } from "../types";
 import { CUSTOMER_FIELDS } from "../fieldMap";
 
-export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
+export type NextIntent =
+  | "skip"
+  | "consent_request" // Consent Needed branch — request PDPA consent
+  | "pdpa_then_renewal" // Consent Obtained branch — recording disclosure + renewal
+  | "campaign2"
+  | "campaign3";
+
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const THAI_MONTHS = [
