@@ -16,10 +16,21 @@ const json = (body: unknown, status = 200) =>
 
 function normalizeThaiPhone(input?: string | null): string | undefined {
   if (!input) return undefined;
-  let digits = String(input).replace(/\D/g, "");
+  let raw = String(input).trim();
+
+  // Step 1: If it starts with "+66", strip "+66" and prepend "0"
+  if (raw.startsWith("+66")) {
+    raw = "0" + raw.slice(3);
+  } else if (raw.startsWith("66") && raw.length >= 11) {
+    // Bare "66..." (no plus) — also normalize to "0..."
+    raw = "0" + raw.slice(2);
+  }
+
+  // Step 2: Strip any remaining non-digit chars (spaces, dashes, parens)
+  const digits = raw.replace(/\D/g, "");
   if (!digits) return undefined;
-  if (digits.startsWith("66")) digits = "0" + digits.slice(2);
-  if (digits.length === 9 && !digits.startsWith("0")) digits = "0" + digits;
+
+  // Step 3: Validate Thai mobile/landline format (10 digits starting with 0)
   if (digits.length !== 10 || !digits.startsWith("0")) return undefined;
   return digits;
 }
@@ -67,24 +78,18 @@ Deno.serve(async (req) => {
     let phoneRaw: string | undefined;
     if (req.method === "GET") {
       const url = new URL(req.url);
-      phoneRaw =
-        url.searchParams.get("customer_id") ??
-        url.searchParams.get("phone") ??
-        undefined;
+      phoneRaw = url.searchParams.get("phone") ?? undefined;
     } else {
       const body = await req.json().catch(() => ({}));
-      phoneRaw =
-        body?.customer_id ??
-        body?.phone ??
-        body?.phone_number ??
-        body?.Phone_Number1;
+      phoneRaw = body?.phone;
     }
 
     if (!phoneRaw || typeof phoneRaw !== "string") {
-      return json({ error: "Missing 'customer_id' in request" }, 400);
+      return json({ error: "Missing 'phone' in request" }, 400);
     }
 
     const normalized = normalizeThaiPhone(phoneRaw);
+    console.log("dhipaya-check-intent phone:", phoneRaw, "→", normalized);
     if (!normalized) {
       return json(
         emptyPayload("consent", {
