@@ -1139,6 +1139,7 @@ async function syncCallLogToAirtable(
           .eq("botnoi_call_id", String(callLogId))
           .maybeSingle();
         const rd: any = data?.result_data;
+        console.log("Result data from call_records: ", rd);
         botType =
           rd?.campaign_determined ||
           rd?.bot_type ||
