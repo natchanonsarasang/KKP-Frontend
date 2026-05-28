@@ -190,6 +190,23 @@ serve(async (req) => {
       console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
 
+    // --- Airtable Call Logs sync (Dhipaya) ---
+    if (callId) {
+      const callLogPromise = syncCallLogToAirtable(payload, conversationLog || "", phoneNumber, callOutcome, callDuration)
+        .catch((err) => console.error("Airtable call log sync failed:", err));
+      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(callLogPromise);
+      } else {
+        await callLogPromise;
+      }
+    } else {
+      console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
+    }
+
+
+
 
 
     // --- Resolve user_id and workspace_id ---
