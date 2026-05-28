@@ -595,71 +595,46 @@ async function classifyCall(
     (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
   ).join("\n");
 
-  const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
+  const systemPrompt = `You classify Thai outbound consent-collection call transcripts for Dhipaya. Return STRICT JSON only.
 Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
-CATEGORY DEFINITIONS
+CONTEXT
+The bot is calling customers to ask CONSENT to retrieve and analyze their data in order to offer (sell) an insurance product. Your job is to classify the FINAL outcome of the call.
 
-Main Outcomes (business result of the call — ALWAYS PREFER THESE):
-- Planned More Than 3     → Customer indicates a payment plan / will pay, but the agreed date is MORE THAN 3 days from the call date (e.g. "อาทิตย์หน้า", "เกิน 3 วัน", "เดือนหน้า", "อีก 5 วัน", or any specific date > 3 days away). Also use for vague acknowledgement of the debt with no clear near-term commitment.
-- Promised to Pay        → Customer explicitly confirms payment WITHIN 3 days from the call date (today, tomorrow, "พรุ่งนี้", "มะรืน", "อีก 2 วัน", or any specific date ≤ 3 days away).
-- Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
-- Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
-- Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
-- Already Paid           → Customer states the payment has already been completed/settled.
-- Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
-- Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
+DECISION ORDER (apply in this exact order — first match wins):
 
-Conversation Behaviors (use ONLY when no clear business outcome above exists):
-- Not Convenient   → Customer says it is not a convenient time but did not commit to a callback time.
-- Wrong Person     → Customer says this is not the policyholder / wrong number.
-- Call Later       → Customer vaguely asks to be called another time without a fixed schedule.
-- Transfer         → Customer asks to speak to a human agent / staff.
-- Background Noise → Audio quality issues, loud background, customer cannot hear clearly, transcript dominated by noise.
-- Silence          → Customer remained silent throughout / no verbal response.
-- Dropped Call     → Call disconnected with no meaningful customer interaction (pure cutoff).
-- Out of Topic     → Customer kept talking about unrelated topics with no resolution.
+1. TRANSFER → If the customer at any point asks to speak with a human agent / staff
+   ("ขอคุยกับเจ้าหน้าที่", "โอนสาย", "transfer to agent", "speak to a person"),
+   classify as "Transfer to Agent".
 
-CRITICAL CLASSIFICATION RULES
+2. NOT CONVENIENT → If the customer says they are not convenient / not available
+   to talk right now ("ไม่สะดวกคุย", "ไม่ว่าง", "ติดประชุม", "not a good time"),
+   AND no consent decision was reached, classify as "Not Convenient".
 
-1. MANDATORY DEBT DISCLOSURE CHECK (HIGHEST PRIORITY):
-   Before classifying as ANY payment outcome ("Promised to Pay" or "Planned More Than 3"), you MUST verify in the conversation_log that the Bot has already DISCLOSED the "Debt Details" to the customer (e.g. license plate, installment number, outstanding balance, due date).
-   - If the Bot has NOT yet disclosed these details, it is IMPOSSIBLE for the interaction to be a payment outcome. You MUST NOT choose "Promised to Pay" or "Planned More Than 3" under any circumstance.
+3. CALLBACK SCHEDULED → If the customer asks to be called back at a specific or
+   vague later time ("โทรกลับพรุ่งนี้", "ติดต่อใหม่อาทิตย์หน้า", "call me back later"),
+   classify as "Callback Scheduled".
 
-2. HANDLING "NOT CONVENIENT" & CALLBACK REQUESTS:
-   If the customer indicates they are "not convenient" (ไม่สะดวก), "busy" (ไม่ว่าง), or asks for a callback / to reschedule / to postpone:
-   - If the customer specifies a date/time (e.g. "พรุ่งนี้"/"tomorrow", "อาทิตย์หน้า"/"next week", "เดือนหน้า"/"next month", a specific clock time or date) → classify STRICTLY as "Inconvenient (With Date)".
-   - If no specific date/time is mentioned → classify as "Inconvenient (Without Date)".
-   - STRICT RULE: As long as the debt details have NOT been disclosed, ANY customer request to reschedule or postpone the conversation MUST be classified as "Inconvenient" (With or Without Date), EVEN IF they mention future dates like "tomorrow" or "next week". Never interpret such date mentions as a payment commitment.
+4. CONSENT DECISION → If the Bot actually asked the consent question (about
+   retrieving / analyzing the customer's data to offer a product) AND the
+   customer gave a clear answer:
+   - Affirmative ("ยินยอม", "ตกลง", "ได้ครับ", "yes / agree") → "Consent Given"
+   - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "no / don't agree", clear refusal of consent) → "Consent Denied"
 
-3. PAYMENT CLASSIFICATION (ONLY AFTER DISCLOSURE):
-   "Promised to Pay" and "Planned More Than 3" are permitted ONLY if BOTH conditions are true:
-   (a) The Bot has disclosed the debt details in the conversation_log, AND
-   (b) The customer then provides a clear payment commitment tied to that disclosed debt.
-   Then decide:
-   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date (inclusive of exactly 3 days).
-   - "Planned More Than 3" → commitment is STRICTLY > 3 days from the call date (i.e. 4 or more days).
-   If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+5. COMPLETED → For any other topic where a real exchange happened and the call
+   ended normally (general questions, off-topic but resolved, etc.) with no
+   consent decision and no callback agreement, classify as "Completed".
 
-   3-DAY BOUNDARY RULE (STRICT):
-   The following Thai phrasings MUST be treated as ≤ 3 days and classified as "Promised to Pay" (assuming debt details were disclosed and a commitment was made). They MUST NEVER be classified as "Planned More Than 3":
-   - "อีก 3 วัน"
-   - "3 วัน"
-   - "ภายใน 3 วัน"
-   - "ไม่เกิน 3 วัน"
-   - any equivalent phrasing meaning "within / no more than / up to 3 days"
-   Only choose "Planned More Than 3" when the customer explicitly commits to a date that is 4 or more days after the call date (e.g. "อีก 5 วัน", "อาทิตย์หน้า", "สิ้นเดือน", a specific date > 3 days out).
+STRICT RULE — TARGET THE FINAL OUTCOME:
+"Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
+in the transcript that the relevant question was actually reached. If the call
+hangs up BEFORE these points (no real exchange, or cut off mid-greeting), use:
+  - "Dropped Call" if the customer engaged briefly then the line cut, or
+  - "Not Reached" if there was effectively no customer interaction.
 
-4. CLASSIFICATION LOGIC SUMMARY:
-   - IF (Debt details NOT disclosed) → MUST be "Inconvenient (With Date)" or "Inconvenient (Without Date)" (regardless of any time/date mentioned), or another non-payment category if more appropriate (e.g. Wrong Person, Refused, Not Reached).
-   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days, inclusive) or "Planned More Than 3" (> 3 days, i.e. ≥ 4 days).
-
-5. ADDITIONAL GUIDELINES:
-   - Conversation Behavior categories should ONLY be chosen when no clear business outcome above applies.
-   - Decide based on the FINAL state of the call, not transient mid-call events.
-   - "Refused" requires a clear refusal — not mere reluctance or "not convenient".
-
+Other behaviors ("Wrong Person", "Background Noise", "Silence") should only be
+chosen when no main outcome above applies.
 
 Output format (STRICT JSON, no markdown, no commentary):
 {
