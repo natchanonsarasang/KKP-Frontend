@@ -8,8 +8,18 @@ export type NextIntent = "skip" | "consent" | "campaign2" | "campaign3";
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const THAI_MONTHS = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
 ];
 
 export function formatThaiDate(input?: string | null): string {
@@ -43,7 +53,7 @@ export function checkConditionFlow(customer: Customer): NextIntent {
   };
 
   const consent = get("consentStatus");
-
+  if (consent === "consent denied") return "skip";
   // Priority: blank/null consent -> always request consent first
   if (!consent) return "consent";
 
