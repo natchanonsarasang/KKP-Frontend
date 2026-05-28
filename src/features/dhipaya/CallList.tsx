@@ -68,9 +68,39 @@ import {
   type QueueRow,
   type QueueStatus,
 } from "./lib/callQueueStore";
+import {
+  resolveMainStatus,
+  type CallStatusTone,
+} from "./lib/dhipaya-callStatuses";
 
-const statusConfig: Record<
-  QueueStatus,
+const mainToneClass: Record<CallStatusTone, string> = {
+  done: "bg-success/10 text-success border-success/30",
+  skip: "bg-destructive/10 text-destructive border-destructive/30",
+  callback: "bg-warning/10 text-warning border-warning/30",
+  "soft-callback": "bg-warning/10 text-warning border-warning/30",
+  transfer: "bg-primary/10 text-primary border-primary/30",
+  other: "bg-muted text-muted-foreground border-border",
+  none: "bg-muted text-muted-foreground border-border",
+};
+
+function ResultBadge({ row }: { row: QueueRow }) {
+  if (row.status === "pending" || row.status === "calling") {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const main = resolveMainStatus(row.aiCategory, {
+    picked_up: row.status === "success",
+    status: row.status,
+    call_outcome: row.callOutcome,
+  });
+  if (!main) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  return (
+    <Badge variant="outline" className={mainToneClass[main.tone]}>
+      {main.label}
+    </Badge>
+  );
+}
   { label: string; className: string; icon: typeof CheckCircle }
 > = {
   pending: { label: "Pending", className: "bg-muted text-muted-foreground", icon: Clock },
