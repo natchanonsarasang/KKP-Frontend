@@ -541,6 +541,9 @@ const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: 
   { id: 4, name: "Callback Scheduled",  thai: "นัดติดต่อกลับ",          group: "main" },
   { id: 5, name: "Not Reached",         thai: "ติดต่อไม่ได้",           group: "main" },
   { id: 6, name: "Completed",           thai: "สนทนาสำเร็จ",            group: "main" },
+  { id: 12, name: "Notice Received",     thai: "ได้รับเอกสารแจ้งเตือนแล้ว", group: "main" },
+  { id: 13, name: "Notice Not Received", thai: "ยังไม่ได้รับเอกสารแจ้งเตือน", group: "main" },
+
   // --- Conversation behaviors (fallbacks) ---
   { id: 7,  name: "Not Convenient",   thai: "ไม่สะดวกคุย",            group: "sub" },
   { id: 8,  name: "Wrong Person",     thai: "ไม่ใช่ผู้เอาประกัน",      group: "sub" },
