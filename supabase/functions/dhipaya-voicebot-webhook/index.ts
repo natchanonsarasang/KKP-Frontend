@@ -669,11 +669,13 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
     const normalized = String(aiName).trim().toLowerCase();
-    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
+    // Alias legacy / shorthand labels into the new Dhipaya taxonomy.
     const aliased =
-      normalized === "acknowledged" || normalized === "acknowledge"
-        ? "planned more than 3"
-        : normalized;
+      normalized === "transfer" ? "transfer to agent" :
+      normalized === "consent" || normalized === "agree" ? "consent given" :
+      normalized === "refused" || normalized === "decline" || normalized === "declined" ? "consent denied" :
+      normalized === "call later" || normalized === "scheduled callback" ? "callback scheduled" :
+      normalized;
     const match = CONVERSATION_CATEGORIES.find(
       (c) => c.name.toLowerCase() === aliased,
     );
@@ -687,11 +689,11 @@ Output format (STRICT JSON, no markdown, no commentary):
       };
     }
 
-    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
-    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
+    console.warn("Unmatched AI category, defaulting to Completed:", aiName);
+    return makeResult("Completed", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return makeResult("Planned More Than 3", "Classifier exception");
+    return makeResult("Completed", "Classifier exception");
   }
 }
 
