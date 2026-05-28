@@ -633,8 +633,30 @@ insurance products, promotions, or benefits via phone.
 This is NOT a debt-collection call. IGNORE any mention of debt, loans, overdue
 payments, policy premiums owed, balances, installments, or money owed. Even if
 such topics appear in the transcript (customer confusion, off-topic remarks),
-they MUST NOT influence the classification. Your only job is to determine
-whether PDPA consent was given, denied, deferred, transferred, or never reached.
+they MUST NOT influence the consent classification. Your only job is to determine
+whether PDPA consent was given, denied, deferred, transferred, or never reached
+— and, as a secondary signal, whether the renewal notice document was received.
+
+INSURANCE RENEWAL CONTEXT
+Some transcripts may include outbound insurance renewal conversations for
+insurance policies partnered with Dhipaya / GSB. The bot may:
+  - Inform customers that their insurance policy is nearing expiry
+  - Confirm whether renewal documents (the "notice") were received
+  - Explain renewal premium amounts
+  - Describe payment channels such as GSB branches, QR payment, MyMo app,
+    bank apps, or the Dhipaya Insure website
+  - Mention installment promotions or payment offers
+  - Thank the customer on behalf of Dhipaya Insurance and GSB
+
+These insurance renewal / payment discussions are informational only and MUST
+NOT affect PDPA consent classification. Do not interpret premium discussions,
+installment offers, or payment explanations as debt collection, consent
+approval, or consent denial unless the customer explicitly answers the PDPA
+consent question.
+
+The "notice check" exchange (did the customer receive the renewal document?)
+IS the one renewal-context signal you may classify on — but only when no
+PDPA consent decision was reached (see step 5 below).
 
 DECISION ORDER (first match wins):
 
@@ -653,14 +675,24 @@ DECISION ORDER (first match wins):
    - Refusal ("ไม่ยินยอม", "ไม่สะดวกให้ข้อมูล", "ไม่อนุญาต", "no / don't agree")
      → "Consent Denied"
 
-5. COMPLETED → A real exchange happened and the call ended normally but none of
-   the above applies (off-topic resolved, general question answered, etc.)
+5. NOTICE CHECK → Only if no Consent Decision (step 4) was reached. The bot
+   asked whether the renewal/notice document was received AND the customer
+   answered:
+   - Affirmative ("ได้รับแล้ว", "ได้รับเอกสารแล้ว", "yes received", "got it")
+     → "Notice Received"
+   - Negative ("ยังไม่ได้รับ", "ไม่ได้รับ", "haven't got it", "no, not yet")
+     → "Notice Not Received"
+   Consent ALWAYS wins over notice — if the customer answered the consent
+   question, classify under step 4 even if they also discussed the notice.
+
+6. COMPLETED → A real exchange happened and the call ended normally but none
+   of the above applies (off-topic resolved, general question answered, etc.)
    → "Completed".
 
 STRICT RULE — TARGET THE FINAL OUTCOME
-"Consent Given", "Consent Denied", and "Callback Scheduled" all require evidence
-that the relevant question was actually reached and answered. If the line drops
-before that point use:
+"Consent Given", "Consent Denied", "Callback Scheduled", "Notice Received",
+and "Notice Not Received" all require evidence that the relevant question was
+actually reached and answered. If the line drops before that point use:
   - "Dropped Call" if the customer engaged briefly then the line cut, or
   - "Not Reached" if there was effectively no customer interaction.
 
@@ -671,8 +703,9 @@ Output format (STRICT JSON, no markdown, no commentary):
 {
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
-  "reason": "<short explanation focused on the PDPA consent outcome>"
+  "reason": "<short explanation focused on the PDPA consent or notice outcome>"
 }`;
+
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
