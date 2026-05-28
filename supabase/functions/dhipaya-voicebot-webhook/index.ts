@@ -152,13 +152,12 @@ serve(async (req) => {
 
     // --- Airtable consent sync (Dhipaya) ---
     // Only when the AI determined a definitive consent outcome and we have a phone number.
-    if (phoneNumber && (aiCategory === "Consent Given" || aiCategory === "Consent Denied")) {
+    const consentOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
+    if (phoneNumber && consentOutcomeOk && (aiCategory === "Consent Given" || aiCategory === "Consent Denied")) {
       console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory}`);
       const syncPromise = syncConsentToAirtable(phoneNumber, aiCategory)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
-      // Keep the edge runtime alive until the background task completes,
-      // otherwise the function shuts down before Airtable HTTP calls finish.
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
         // @ts-ignore
@@ -167,7 +166,7 @@ serve(async (req) => {
         await syncPromise;
       }
     } else {
-      console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory });
+      console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
 
 
