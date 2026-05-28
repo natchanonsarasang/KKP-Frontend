@@ -60,6 +60,8 @@ import {
   clearCallQueue,
   clearCompleted,
   removeFromCallQueue,
+  requeueRow,
+  requeueAllCompleted,
   setSelectedPhone,
   applyCallRecordUpdate,
   reconcileCallingRows,
