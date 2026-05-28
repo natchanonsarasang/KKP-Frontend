@@ -804,8 +804,24 @@ Return STRICT JSON only:
 
 const AIRTABLE_API_BASE = "https://api.airtable.com/v0";
 
+/**
+ * Normalize Thai phone numbers to local 10-digit form starting with "0".
+ * Accepts variants like "(084) 567-8901", "+66819351840", "66819351840",
+ * "081-234-5678", "0925998999". Returns digits-only string; falls back to
+ * the raw digit sequence when it can't be coerced to a valid local number.
+ */
 function normalizePhone(p: string): string {
-  return (p || "").replace(/\D/g, "");
+  let digits = (p || "").replace(/\D/g, "");
+  if (!digits) return "";
+  // International "+66..." / "66..." -> "0..."
+  if (digits.startsWith("66") && digits.length >= 11) {
+    digits = "0" + digits.slice(2);
+  }
+  // 9-digit local missing leading zero -> prepend it
+  if (digits.length === 9 && !digits.startsWith("0")) {
+    digits = "0" + digits;
+  }
+  return digits;
 }
 
 async function airtableFetch(
