@@ -65,8 +65,29 @@ function emptyPayload(intent: Intent, extras: Record<string, unknown> = {}) {
     name: "",
     renewal_premium: "",
     expiry_date: "",
+    condition: "",
     ...extras,
   };
+}
+
+// Convert various Gregorian date strings into Thai Buddhist-Era DD/MM/YYYY (BE).
+function toThaiBEDate(input: string): string {
+  const s = (input || "").trim();
+  if (!s) return "";
+  let d: number | undefined, m: number | undefined, y: number | undefined;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    y = Number(iso[1]); m = Number(iso[2]); d = Number(iso[3]);
+  } else {
+    const parts = s.split(/[\/\-.]/).map((p) => p.trim());
+    if (parts.length >= 3) {
+      d = Number(parts[0]); m = Number(parts[1]); y = Number(parts[2]);
+    }
+  }
+  if (!d || !m || !y) return s;
+  if (y < 2500) y += 543;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d)}/${pad(m)}/${y}`;
 }
 
 Deno.serve(async (req) => {
@@ -167,7 +188,8 @@ Deno.serve(async (req) => {
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
 
     // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
-    let expiryDate = "";
+    let expiryDateRaw = "";
+    let planCode = "";
     const policyIds: string[] = Array.isArray(f["Policy"]) ? f["Policy"] : [];
     if (policyIds.length > 0) {
       try {
@@ -177,7 +199,8 @@ Deno.serve(async (req) => {
         );
         if (polRes.ok) {
           const polData = await polRes.json();
-          expiryDate = firstString(polData?.fields?.["Expiry_Date"]);
+          expiryDateRaw = firstString(polData?.fields?.["Expiry_Date"]);
+          planCode = firstString(polData?.fields?.["Plan_Code"]);
         } else {
           console.error("Policy lookup failed", polRes.status);
         }
@@ -185,6 +208,38 @@ Deno.serve(async (req) => {
         console.error("Policy fetch error", e);
       }
     }
+
+    const expiryDate = toThaiBEDate(expiryDateRaw);
+
+    // Lookup Condition_TH from INSTALLMENT_KB by Plan_Code.
+    // On the Policy table, Plan_Code is a linked-record array of INSTALLMENT_KB ids,
+    // so we fetch the linked record directly when it looks like an Airtable record id.
+    let condition = "";
+    if (planCode) {
+      try {
+        const isRecordId = /^rec[A-Za-z0-9]{14}$/.test(planCode);
+        const kbUrl = isRecordId
+          ? `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB/${planCode}`
+          : `https://api.airtable.com/v0/${baseId}/INSTALLMENT_KB` +
+            `?filterByFormula=${encodeURIComponent(`{Plan_Code}='${planCode.replace(/'/g, "\\'")}'`)}` +
+            `&maxRecords=1` +
+            `&fields%5B%5D=${encodeURIComponent("Plan_Code")}` +
+            `&fields%5B%5D=${encodeURIComponent("Condition_TH")}`;
+        const kbRes = await fetch(kbUrl, {
+          headers: { Authorization: `Bearer ${pat}` },
+        });
+        if (kbRes.ok) {
+          const kbData = await kbRes.json();
+          const fields = isRecordId ? kbData?.fields : kbData?.records?.[0]?.fields;
+          condition = firstString(fields?.["Condition_TH"]);
+        } else {
+          console.error("INSTALLMENT_KB lookup failed", kbRes.status, await kbRes.text().catch(() => ""));
+        }
+      } catch (e) {
+        console.error("INSTALLMENT_KB fetch error", e);
+      }
+    }
+    console.log("dhipaya-check-intent Plan_Code:", planCode, "Condition_TH:", condition);
 
     const intent = routeIntent(policyStatus, consentStatus);
 
@@ -194,6 +249,7 @@ Deno.serve(async (req) => {
       name: firstName,
       renewal_premium: renewalPremium,
       expiry_date: expiryDate,
+      condition,
     });
   } catch (err) {
     console.error("dhipaya-check-intent error", err);
