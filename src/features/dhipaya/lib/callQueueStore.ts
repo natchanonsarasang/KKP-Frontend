@@ -264,6 +264,11 @@ async function dialOne(rowId: string): Promise<void> {
 
   try {
     const fullName = [row.customer.firstName, row.customer.lastName].filter(Boolean).join(" ");
+    let conditionTh = "";
+    if (row.customer.planCodeId) {
+      const { getInstallmentKbConditionTh } = await import("../api/airtable");
+      conditionTh = (await getInstallmentKbConditionTh(row.customer.planCodeId)) || "";
+    }
     const variables = {
       name: row.customer.firstName,
       customer_name: fullName,
@@ -271,7 +276,7 @@ async function dialOne(rowId: string): Promise<void> {
       next_intent: nextIntent,
       renewal_premium: row.customer.renewalPremium,
       expiry_date: formatThaiDate(row.customer.expiryDate),
-      condition: row.customer.conditionTh || "",
+      condition: conditionTh,
     };
     const { data: resp, error: invokeErr } = await supabase.functions.invoke("dhipaya-voicebot-make-call", {
       body: {
