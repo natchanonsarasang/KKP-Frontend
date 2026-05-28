@@ -884,4 +884,55 @@ Return STRICT JSON only:
   }
 }
 
+// ============================================================================
+// AIRTABLE CONSENT WRITE-BACK
+// Updates (or creates) the linked Consents row for a Dhipaya customer when the
+// classifier resolves the call to "Consent Granted" or "Consent Refused".
+// Uses the AIRTABLE_PAT secret directly — does NOT go through dhipaya-airtable
+// because that proxy requires an end-user JWT, which the webhook does not have.
+// ============================================================================
+async function writeAirtableConsent(customerNumericId: number, consentStatus: string): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    throw new Error("AIRTABLE_PAT or AIRTABLE_BASE_ID not configured");
+  }
+  const headers = {
+    Authorization: `Bearer ${pat}`,
+    "Content-Type": "application/json",
+  };
+  const baseUrl = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent("Consents")}`;
+
+  // Look up existing Consents row by Customer link (numeric Customer_ID).
+  const formula = encodeURIComponent(`{Customer} = ${customerNumericId}`);
+  const listRes = await fetch(`${baseUrl}?filterByFormula=${formula}&maxRecords=1`, { headers });
+  if (!listRes.ok) {
+    throw new Error(`Airtable list failed: ${listRes.status} ${await listRes.text()}`);
+  }
+  const listData = await listRes.json();
+  const existing = listData.records?.[0];
+
+  const fields: Record<string, unknown> = { Consent_Status: consentStatus };
+
+  if (existing) {
+    const patchRes = await fetch(`${baseUrl}/${existing.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ fields }),
+    });
+    if (!patchRes.ok) {
+      throw new Error(`Airtable patch failed: ${patchRes.status} ${await patchRes.text()}`);
+    }
+  } else {
+    const createRes = await fetch(baseUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ fields: { ...fields, Customer: customerNumericId } }),
+    });
+    if (!createRes.ok) {
+      throw new Error(`Airtable create failed: ${createRes.status} ${await createRes.text()}`);
+    }
+  }
+}
+
 
