@@ -1134,9 +1134,10 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
   } else {
+    const callLogIdNum = Number(callLogId);
     const createFields: Record<string, unknown> = {
       ...fields,
-      Call_Log_ID: String(callLogId),
+      Call_Log_ID: Number.isFinite(callLogIdNum) ? callLogIdNum : String(callLogId),
     };
     if (customerRec?.id) createFields.Customer = [customerRec.id];
     await airtableFetch(
