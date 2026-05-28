@@ -93,6 +93,29 @@ export const MAIN_STATUSES: StatusDef[] = [
       c.includes("ไม่รับสาย"),
   },
   {
+    key: "notice_received",
+    label: "Notice Received",
+    thai: "ได้รับเอกสารแจ้งเตือนแล้ว",
+    color: "#22c55e",
+    tone: "done",
+    match: (c) =>
+      c.includes("notice received") ||
+      c.includes("notice_received") ||
+      c.includes("ได้รับเอกสาร"),
+  },
+  {
+    key: "notice_not_received",
+    label: "Notice Not Received",
+    thai: "ยังไม่ได้รับเอกสารแจ้งเตือน",
+    color: "#94a3b8",
+    tone: "other",
+    match: (c) =>
+      c.includes("notice not received") ||
+      c.includes("notice_not_received") ||
+      c.includes("ยังไม่ได้รับเอกสาร") ||
+      c.includes("ไม่ได้รับเอกสาร"),
+  },
+  {
     key: "completed",
     label: "Completed",
     thai: "สนทนาสำเร็จ",
@@ -105,6 +128,7 @@ export const MAIN_STATUSES: StatusDef[] = [
       c.includes("สำเร็จ"),
   },
 ];
+
 
 // ---------------------------------------------------------------------
 // 2. SUB STATUSES — secondary conversation behaviors (Dhipaya subset)
