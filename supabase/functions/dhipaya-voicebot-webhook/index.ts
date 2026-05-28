@@ -788,7 +788,110 @@ Return STRICT JSON only:
     const value = parsed?.date_con;
     if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return value;
-    }
+}
+
+// ============================================================================
+// AIRTABLE CONSENT SYNC
+// Looks up the Dhipaya Customer in Airtable by phone, then patches or creates
+// a Consents row with the AI-determined consent outcome.
+// ============================================================================
+
+const AIRTABLE_API_BASE = "https://api.airtable.com/v0";
+
+function normalizePhone(p: string): string {
+  return (p || "").replace(/\D/g, "");
+}
+
+async function airtableFetch(
+  path: string,
+  init: RequestInit,
+  pat: string,
+): Promise<any> {
+  const res = await fetch(`${AIRTABLE_API_BASE}/${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: `Bearer ${pat}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Airtable ${res.status}: ${text.slice(0, 300)}`);
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+async function syncConsentToAirtable(
+  phone: string,
+  aiCategory: "Consent Given" | "Consent Denied",
+): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("Airtable credentials missing; skipping consent sync");
+    return;
+  }
+
+  const normalized = normalizePhone(phone);
+  if (!normalized) return;
+
+  // Match against any of the three phone columns; compare digits-only.
+  const phoneFormula =
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `)`;
+
+  const customerRes = await airtableFetch(
+    `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
+    { method: "GET" },
+    pat,
+  );
+  const customerRec = customerRes?.records?.[0];
+  if (!customerRec) {
+    console.warn(`Airtable: no Customer found for phone ${normalized}`);
+    return;
+  }
+  const customerId = customerRec.fields?.["Customer_ID"];
+  if (customerId == null) {
+    console.warn("Airtable: Customer row missing Customer_ID");
+    return;
+  }
+
+  // Find existing Consents row.
+  const consentFormula = `{Customer} = ${customerId}`;
+  const consentRes = await airtableFetch(
+    `${baseId}/Consents?filterByFormula=${encodeURIComponent(consentFormula)}&maxRecords=1`,
+    { method: "GET" },
+    pat,
+  );
+  const existing = consentRes?.records?.[0];
+  const fields = { Consent_Status: aiCategory };
+
+  if (existing) {
+    await airtableFetch(
+      `${baseId}/Consents/${existing.id}`,
+      { method: "PATCH", body: JSON.stringify({ fields }) },
+      pat,
+    );
+    console.log(`Airtable consent updated for Customer_ID ${customerId}: ${aiCategory}`);
+  } else {
+    await airtableFetch(
+      `${baseId}/Consents`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          fields: { ...fields, Customer: customerId },
+        }),
+      },
+      pat,
+    );
+    console.log(`Airtable consent created for Customer_ID ${customerId}: ${aiCategory}`);
+  }
+}
+
     return null;
   } catch (err) {
     console.error("extractCallbackDate exception:", err);
