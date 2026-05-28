@@ -512,22 +512,38 @@ const DhipayaCallList = () => {
                               )}
                               {(r.status === "success" ||
                                 r.status === "failed" ||
-                                r.status === "no_answer") &&
-                                (r.conversationLog || r.audioUrl) && (
+                                r.status === "no_answer") && (
+                                <div className="flex items-center justify-end gap-1">
+                                  {(r.conversationLog || r.audioUrl) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setTranscript({
+                                          conversationLog: r.conversationLog ?? null,
+                                          audioUrl: r.audioUrl ?? null,
+                                        })
+                                      }
+                                    >
+                                      <FileText className="w-4 h-4 mr-1" />
+                                      Transcript
+                                    </Button>
+                                  )}
                                   <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={() =>
-                                      setTranscript({
-                                        conversationLog: r.conversationLog ?? null,
-                                        audioUrl: r.audioUrl ?? null,
-                                      })
-                                    }
+                                    onClick={() => {
+                                      requeueRow(r.id);
+                                      toast.success("Moved back to Pending");
+                                      setActiveTab("pending");
+                                    }}
+                                    title="Re-queue this call"
                                   >
-                                    <FileText className="w-4 h-4 mr-1" />
-                                    Transcript
+                                    <RotateCcw className="w-4 h-4 mr-1" />
+                                    Re-queue
                                   </Button>
-                                )}
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
