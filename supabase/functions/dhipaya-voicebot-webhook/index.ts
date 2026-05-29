@@ -183,10 +183,12 @@ serve(async (req) => {
     console.log("AI Classification:", aiResult);
 
     // --- Airtable consent sync (Dhipaya) ---
-    // Only when the AI determined a definitive consent outcome and we have a phone number.
-    const consentOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
-    if (phoneNumber && consentOutcomeOk && (aiCategory === "Consent Given" || aiCategory === "Consent Denied")) {
-      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory}`);
+    // Sync whenever the AI captured a definitive consent outcome, regardless of
+    // the technical call outcome (the consent conversation can complete even
+    // when the underlying call status maps to "Failed"/"Hangup" etc.).
+    const consentCaptured = aiCategory === "Consent Given" || aiCategory === "Consent Denied";
+    if (phoneNumber && consentCaptured) {
+      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory} (callOutcome=${callOutcome})`);
       const syncPromise = syncConsentToAirtable(phoneNumber, aiCategory)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
@@ -200,6 +202,7 @@ serve(async (req) => {
     } else {
       console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
+
 
     // --- Airtable notice_received sync (Dhipaya) ---
     const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
