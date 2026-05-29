@@ -1193,20 +1193,83 @@ async function syncCallLogToAirtable(
     resultData?.variables?.bot_type ||
     resultData?.variables?.next_intent ||
     resultData?.variables?.intent;
-  const normalizedBotType = String(rawBotType ?? "")
-    .toLowerCase()
-    .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
-    .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
-    .trim();
-  console.log("Campaign detection:", { rawBotType, normalizedBotType });
-  const campaignHeader =
-    normalizedBotType === "consent" || normalizedBotType === "campaign1"
+  const normalizeBot = (v: unknown) =>
+    String(v ?? "")
+      .toLowerCase()
+      .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
+      .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
+      .trim();
+  let normalizedBotType = normalizeBot(rawBotType);
+  console.log("Campaign detection (primary):", { rawBotType, normalizedBotType });
+
+  const toCampaignHeader = (b: string) =>
+    b === "consent" || b === "campaign1"
       ? "Campaign 1"
-      : normalizedBotType === "campaign2"
+      : b === "campaign2"
         ? "Campaign 2"
-        : normalizedBotType === "campaign3"
+        : b === "campaign3"
           ? "Campaign 3"
-          : "Campaign Unknown";
+          : "";
+
+  let campaignHeader = toCampaignHeader(normalizedBotType);
+
+  // Fallback 1: use Campaign field from already-fetched Customer record
+  if (!campaignHeader) {
+    const custCampaign = customerRec?.fields?.Campaign;
+    const custCampaignNorm = normalizeBot(custCampaign);
+    if (custCampaignNorm) {
+      const fromCustomer = toCampaignHeader(custCampaignNorm);
+      const direct =
+        typeof custCampaign === "string" && /^campaign\s*[123]$/i.test(custCampaign.trim())
+          ? `Campaign ${custCampaign.trim().match(/[123]/)?.[0]}`
+          : "";
+      campaignHeader = fromCustomer || direct;
+      if (campaignHeader) {
+        normalizedBotType = custCampaignNorm;
+        console.log("Campaign detection (customer fallback):", { custCampaign, campaignHeader });
+      }
+    }
+  }
+
+  // Fallback 2: look up active campaign for this caller in Airtable "Call List"
+  if (!campaignHeader && phone) {
+    const normalized = normalizePhone(phone);
+    if (normalized) {
+      try {
+        const callListFormula =
+          `OR(` +
+          `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+          `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+          `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}',` +
+          `REGEX_REPLACE({Caller_Number}&"",'[^0-9]','')='${normalized}'` +
+          `)`;
+        const callListRes = await airtableFetch(
+          `${baseId}/${encodeURIComponent("Call List")}?filterByFormula=${encodeURIComponent(callListFormula)}&maxRecords=1`,
+          { method: "GET" },
+          pat,
+        );
+        const clCampaign = callListRes?.records?.[0]?.fields?.Campaign;
+        const clNorm = normalizeBot(clCampaign);
+        if (clNorm) {
+          campaignHeader =
+            toCampaignHeader(clNorm) ||
+            (typeof clCampaign === "string" && /^campaign\s*[123]$/i.test(clCampaign.trim())
+              ? `Campaign ${clCampaign.trim().match(/[123]/)?.[0]}`
+              : "");
+          if (campaignHeader) {
+            normalizedBotType = clNorm;
+            console.log("Campaign detection (Call List fallback):", { clCampaign, campaignHeader });
+          }
+        }
+      } catch (e) {
+        console.warn("Airtable call log: Call List campaign lookup failed", e);
+      }
+    }
+  }
+
+  if (!campaignHeader) campaignHeader = "Campaign Unknown";
+  console.log("Campaign detection (final):", { normalizedBotType, campaignHeader });
+
 
 
   // Build fields
