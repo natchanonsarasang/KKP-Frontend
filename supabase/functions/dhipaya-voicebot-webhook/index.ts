@@ -266,9 +266,12 @@ serve(async (req) => {
       } else {
         await callLogPromise;
       }
-    } else {
+    } else if (!callId) {
       console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
+    } else {
+      console.log("Airtable call log sync skipped: CheckCall != 'Y'");
     }
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
