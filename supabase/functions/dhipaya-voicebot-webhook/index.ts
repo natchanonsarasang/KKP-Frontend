@@ -1205,9 +1205,6 @@ async function syncCallLogToAirtable(
           ? "Campaign 3"
           : "Campaign Unknown";
 
-        : botType === "campaign3"
-          ? "Campaign 3"
-          : "Campaign Unknown";
 
   // Build fields
   const fields: Record<string, unknown> = {
