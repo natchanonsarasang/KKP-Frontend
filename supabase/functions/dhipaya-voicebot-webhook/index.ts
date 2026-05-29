@@ -592,7 +592,10 @@ type ClassifyResult = {
   status_name: string;
   category: string;
   reason: string;
+  consentDecision: "Given" | "Denied" | null;
+  noticeReceived: "Yes" | "No" | null;
 };
+
 
 // System-level statuses from the telephony layer all collapse to "Not Reached"
 // in the new taxonomy (the customer could not actually be contacted).
