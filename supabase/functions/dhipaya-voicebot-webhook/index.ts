@@ -1172,7 +1172,11 @@ async function syncCallLogToAirtable(
       existing = callLogRes?.records?.[0] ?? null;
     } catch (e) {
       console.warn("Airtable call log: lookup failed", e);
+    }
+  }
+
   // Determine campaign header from payload.variables or result_data.
+
   // Intents can come back with language suffixes like "campaign2[ENG]" or
   // "consent_EN" / "consent_ISAN" — strip those before matching.
   const rawBotType: unknown =
