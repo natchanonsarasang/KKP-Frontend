@@ -183,13 +183,19 @@ serve(async (req) => {
     console.log("AI Classification:", aiResult);
 
     // --- Airtable consent sync (Dhipaya) ---
-    // Sync whenever the AI captured a definitive consent outcome, regardless of
-    // the technical call outcome (the consent conversation can complete even
-    // when the underlying call status maps to "Failed"/"Hangup" etc.).
-    const consentCaptured = aiCategory === "Consent Given" || aiCategory === "Consent Denied";
-    if (phoneNumber && consentCaptured) {
-      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory} (callOutcome=${callOutcome})`);
-      const syncPromise = syncConsentToAirtable(phoneNumber, aiCategory)
+    // Sync whenever the customer was reached (pickedUp) AND the AI independently
+    // captured a definitive consent decision. Telephony callOutcome is NOT used
+    // to gate this — the consent conversation can complete even when the call
+    // technically ends as "Failed"/"Hangup".
+    const consentValue: "Consent Given" | "Consent Denied" | null =
+      aiResult.consentDecision === "Given"
+        ? "Consent Given"
+        : aiResult.consentDecision === "Denied"
+          ? "Consent Denied"
+          : null;
+    if (phoneNumber && pickedUp && consentValue) {
+      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
+      const syncPromise = syncConsentToAirtable(phoneNumber, consentValue)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
@@ -200,14 +206,15 @@ serve(async (req) => {
         await syncPromise;
       }
     } else {
-      console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
+      console.log("Airtable consent sync skipped:", { phoneNumber, pickedUp, consentDecision: aiResult.consentDecision });
     }
 
 
     // --- Airtable notice_received sync (Dhipaya) ---
-    const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
-    const noticeValue = aiCategory === "Notice Received" ? "Yes" : aiCategory === "Notice Not Received" ? "No" : null;
-    if (phoneNumber && noticeOutcomeOk && noticeValue) {
+    // Independent of callOutcome — sync whenever the call was picked up and the
+    // AI captured a notice_received signal from the transcript.
+    const noticeValue = aiResult.noticeReceived;
+    if (phoneNumber && pickedUp && noticeValue) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
       const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
         .then(() => console.log("Airtable notice sync finished"))
@@ -220,8 +227,10 @@ serve(async (req) => {
         await noticePromise;
       }
     } else {
-      console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
+      console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
+
+
 
     // --- Airtable Call Logs sync (Dhipaya) ---
     if (callId) {
