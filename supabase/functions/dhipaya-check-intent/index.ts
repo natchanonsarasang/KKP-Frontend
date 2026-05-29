@@ -209,7 +209,6 @@ Deno.serve(async (req) => {
     const firstName = firstString(f["First_Name"]);
     const lastName = firstString(f["Last_Name"]);
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
-    const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
 
     // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
     let expiryDateRaw = "";
