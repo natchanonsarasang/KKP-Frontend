@@ -181,6 +181,23 @@ serve(async (req) => {
     const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
+    // --- STRICT CheckCall='Y' gate (Dhipaya) ---
+    // Before performing ANY Airtable write-back (consent, notice, call log),
+    // fetch the debtor's row and verify CheckCall === 'Y'. Abort otherwise.
+    let checkCallAllowed = false;
+    if (phoneNumber) {
+      try {
+        checkCallAllowed = await isCheckCallAllowed(phoneNumber);
+      } catch (e) {
+        console.error("CheckCall lookup failed:", e);
+        checkCallAllowed = false;
+      }
+    }
+    if (!checkCallAllowed) {
+      console.log(
+        `[SKIPPED] CheckCall != 'Y' for phone ${phoneNumber ?? "unknown"} — aborting Airtable consent/notice/call-log sync.`,
+      );
+    }
 
     // --- Airtable consent sync (Dhipaya) ---
     // Sync whenever the customer was reached (pickedUp) AND the AI independently
