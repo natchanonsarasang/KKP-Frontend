@@ -17,7 +17,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    const payload = await req.json();
+    const payload = await req.json().catch(() => ({}));
     console.log("Webhook received:", JSON.stringify(payload, null, 2));
 
     // CRITICAL FIX: Ignore the initiation "Success" message if it's sent to the webhook
