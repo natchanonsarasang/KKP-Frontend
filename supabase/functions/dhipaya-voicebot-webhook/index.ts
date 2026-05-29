@@ -183,13 +183,19 @@ serve(async (req) => {
     console.log("AI Classification:", aiResult);
 
     // --- Airtable consent sync (Dhipaya) ---
-    // Sync whenever the AI captured a definitive consent outcome, regardless of
-    // the technical call outcome (the consent conversation can complete even
-    // when the underlying call status maps to "Failed"/"Hangup" etc.).
-    const consentCaptured = aiCategory === "Consent Given" || aiCategory === "Consent Denied";
-    if (phoneNumber && consentCaptured) {
-      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory} (callOutcome=${callOutcome})`);
-      const syncPromise = syncConsentToAirtable(phoneNumber, aiCategory)
+    // Sync whenever the customer was reached (pickedUp) AND the AI independently
+    // captured a definitive consent decision. Telephony callOutcome is NOT used
+    // to gate this — the consent conversation can complete even when the call
+    // technically ends as "Failed"/"Hangup".
+    const consentValue: "Consent Given" | "Consent Denied" | null =
+      aiResult.consentDecision === "Given"
+        ? "Consent Given"
+        : aiResult.consentDecision === "Denied"
+          ? "Consent Denied"
+          : null;
+    if (phoneNumber && pickedUp && consentValue) {
+      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
+      const syncPromise = syncConsentToAirtable(phoneNumber, consentValue)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
@@ -200,14 +206,15 @@ serve(async (req) => {
         await syncPromise;
       }
     } else {
-      console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
+      console.log("Airtable consent sync skipped:", { phoneNumber, pickedUp, consentDecision: aiResult.consentDecision });
     }
 
 
     // --- Airtable notice_received sync (Dhipaya) ---
-    const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
-    const noticeValue = aiCategory === "Notice Received" ? "Yes" : aiCategory === "Notice Not Received" ? "No" : null;
-    if (phoneNumber && noticeOutcomeOk && noticeValue) {
+    // Independent of callOutcome — sync whenever the call was picked up and the
+    // AI captured a notice_received signal from the transcript.
+    const noticeValue = aiResult.noticeReceived;
+    if (phoneNumber && pickedUp && noticeValue) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
       const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
         .then(() => console.log("Airtable notice sync finished"))
@@ -220,8 +227,10 @@ serve(async (req) => {
         await noticePromise;
       }
     } else {
-      console.log("Airtable notice sync skipped:", { phoneNumber, aiCategory, callOutcome });
+      console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
+
+
 
     // --- Airtable Call Logs sync (Dhipaya) ---
     if (callId) {
@@ -592,7 +601,10 @@ type ClassifyResult = {
   status_name: string;
   category: string;
   reason: string;
+  consentDecision: "Given" | "Denied" | null;
+  noticeReceived: "Yes" | "No" | null;
 };
+
 
 // System-level statuses from the telephony layer all collapse to "Not Reached"
 // in the new taxonomy (the customer could not actually be contacted).
@@ -649,10 +661,22 @@ function detectAudioQualityIssue(log: string): boolean {
   return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
 }
 
-function makeResult(name: string, reason: string): ClassifyResult {
+function makeResult(
+  name: string,
+  reason: string,
+  extras?: { consentDecision?: "Given" | "Denied" | null; noticeReceived?: "Yes" | "No" | null },
+): ClassifyResult {
   const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
-  return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
+  return {
+    status_id: cat.id,
+    status_name: cat.name,
+    category: cat.name,
+    reason,
+    consentDecision: extras?.consentDecision ?? null,
+    noticeReceived: extras?.noticeReceived ?? null,
+  };
 }
+
 
 async function classifyCall(
   payload: Record<string, unknown>,
@@ -774,12 +798,31 @@ actually reached and answered. If the line drops before that point use:
 "Wrong Person", "Background Noise", and "Silence" are only chosen when no main
 outcome above applies.
 
+Additionally, INDEPENDENTLY extract two secondary signals from the transcript:
+
+- "consent_decision": Did the customer give or refuse PDPA consent?
+  - "Given" if the customer clearly agreed to data processing / marketing consent
+  - "Denied" if the customer clearly refused
+  - null if the consent question was not answered
+
+- "notice_received": Did the customer confirm whether they received the renewal/notice document?
+  - "Yes" if the customer said they received the notice/document
+  - "No" if the customer said they have NOT received the notice/document
+  - null if the notice question was not answered
+
+These two fields are INDEPENDENT — a single call may capture BOTH (e.g. the
+customer confirms they received the notice AND gives consent). Extract each
+signal on its own merits regardless of the chosen status_name.
+
 Output format (STRICT JSON, no markdown, no commentary):
 {
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
-  "reason": "<short explanation focused on the PDPA consent or notice outcome>"
+  "reason": "<short explanation focused on the PDPA consent or notice outcome>",
+  "consent_decision": "Given" | "Denied" | null,
+  "notice_received": "Yes" | "No" | null
 }`;
+
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -820,14 +863,31 @@ Output format (STRICT JSON, no markdown, no commentary):
               : normalized;
     const match = CONVERSATION_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
 
+    // Independent extraction of consent_decision and notice_received signals.
+    const rawConsent = String(parsed?.consent_decision ?? "").trim().toLowerCase();
+    const consentDecision: "Given" | "Denied" | null =
+      rawConsent === "given" ? "Given" : rawConsent === "denied" ? "Denied" : null;
+
+    const rawNotice = String(parsed?.notice_received ?? "").trim().toLowerCase();
+    const noticeReceived: "Yes" | "No" | null =
+      rawNotice === "yes" ? "Yes" : rawNotice === "no" ? "No" : null;
+
+    console.log("AI independent signals:", { consentDecision, noticeReceived });
+
     if (match) {
       return {
         status_id: match.id,
         status_name: match.name,
         category: match.name,
         reason: parsed?.reason || "AI classification",
+        consentDecision,
+        noticeReceived,
       };
     }
+
+    console.warn("Unmatched AI category, defaulting to Completed:", aiName);
+    return makeResult("Completed", `Unmatched AI category: ${aiName}`, { consentDecision, noticeReceived });
+
 
     console.warn("Unmatched AI category, defaulting to Completed:", aiName);
     return makeResult("Completed", `Unmatched AI category: ${aiName}`);
