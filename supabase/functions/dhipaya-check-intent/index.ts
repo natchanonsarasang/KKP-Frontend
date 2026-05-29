@@ -264,7 +264,8 @@ Deno.serve(async (req) => {
       }
     }
     console.log("dhipaya-check-intent Plan_Code:", planCode, "Condition_TH:", condition);
-
+    console.log("Detected Policy_Status:", firstString(policyStatus));
+    console.log("dhipaya-check-intent Consent_Status:", firstString(consentStatus), "Policy_Status:", firstString(policyStatus));
     console.log("dhipaya-check-intent Consent_Status:", firstString(consentStatus), "Policy_Status:", firstString(policyStatus));
     const { intent, suffix } = routeIntent(policyStatus, consentStatus);
     console.log("dhipaya-check-intent suffix:", suffix || "(none)", "selected intent:", intent);
