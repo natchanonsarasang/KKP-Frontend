@@ -1008,20 +1008,50 @@ function normalizePhone(p: string): string {
 }
 
 async function airtableFetch(path: string, init: RequestInit, pat: string): Promise<any> {
-  const res = await fetch(`${AIRTABLE_API_BASE}/${path}`, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      Authorization: `Bearer ${pat}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Airtable ${res.status}: ${text.slice(0, 300)}`);
+  const maxAttempts = 5;
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${AIRTABLE_API_BASE}/${path}`, {
+        ...init,
+        headers: {
+          ...(init.headers || {}),
+          Authorization: `Bearer ${pat}`,
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (e) {
+      lastErr = e;
+      const delay = Math.floor(200 + Math.random() * 800) * attempt;
+      console.log(`Airtable network error. Retrying attempt #${attempt + 1} after ${delay}ms...`, e);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+    const text = await res.text();
+    if (res.status === 429 || /Too Many Requests/i.test(text)) {
+      const delay = Math.floor(200 + Math.random() * 800) * attempt;
+      console.log(`Airtable update hit Rate Limit (429). Retrying attempt #${attempt} after ${delay}ms... path=${path}`);
+      lastErr = new Error(`Airtable 429: ${text.slice(0, 200)}`);
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      console.error(`CRITICAL: Airtable rate-limit retries exhausted for ${path}`);
+      throw lastErr;
+    }
+    if (!res.ok) {
+      throw new Error(`Airtable ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const parsed = text ? JSON.parse(text) : {};
+    if (init.method && init.method !== "GET" && parsed?.id) {
+      console.log("Airtable update successful for record:", parsed.id);
+    }
+    return parsed;
   }
-  return text ? JSON.parse(text) : {};
+  throw lastErr ?? new Error("Airtable fetch failed");
 }
+
 
 async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" | "Consent Denied"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
