@@ -181,6 +181,23 @@ serve(async (req) => {
     const aiResult = await classifyCall(payload, conversationLog || "", LOVABLE_API_KEY);
     aiCategory = aiResult.category;
     console.log("AI Classification:", aiResult);
+    // --- STRICT CheckCall='Y' gate (Dhipaya) ---
+    // Before performing ANY Airtable write-back (consent, notice, call log),
+    // fetch the debtor's row and verify CheckCall === 'Y'. Abort otherwise.
+    let checkCallAllowed = false;
+    if (phoneNumber) {
+      try {
+        checkCallAllowed = await isCheckCallAllowed(phoneNumber);
+      } catch (e) {
+        console.error("CheckCall lookup failed:", e);
+        checkCallAllowed = false;
+      }
+    }
+    if (!checkCallAllowed) {
+      console.log(
+        `[SKIPPED] CheckCall != 'Y' for phone ${phoneNumber ?? "unknown"} — aborting Airtable consent/notice/call-log sync.`,
+      );
+    }
 
     // --- Airtable consent sync (Dhipaya) ---
     // Sync whenever the customer was reached (pickedUp) AND the AI independently
@@ -193,7 +210,7 @@ serve(async (req) => {
         : aiResult.consentDecision === "Denied"
           ? "Consent Denied"
           : null;
-    if (phoneNumber && pickedUp && consentValue) {
+    if (phoneNumber && pickedUp && consentValue && checkCallAllowed) {
       console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
       const syncPromise = syncConsentToAirtable(phoneNumber, consentValue)
         .then(() => console.log("Airtable consent sync finished"))
@@ -214,7 +231,7 @@ serve(async (req) => {
     // Independent of callOutcome — sync whenever the call was picked up and the
     // AI captured a notice_received signal from the transcript.
     const noticeValue = aiResult.noticeReceived;
-    if (phoneNumber && pickedUp && noticeValue) {
+    if (phoneNumber && pickedUp && noticeValue && checkCallAllowed) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
       const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
         .then(() => console.log("Airtable notice sync finished"))
@@ -233,7 +250,7 @@ serve(async (req) => {
 
 
     // --- Airtable Call Logs sync (Dhipaya) ---
-    if (callId) {
+    if (callId && checkCallAllowed) {
       const callLogPromise = syncCallLogToAirtable(
         payload,
         conversationLog || "",
@@ -249,9 +266,12 @@ serve(async (req) => {
       } else {
         await callLogPromise;
       }
-    } else {
+    } else if (!callId) {
       console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
+    } else {
+      console.log("Airtable call log sync skipped: CheckCall != 'Y'");
     }
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -1052,6 +1072,47 @@ async function airtableFetch(path: string, init: RequestInit, pat: string): Prom
   throw lastErr ?? new Error("Airtable fetch failed");
 }
 
+
+async function isCheckCallAllowed(phone: string): Promise<boolean> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("CheckCall gate: Airtable credentials missing — denying write-back.");
+    return false;
+  }
+  const normalized = normalizePhone(phone);
+  if (!normalized) return false;
+
+  const phoneFormula =
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `)`;
+
+  try {
+    const res = await airtableFetch(
+      `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1&fields%5B%5D=CheckCall&fields%5B%5D=Customer_ID`,
+      { method: "GET" },
+      pat,
+    );
+    const rec = res?.records?.[0];
+    if (!rec) {
+      console.warn(`CheckCall gate: no Customer found for phone ${normalized} — denying.`);
+      return false;
+    }
+    const raw = rec.fields?.["CheckCall"];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const ok = String(value ?? "").trim().toUpperCase() === "Y";
+    console.log(
+      `CheckCall gate: phone=${normalized} Customer_ID=${rec.fields?.["Customer_ID"]} CheckCall=${JSON.stringify(value)} allowed=${ok}`,
+    );
+    return ok;
+  } catch (e) {
+    console.error("CheckCall gate: Airtable lookup failed —", e);
+    return false;
+  }
+}
 
 async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" | "Consent Denied"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
