@@ -1095,11 +1095,10 @@ async function syncCallLogToAirtable(
     return;
   }
 
+  // Call_Log_ID is volatile (changes every call) — kept only for traceability,
+  // never used for lookup. Lookup is by Customer link only.
   const callLogId = payload?.outbound_id || payload?.call_id;
-  if (!callLogId) {
-    console.warn("Airtable call log sync: missing Call_Log_ID");
-    return;
-  }
+
 
   // Step A: load result_data from call_records (single lookup; reused for customer + campaign)
   let resultData: any = null;
