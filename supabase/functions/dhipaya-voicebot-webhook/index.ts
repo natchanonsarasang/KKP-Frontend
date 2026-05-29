@@ -1073,6 +1073,47 @@ async function airtableFetch(path: string, init: RequestInit, pat: string): Prom
 }
 
 
+async function isCheckCallAllowed(phone: string): Promise<boolean> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("CheckCall gate: Airtable credentials missing — denying write-back.");
+    return false;
+  }
+  const normalized = normalizePhone(phone);
+  if (!normalized) return false;
+
+  const phoneFormula =
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `)`;
+
+  try {
+    const res = await airtableFetch(
+      `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1&fields%5B%5D=CheckCall&fields%5B%5D=Customer_ID`,
+      { method: "GET" },
+      pat,
+    );
+    const rec = res?.records?.[0];
+    if (!rec) {
+      console.warn(`CheckCall gate: no Customer found for phone ${normalized} — denying.`);
+      return false;
+    }
+    const raw = rec.fields?.["CheckCall"];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const ok = String(value ?? "").trim().toUpperCase() === "Y";
+    console.log(
+      `CheckCall gate: phone=${normalized} Customer_ID=${rec.fields?.["Customer_ID"]} CheckCall=${JSON.stringify(value)} allowed=${ok}`,
+    );
+    return ok;
+  } catch (e) {
+    console.error("CheckCall gate: Airtable lookup failed —", e);
+    return false;
+  }
+}
+
 async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" | "Consent Denied"): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
