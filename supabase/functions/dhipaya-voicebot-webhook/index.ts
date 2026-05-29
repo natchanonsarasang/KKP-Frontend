@@ -6,15 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// --- Sequential Mutex Queue ---------------------------------------------
-// Concurrent webhook fires (e.g. 5 calls hanging up at once) previously caused
-// Airtable 429 storms and DB race conditions. We serialize all webhook work
-// behind an in-memory FIFO queue: at most ONE payload is processed at a time.
-let __webhookChain: Promise<unknown> = Promise.resolve();
-function enqueueWebhook<T>(task: () => Promise<T>): Promise<T> {
-  const run = __webhookChain.then(task, task);
-  __webhookChain = run.catch(() => undefined);
-  return run;
+// --- Concurrency strategy ------------------------------------------------
+// Webhooks process fully in parallel (no mutex queue) to avoid hitting the
+// Edge Function global timeout. To respect Airtable's 5 req/sec limit when
+// many calls hang up simultaneously, we inject an initial jittered delay
+// (0-1500ms) before the first Airtable read. Writes keep the 429-aware
+// exponential backoff in airtableFetch.
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function initialAirtableJitter() {
+  const delay = Math.floor(Math.random() * 1500);
+  console.log(`[JITTER] Spacing Airtable lookup by ${delay}ms`);
+  await sleep(delay);
 }
 
 // Shared formula: strict (phone match) AND CheckCall='Y'
@@ -35,10 +37,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-  return await enqueueWebhook(() => handleWebhook(req));
+  return await handleWebhook(req);
 });
 
 async function handleWebhook(req: Request): Promise<Response> {
+
+  try {
+    // Spread parallel webhook fires across ~1.5s before first Airtable read
+    await initialAirtableJitter();
+
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
