@@ -41,7 +41,6 @@ serve(async (req) => {
 });
 
 async function handleWebhook(req: Request): Promise<Response> {
-
   try {
     // Spread parallel webhook fires across ~1.5s before first Airtable read
     await initialAirtableJitter();
@@ -257,9 +256,12 @@ async function handleWebhook(req: Request): Promise<Response> {
         await syncPromise;
       }
     } else {
-      console.log("Airtable consent sync skipped:", { phoneNumber, pickedUp, consentDecision: aiResult.consentDecision });
+      console.log("Airtable consent sync skipped:", {
+        phoneNumber,
+        pickedUp,
+        consentDecision: aiResult.consentDecision,
+      });
     }
-
 
     // --- Airtable notice_received sync (Dhipaya) ---
     // Independent of callOutcome — sync whenever the call was picked up and the
@@ -280,8 +282,6 @@ async function handleWebhook(req: Request): Promise<Response> {
     } else {
       console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
-
-
 
     // --- Airtable Call Logs sync (Dhipaya) ---
     if (callId && checkCallAllowed) {
@@ -305,7 +305,6 @@ async function handleWebhook(req: Request): Promise<Response> {
     } else {
       console.log("Airtable call log sync skipped: CheckCall != 'Y'");
     }
-
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -659,7 +658,6 @@ type ClassifyResult = {
   noticeReceived: "Yes" | "No" | null;
 };
 
-
 // System-level statuses from the telephony layer all collapse to "Not Reached"
 // in the new taxonomy (the customer could not actually be contacted).
 const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
@@ -730,7 +728,6 @@ function makeResult(
     noticeReceived: extras?.noticeReceived ?? null,
   };
 }
-
 
 async function classifyCall(
   payload: Record<string, unknown>,
@@ -877,7 +874,6 @@ Output format (STRICT JSON, no markdown, no commentary):
   "notice_received": "Yes" | "No" | null
 }`;
 
-
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -918,13 +914,16 @@ Output format (STRICT JSON, no markdown, no commentary):
     const match = CONVERSATION_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
 
     // Independent extraction of consent_decision and notice_received signals.
-    const rawConsent = String(parsed?.consent_decision ?? "").trim().toLowerCase();
+    const rawConsent = String(parsed?.consent_decision ?? "")
+      .trim()
+      .toLowerCase();
     const consentDecision: "Given" | "Denied" | null =
       rawConsent === "given" ? "Given" : rawConsent === "denied" ? "Denied" : null;
 
-    const rawNotice = String(parsed?.notice_received ?? "").trim().toLowerCase();
-    const noticeReceived: "Yes" | "No" | null =
-      rawNotice === "yes" ? "Yes" : rawNotice === "no" ? "No" : null;
+    const rawNotice = String(parsed?.notice_received ?? "")
+      .trim()
+      .toLowerCase();
+    const noticeReceived: "Yes" | "No" | null = rawNotice === "yes" ? "Yes" : rawNotice === "no" ? "No" : null;
 
     console.log("AI independent signals:", { consentDecision, noticeReceived });
 
@@ -941,7 +940,6 @@ Output format (STRICT JSON, no markdown, no commentary):
 
     console.warn("Unmatched AI category, defaulting to Completed:", aiName);
     return makeResult("Completed", `Unmatched AI category: ${aiName}`, { consentDecision, noticeReceived });
-
 
     console.warn("Unmatched AI category, defaulting to Completed:", aiName);
     return makeResult("Completed", `Unmatched AI category: ${aiName}`);
@@ -1085,7 +1083,9 @@ async function airtableFetch(path: string, init: RequestInit, pat: string): Prom
     const text = await res.text();
     if (res.status === 429 || /Too Many Requests/i.test(text)) {
       const delay = Math.floor(200 + Math.random() * 800) * attempt;
-      console.log(`Airtable update hit Rate Limit (429). Retrying attempt #${attempt} after ${delay}ms... path=${path}`);
+      console.log(
+        `Airtable update hit Rate Limit (429). Retrying attempt #${attempt} after ${delay}ms... path=${path}`,
+      );
       lastErr = new Error(`Airtable 429: ${text.slice(0, 200)}`);
       if (attempt < maxAttempts) {
         await new Promise((r) => setTimeout(r, delay));
@@ -1105,7 +1105,6 @@ async function airtableFetch(path: string, init: RequestInit, pat: string): Prom
   }
   throw lastErr ?? new Error("Airtable fetch failed");
 }
-
 
 async function isCheckCallAllowed(phone: string): Promise<boolean> {
   const pat = Deno.env.get("AIRTABLE_PAT");
@@ -1132,7 +1131,10 @@ async function isCheckCallAllowed(phone: string): Promise<boolean> {
     }
     const raw = rec.fields?.["CheckCall"];
     const value = Array.isArray(raw) ? raw[0] : raw;
-    const ok = String(value ?? "").trim().toUpperCase() === "Y";
+    const ok =
+      String(value ?? "")
+        .trim()
+        .toUpperCase() === "Y";
     console.log(
       `CheckCall gate: phone=${normalized} Customer_ID=${rec.fields?.["Customer_ID"]} CheckCall=${JSON.stringify(value)} allowed=${ok}`,
     );
@@ -1271,7 +1273,6 @@ async function syncCallLogToAirtable(
   // never used for lookup. Lookup is by Customer link only.
   const callLogId = payload?.outbound_id || payload?.call_id;
 
-
   // Step A: load result_data from call_records (single lookup; reused for customer + campaign)
   let resultData: any = null;
   try {
@@ -1371,27 +1372,48 @@ async function syncCallLogToAirtable(
 
   // Campaign header is driven strictly by normalizedBotType (the script used).
   let campaignHeader: string;
+
+  // 1. ถ้ามีข้อมูล Bot Type ระบุมาชัดเจน (ยิงผ่านระบบ) ให้ยึดตามนั้น
   if (normalizedBotType === "campaign2") {
     campaignHeader = "Campaign 2";
   } else if (normalizedBotType === "campaign3") {
     campaignHeader = "Campaign 3";
-  } else if (normalizedBotType.includes("consent")) {
-    // covers 'consent' and any consent-related variants
-    campaignHeader = "Campaign 1";
-  } else if (normalizedBotType === "เคยได้รับconsentแล้ว") {
-    campaignHeader = "Campaign 1";
-  } else {
+  } else if (normalizedBotType.includes("consent") || normalizedBotType === "เคยได้รับconsentแล้ว") {
     campaignHeader = "Campaign 1";
   }
-  console.log("Campaign detection (bot intent):", {
-    normalizedBotType,
-    campaignHeader,
-  });
+  // 2. ถ้าเป็น Manual Call (ยิงตรง) ให้คำนวณจากสถานะจริงใน Airtable
+  else if (customerRec) {
+    const cStatusRaw = customerRec.fields?.["Consent_Status (from Consents)"];
+    const pStatusRaw = customerRec.fields?.["Policy_Status (from Policy)"];
 
+    const consentStatus = (Array.isArray(cStatusRaw) ? cStatusRaw[0] : cStatusRaw || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const policyStatus = (Array.isArray(pStatusRaw) ? pStatusRaw[0] : pStatusRaw || "").toString().trim().toLowerCase();
 
+    if (consentStatus === "" || consentStatus === "blank") {
+      campaignHeader = "Campaign 1";
+    } else if (policyStatus === "overdue") {
+      campaignHeader = "Campaign 2";
+    } else if (policyStatus === "prospect" && consentStatus === "consent given") {
+      campaignHeader = "Campaign 3";
+    } else {
+      campaignHeader = "Campaign 1";
+    }
 
+    console.log("Campaign Calculated from Airtable Status (Manual Call):", {
+      consentStatus,
+      policyStatus,
+      result: campaignHeader,
+    });
+  }
+  // 3. กรณีหาข้อมูลลูกค้าไม่เจอ ให้เป็น Campaign 1 ไว้ก่อน (Safe Default)
+  else {
+    campaignHeader = "Campaign 1";
+  }
 
-
+  console.log("Final Campaign determined:", campaignHeader);
 
   // Build fields
   const fields: Record<string, unknown> = {
