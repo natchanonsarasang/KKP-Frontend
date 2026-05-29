@@ -638,7 +638,7 @@ async function handleWebhook(req: Request): Promise<Response> {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
 
 // Strict call classifier — aligned with src/lib/callStatuses.ts (15-status taxonomy)
 // STEP 1: Check json_log status first → Not Reached (no_answer/busy/voicemail/rejected/unreachable)
