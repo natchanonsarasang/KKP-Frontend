@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     }
 
     const formula =
-      `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}'`;
+      `AND(REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',{CheckCall}='Y')`;
     const fields = [
       "Phone_Number1",
       "First_Name",
@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
       "Policy_Status (from Policy)",
       "Consent_Status (from Consents)",
       "Renewal_Premium (from Policy)",
+      "CheckCall",
     ];
     const url =
       `https://api.airtable.com/v0/${baseId}/Customer` +
