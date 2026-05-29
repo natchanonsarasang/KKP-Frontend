@@ -33,7 +33,30 @@ serve(async (req) => {
     const callId = payload.outbound_id || payload.call_id;
     const status = payload.status; // e.g. "completed"
     const action = payload.action; // e.g. "Confirm", "Decline", ""
-    const conversationLog = payload.conversation_log || null;
+    // Normalize conversation_log defensively — webhook may send a string,
+    // an array of turn objects ({sayingName, content, ...}), or undefined.
+    const rawConversationLog = payload.conversation_log;
+    console.log("Received conversationLog type:", typeof rawConversationLog);
+    console.log("Received conversationLog value:", rawConversationLog);
+    let conversationLog: string | null = null;
+    if (typeof rawConversationLog === "string") {
+      conversationLog = rawConversationLog;
+    } else if (Array.isArray(rawConversationLog)) {
+      conversationLog = rawConversationLog
+        .map((turn: any) => {
+          if (typeof turn === "string") return turn;
+          const speaker = turn?.sayingName || turn?.speaker || turn?.role || "";
+          const content = turn?.content ?? turn?.text ?? turn?.message ?? "";
+          return speaker ? `${speaker}: ${content}` : String(content);
+        })
+        .join("\n");
+    } else if (rawConversationLog != null) {
+      try {
+        conversationLog = String(rawConversationLog);
+      } catch {
+        conversationLog = null;
+      }
+    }
     const audioUrl = payload.audio_url || null;
     const callDuration = payload.duration || payload.call_duration || null;
     const appointmentDate = payload.appointment_date || null;
