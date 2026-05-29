@@ -210,7 +210,7 @@ serve(async (req) => {
         : aiResult.consentDecision === "Denied"
           ? "Consent Denied"
           : null;
-    if (phoneNumber && pickedUp && consentValue) {
+    if (phoneNumber && pickedUp && consentValue && checkCallAllowed) {
       console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
       const syncPromise = syncConsentToAirtable(phoneNumber, consentValue)
         .then(() => console.log("Airtable consent sync finished"))
