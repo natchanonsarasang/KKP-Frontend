@@ -183,10 +183,12 @@ serve(async (req) => {
     console.log("AI Classification:", aiResult);
 
     // --- Airtable consent sync (Dhipaya) ---
-    // Only when the AI determined a definitive consent outcome and we have a phone number.
-    const consentOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
-    if (phoneNumber && consentOutcomeOk && (aiCategory === "Consent Given" || aiCategory === "Consent Denied")) {
-      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory}`);
+    // Sync whenever the AI captured a definitive consent outcome, regardless of
+    // the technical call outcome (the consent conversation can complete even
+    // when the underlying call status maps to "Failed"/"Hangup" etc.).
+    const consentCaptured = aiCategory === "Consent Given" || aiCategory === "Consent Denied";
+    if (phoneNumber && consentCaptured) {
+      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${aiCategory} (callOutcome=${callOutcome})`);
       const syncPromise = syncConsentToAirtable(phoneNumber, aiCategory)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
@@ -200,6 +202,7 @@ serve(async (req) => {
     } else {
       console.log("Airtable consent sync skipped:", { phoneNumber, aiCategory, callOutcome });
     }
+
 
     // --- Airtable notice_received sync (Dhipaya) ---
     const noticeOutcomeOk = callOutcome === "Confirmed" || callOutcome === "Completed";
@@ -1172,26 +1175,40 @@ async function syncCallLogToAirtable(
     }
   }
 
-  // Determine campaign header from payload.variables or result_data
-  let botType: string | undefined =
+  // Determine campaign header from payload.variables or result_data.
+
+  // Intents can come back with language suffixes like "campaign2[ENG]" or
+  // "consent_EN" / "consent_ISAN" — strip those before matching.
+  const rawBotType: unknown =
     payload?.variables?.campaign_determined ||
     payload?.variables?.bot_type ||
     payload?.variables?.next_intent ||
+    payload?.variables?.intent ||
     payload?.bot_type ||
     payload?.next_intent ||
+    payload?.intent ||
     resultData?.campaign_determined ||
     resultData?.bot_type ||
     resultData?.next_intent ||
+    resultData?.intent ||
     resultData?.variables?.bot_type ||
-    resultData?.variables?.next_intent;
+    resultData?.variables?.next_intent ||
+    resultData?.variables?.intent;
+  const normalizedBotType = String(rawBotType ?? "")
+    .toLowerCase()
+    .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
+    .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
+    .trim();
+  console.log("Campaign detection:", { rawBotType, normalizedBotType });
   const campaignHeader =
-    botType === "consent"
+    normalizedBotType === "consent" || normalizedBotType === "campaign1"
       ? "Campaign 1"
-      : botType === "campaign2"
+      : normalizedBotType === "campaign2"
         ? "Campaign 2"
-        : botType === "campaign3"
+        : normalizedBotType === "campaign3"
           ? "Campaign 3"
           : "Campaign Unknown";
+
 
   // Build fields
   const fields: Record<string, unknown> = {
