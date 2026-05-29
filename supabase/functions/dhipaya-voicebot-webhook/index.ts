@@ -1172,26 +1172,39 @@ async function syncCallLogToAirtable(
       existing = callLogRes?.records?.[0] ?? null;
     } catch (e) {
       console.warn("Airtable call log: lookup failed", e);
-    }
-  }
-
-  // Determine campaign header from payload.variables or result_data
-  let botType: string | undefined =
+  // Determine campaign header from payload.variables or result_data.
+  // Intents can come back with language suffixes like "campaign2[ENG]" or
+  // "consent_EN" / "consent_ISAN" — strip those before matching.
+  const rawBotType: unknown =
     payload?.variables?.campaign_determined ||
     payload?.variables?.bot_type ||
     payload?.variables?.next_intent ||
+    payload?.variables?.intent ||
     payload?.bot_type ||
     payload?.next_intent ||
+    payload?.intent ||
     resultData?.campaign_determined ||
     resultData?.bot_type ||
     resultData?.next_intent ||
+    resultData?.intent ||
     resultData?.variables?.bot_type ||
-    resultData?.variables?.next_intent;
+    resultData?.variables?.next_intent ||
+    resultData?.variables?.intent;
+  const normalizedBotType = String(rawBotType ?? "")
+    .toLowerCase()
+    .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
+    .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
+    .trim();
+  console.log("Campaign detection:", { rawBotType, normalizedBotType });
   const campaignHeader =
-    botType === "consent"
+    normalizedBotType === "consent" || normalizedBotType === "campaign1"
       ? "Campaign 1"
-      : botType === "campaign2"
+      : normalizedBotType === "campaign2"
         ? "Campaign 2"
+        : normalizedBotType === "campaign3"
+          ? "Campaign 3"
+          : "Campaign Unknown";
+
         : botType === "campaign3"
           ? "Campaign 3"
           : "Campaign Unknown";
