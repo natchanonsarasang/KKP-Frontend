@@ -250,7 +250,7 @@ serve(async (req) => {
 
 
     // --- Airtable Call Logs sync (Dhipaya) ---
-    if (callId) {
+    if (callId && checkCallAllowed) {
       const callLogPromise = syncCallLogToAirtable(
         payload,
         conversationLog || "",
