@@ -46,8 +46,6 @@ async function handleWebhook(req: Request): Promise<Response> {
     // Spread parallel webhook fires across ~1.5s before first Airtable read
     await initialAirtableJitter();
 
-
-  try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
