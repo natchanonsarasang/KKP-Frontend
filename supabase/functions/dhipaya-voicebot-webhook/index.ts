@@ -1228,5 +1228,4 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogIdStr})`);
   }
-  }
 }
