@@ -1217,31 +1217,34 @@ async function syncCallLogToAirtable(
   if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
   const mappedStatus = mapCallStatus(callOutcome) ?? mapCallStatus(payload?.status);
   if (mappedStatus) fields.Call_Status = mappedStatus;
+  // Step D: upsert by Customer link — PATCH if a Call Log already exists for
+  // this Customer, otherwise POST a new row. Call_Log_ID is NOT used for lookup.
+  if (!customerRec?.id) {
+    console.warn("Airtable call log: no Customer matched; skipping upsert to avoid orphan row");
+    return;
+  }
 
-  // Step C: update or create
   if (existing) {
     await airtableFetch(
       `${baseId}/${tablePath}/${existing.id}`,
       { method: "PATCH", body: JSON.stringify({ fields }) },
       pat,
     );
-    console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
+    console.log(`Airtable call log PATCHED for Customer ${customerRec.id} (existing ${existing.id})`);
   } else {
-    const callLogIdStr = String(callLogId).trim();
-    if (!callLogIdStr) {
-      console.warn(`Airtable call log: empty Call_Log_ID; skipping create`);
-      return;
-    }
     const createFields: Record<string, unknown> = {
       ...fields,
-      Call_Log_ID: callLogIdStr,
+      Customer: [customerRec.id],
     };
-    if (customerRec?.id) createFields.Customer = [customerRec.id];
+    const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
+    if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
     await airtableFetch(
       `${baseId}/${tablePath}`,
       { method: "POST", body: JSON.stringify({ fields: createFields }) },
       pat,
     );
-    console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogIdStr})`);
+    console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
   }
+}
+
 }
