@@ -64,8 +64,8 @@ function routeIntent(policyStatus: unknown, consentStatus: unknown): { intent: I
   const base = suffix ? policyRaw.slice(0, policyRaw.length - suffix.length) : policyRaw;
   const baseLower = base.toLowerCase();
 
-  // Priority 1: Already received consent — no suffix label
-  if (consent === "consent received") return { intent: "เคยได้รับconsentแล้ว", suffix };
+  // Priority 1: Policy_Status is Prospect_Refer (any suffix) — already consented
+  if (baseLower === "prospect_refer") return { intent: "เคยได้รับconsentแล้ว", suffix };
 
   if (baseLower === "overdue") {
     if (consent === "consent given") return { intent: `campaign2${label}`, suffix };
@@ -77,6 +77,7 @@ function routeIntent(policyStatus: unknown, consentStatus: unknown): { intent: I
   }
   return { intent: `consent${label}`, suffix };
 }
+
 
 
 
