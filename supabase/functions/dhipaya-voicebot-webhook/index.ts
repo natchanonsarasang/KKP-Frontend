@@ -1211,14 +1211,14 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
   } else {
-    const callLogIdNum = String(callLogId);
-    if (!Number.isFinite(callLogIdNum)) {
-      console.warn(`Airtable call log: Call_Log_ID '${callLogId}' is not numeric; skipping create`);
+    const callLogIdStr = String(callLogId).trim();
+    if (!callLogIdStr) {
+      console.warn(`Airtable call log: empty Call_Log_ID; skipping create`);
       return;
     }
     const createFields: Record<string, unknown> = {
       ...fields,
-      Call_Log_ID: callLogIdNum,
+      Call_Log_ID: callLogIdStr,
     };
     if (customerRec?.id) createFields.Customer = [customerRec.id];
     await airtableFetch(
@@ -1226,6 +1226,7 @@ async function syncCallLogToAirtable(
       { method: "POST", body: JSON.stringify({ fields: createFields }) },
       pat,
     );
-    console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogId})`);
+    console.log(`Airtable call log created for Customer ${customerRec?.id ?? "unknown"} (Call_Log_ID ${callLogIdStr})`);
+  }
   }
 }
