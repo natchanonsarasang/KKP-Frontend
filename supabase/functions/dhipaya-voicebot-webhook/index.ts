@@ -1122,11 +1122,7 @@ async function syncCallLogToAirtable(
   const customerRecId: string | undefined = resultData?.customer_rec_id;
   if (customerRecId && typeof customerRecId === "string" && customerRecId.startsWith("rec")) {
     try {
-      customerRec = await airtableFetch(
-        `${baseId}/Customer/${customerRecId}`,
-        { method: "GET" },
-        pat,
-      );
+      customerRec = await airtableFetch(`${baseId}/Customer/${customerRecId}`, { method: "GET" }, pat);
     } catch (e) {
       console.warn(`Airtable call log: direct Customer fetch failed for ${customerRecId}`, e);
     }
@@ -1153,7 +1149,9 @@ async function syncCallLogToAirtable(
     }
   }
   if (!customerRec) {
-    console.warn(`Airtable call log: no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`);
+    console.warn(
+      `Airtable call log: no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
+    );
   }
 
   // Step C: search Call Logs for existing record linked to this Customer
@@ -1195,7 +1193,6 @@ async function syncCallLogToAirtable(
           ? "Campaign 3"
           : "Campaign Unknown";
 
-
   // Build fields
   const fields: Record<string, unknown> = {
     Conversation_Logs: `${campaignHeader}\n\n${conversationLog}`,
@@ -1214,7 +1211,7 @@ async function syncCallLogToAirtable(
     );
     console.log(`Airtable call log updated for Call_Log_ID ${callLogId}`);
   } else {
-    const callLogIdNum = Number(String(callLogId).replace(/[^0-9.-]/g, ""));
+    const callLogIdNum = String(callLogId);
     if (!Number.isFinite(callLogIdNum)) {
       console.warn(`Airtable call log: Call_Log_ID '${callLogId}' is not numeric; skipping create`);
       return;
