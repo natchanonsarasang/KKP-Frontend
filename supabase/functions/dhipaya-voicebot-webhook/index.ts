@@ -1264,31 +1264,25 @@ async function syncCallLogToAirtable(
   let normalizedBotType = normalizeBot(rawBotType);
   console.log("Campaign detection (primary):", { rawBotType, normalizedBotType });
 
-  // Campaign header is driven by Customer Policy_Status, NOT bot flow.
-  // Overdue -> Campaign 2, Prospect -> Campaign 3, anything else/blank -> Campaign 1.
-  const rawPolicyStatus = customerRec?.fields?.["Policy_Status (from Policy)"];
-  const policyStatusStr = Array.isArray(rawPolicyStatus)
-    ? String(rawPolicyStatus[0] ?? "")
-    : String(rawPolicyStatus ?? "");
-  const policyStatusNorm = policyStatusStr
-    .toLowerCase()
-    .replace(/_(en|isan|th)$/i, "")
-    .trim();
-
+  // Campaign header is driven strictly by normalizedBotType (the script used).
   let campaignHeader: string;
-  if (policyStatusNorm === "overdue") {
+  if (normalizedBotType === "campaign2") {
     campaignHeader = "Campaign 2";
-  } else if (policyStatusNorm === "prospect") {
+  } else if (normalizedBotType === "campaign3") {
     campaignHeader = "Campaign 3";
+  } else if (normalizedBotType.includes("consent")) {
+    // covers 'consent' and any consent-related variants
+    campaignHeader = "Campaign 1";
+  } else if (normalizedBotType === "เคยได้รับconsentแล้ว") {
+    campaignHeader = "Campaign 1";
   } else {
     campaignHeader = "Campaign 1";
   }
-  console.log("Campaign detection (policy status):", {
-    rawPolicyStatus,
-    policyStatusNorm,
-    campaignHeader,
+  console.log("Campaign detection (bot intent):", {
     normalizedBotType,
+    campaignHeader,
   });
+
 
 
 
