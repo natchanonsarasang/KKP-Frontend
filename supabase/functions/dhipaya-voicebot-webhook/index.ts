@@ -6,10 +6,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// --- Sequential Mutex Queue ---------------------------------------------
+// Concurrent webhook fires (e.g. 5 calls hanging up at once) previously caused
+// Airtable 429 storms and DB race conditions. We serialize all webhook work
+// behind an in-memory FIFO queue: at most ONE payload is processed at a time.
+let __webhookChain: Promise<unknown> = Promise.resolve();
+function enqueueWebhook<T>(task: () => Promise<T>): Promise<T> {
+  const run = __webhookChain.then(task, task);
+  __webhookChain = run.catch(() => undefined);
+  return run;
+}
+
+// Shared formula: strict (phone match) AND CheckCall='Y'
+function phoneCheckCallFormula(normalized: string): string {
+  return (
+    `AND(` +
+    `OR(` +
+    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
+    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
+    `),` +
+    `UPPER(TRIM({CheckCall}&""))='Y'` +
+    `)`
+  );
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  return await enqueueWebhook(() => handleWebhook(req));
+});
+
+async function handleWebhook(req: Request): Promise<Response> {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -609,7 +638,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
 
 // Strict call classifier — aligned with src/lib/callStatuses.ts (15-status taxonomy)
 // STEP 1: Check json_log status first → Not Reached (no_answer/busy/voicemail/rejected/unreachable)
@@ -1083,12 +1112,7 @@ async function isCheckCallAllowed(phone: string): Promise<boolean> {
   const normalized = normalizePhone(phone);
   if (!normalized) return false;
 
-  const phoneFormula =
-    `OR(` +
-    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
-    `)`;
+  const phoneFormula = phoneCheckCallFormula(normalized);
 
   try {
     const res = await airtableFetch(
@@ -1125,12 +1149,7 @@ async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" 
   const normalized = normalizePhone(phone);
   if (!normalized) return;
 
-  const phoneFormula =
-    `OR(` +
-    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
-    `)`;
+  const phoneFormula = phoneCheckCallFormula(normalized);
 
   const customerRes = await airtableFetch(
     `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
@@ -1190,12 +1209,7 @@ async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise
   const normalized = normalizePhone(phone);
   if (!normalized) return;
 
-  const phoneFormula =
-    `OR(` +
-    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
-    `)`;
+  const phoneFormula = phoneCheckCallFormula(normalized);
 
   const customerRes = await airtableFetch(
     `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
@@ -1285,12 +1299,7 @@ async function syncCallLogToAirtable(
   if (!customerRec && phone) {
     const normalized = normalizePhone(phone);
     if (normalized) {
-      const phoneFormula =
-        `OR(` +
-        `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
-        `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
-        `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
-        `)`;
+      const phoneFormula = phoneCheckCallFormula(normalized);
       try {
         const customerRes = await airtableFetch(
           `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
