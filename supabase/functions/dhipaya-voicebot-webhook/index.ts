@@ -789,12 +789,31 @@ actually reached and answered. If the line drops before that point use:
 "Wrong Person", "Background Noise", and "Silence" are only chosen when no main
 outcome above applies.
 
+Additionally, INDEPENDENTLY extract two secondary signals from the transcript:
+
+- "consent_decision": Did the customer give or refuse PDPA consent?
+  - "Given" if the customer clearly agreed to data processing / marketing consent
+  - "Denied" if the customer clearly refused
+  - null if the consent question was not answered
+
+- "notice_received": Did the customer confirm whether they received the renewal/notice document?
+  - "Yes" if the customer said they received the notice/document
+  - "No" if the customer said they have NOT received the notice/document
+  - null if the notice question was not answered
+
+These two fields are INDEPENDENT — a single call may capture BOTH (e.g. the
+customer confirms they received the notice AND gives consent). Extract each
+signal on its own merits regardless of the chosen status_name.
+
 Output format (STRICT JSON, no markdown, no commentary):
 {
   "status_name": "<exact English label from the list>",
   "confidence": <number between 0 and 1>,
-  "reason": "<short explanation focused on the PDPA consent or notice outcome>"
+  "reason": "<short explanation focused on the PDPA consent or notice outcome>",
+  "consent_decision": "Given" | "Denied" | null,
+  "notice_received": "Yes" | "No" | null
 }`;
+
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
