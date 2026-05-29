@@ -202,12 +202,13 @@ Deno.serve(async (req) => {
         }),
       );
     }
-
     const f = record.fields ?? {};
+    console.log("dhipaya-check-intent CheckCall:", firstString(f["CheckCall"]));
     const policyStatus = f["Policy_Status (from Policy)"];
     const consentStatus = f["Consent_Status (from Consents)"];
     const firstName = firstString(f["First_Name"]);
     const lastName = firstString(f["Last_Name"]);
+    const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
 
     // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
