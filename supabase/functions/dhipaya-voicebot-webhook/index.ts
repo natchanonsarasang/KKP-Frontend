@@ -854,14 +854,31 @@ Output format (STRICT JSON, no markdown, no commentary):
               : normalized;
     const match = CONVERSATION_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
 
+    // Independent extraction of consent_decision and notice_received signals.
+    const rawConsent = String(parsed?.consent_decision ?? "").trim().toLowerCase();
+    const consentDecision: "Given" | "Denied" | null =
+      rawConsent === "given" ? "Given" : rawConsent === "denied" ? "Denied" : null;
+
+    const rawNotice = String(parsed?.notice_received ?? "").trim().toLowerCase();
+    const noticeReceived: "Yes" | "No" | null =
+      rawNotice === "yes" ? "Yes" : rawNotice === "no" ? "No" : null;
+
+    console.log("AI independent signals:", { consentDecision, noticeReceived });
+
     if (match) {
       return {
         status_id: match.id,
         status_name: match.name,
         category: match.name,
         reason: parsed?.reason || "AI classification",
+        consentDecision,
+        noticeReceived,
       };
     }
+
+    console.warn("Unmatched AI category, defaulting to Completed:", aiName);
+    return makeResult("Completed", `Unmatched AI category: ${aiName}`, { consentDecision, noticeReceived });
+
 
     console.warn("Unmatched AI category, defaulting to Completed:", aiName);
     return makeResult("Completed", `Unmatched AI category: ${aiName}`);
