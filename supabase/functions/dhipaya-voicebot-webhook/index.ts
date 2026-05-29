@@ -1112,12 +1112,7 @@ async function isCheckCallAllowed(phone: string): Promise<boolean> {
   const normalized = normalizePhone(phone);
   if (!normalized) return false;
 
-  const phoneFormula =
-    `OR(` +
-    `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number2}&"",'[^0-9]','')='${normalized}',` +
-    `REGEX_REPLACE({Phone_Number3}&"",'[^0-9]','')='${normalized}'` +
-    `)`;
+  const phoneFormula = phoneCheckCallFormula(normalized);
 
   try {
     const res = await airtableFetch(
