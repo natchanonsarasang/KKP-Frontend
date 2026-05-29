@@ -649,10 +649,22 @@ const AUDIO_QUALITY_PATTERNS: RegExp[] = [
 ];
 
 function detectAudioQualityIssue(log: string): boolean {
-  return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
+function makeResult(
+  name: string,
+  reason: string,
+  extras?: { consentDecision?: "Given" | "Denied" | null; noticeReceived?: "Yes" | "No" | null },
+): ClassifyResult {
+  const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
+  return {
+    status_id: cat.id,
+    status_name: cat.name,
+    category: cat.name,
+    reason,
+    consentDecision: extras?.consentDecision ?? null,
+    noticeReceived: extras?.noticeReceived ?? null,
+  };
 }
 
-function makeResult(name: string, reason: string): ClassifyResult {
   const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
   return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
 }
