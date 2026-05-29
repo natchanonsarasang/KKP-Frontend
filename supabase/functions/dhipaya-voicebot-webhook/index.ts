@@ -30,7 +30,7 @@ serve(async (req) => {
     }
 
     // Extract fields from payload
-    const callId = payload.outbound_id || payload.call_id;
+    const callId = payload.call_id || payload.outbound_id;
     const status = payload.status; // e.g. "completed"
     const action = payload.action; // e.g. "Confirm", "Decline", ""
     // Normalize conversation_log defensively — webhook may send a string,
