@@ -231,7 +231,7 @@ serve(async (req) => {
     // Independent of callOutcome — sync whenever the call was picked up and the
     // AI captured a notice_received signal from the transcript.
     const noticeValue = aiResult.noticeReceived;
-    if (phoneNumber && pickedUp && noticeValue) {
+    if (phoneNumber && pickedUp && noticeValue && checkCallAllowed) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
       const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
         .then(() => console.log("Airtable notice sync finished"))
