@@ -658,6 +658,9 @@ const AUDIO_QUALITY_PATTERNS: RegExp[] = [
 ];
 
 function detectAudioQualityIssue(log: string): boolean {
+  return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
+}
+
 function makeResult(
   name: string,
   reason: string,
@@ -674,9 +677,6 @@ function makeResult(
   };
 }
 
-  const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
-  return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
-}
 
 async function classifyCall(
   payload: Record<string, unknown>,
