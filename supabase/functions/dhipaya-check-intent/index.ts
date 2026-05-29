@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     }
 
     const formula =
-      `REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}'`;
+      `AND(REGEX_REPLACE({Phone_Number1}&"",'[^0-9]','')='${normalized}',{CheckCall}='Y')`;
     const fields = [
       "Phone_Number1",
       "First_Name",
@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
       "Policy_Status (from Policy)",
       "Consent_Status (from Consents)",
       "Renewal_Premium (from Policy)",
+      "CheckCall",
     ];
     const url =
       `https://api.airtable.com/v0/${baseId}/Customer` +
@@ -201,12 +202,13 @@ Deno.serve(async (req) => {
         }),
       );
     }
-
     const f = record.fields ?? {};
+    console.log("dhipaya-check-intent CheckCall:", firstString(f["CheckCall"]));
     const policyStatus = f["Policy_Status (from Policy)"];
     const consentStatus = f["Consent_Status (from Consents)"];
     const firstName = firstString(f["First_Name"]);
     const lastName = firstString(f["Last_Name"]);
+    const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
     const renewalPremium = firstString(f["Renewal_Premium (from Policy)"]);
 
     // Expiry_Date isn't exposed as a lookup on Customer — fetch from linked Policy record
