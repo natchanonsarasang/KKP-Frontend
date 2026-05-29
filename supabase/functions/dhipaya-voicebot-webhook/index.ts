@@ -1246,5 +1246,3 @@ async function syncCallLogToAirtable(
     console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
   }
 }
-
-}
