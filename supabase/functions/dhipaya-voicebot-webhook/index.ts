@@ -231,6 +231,7 @@ serve(async (req) => {
         phoneNumber,
         callOutcome,
         callDuration,
+        payload.audio_url ?? null,
       ).catch((err) => console.error("Airtable call log sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
@@ -1087,6 +1088,7 @@ async function syncCallLogToAirtable(
   phone: string | null,
   callOutcome: string | null,
   callDuration: any,
+  audioUrl: string | null,
 ): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
@@ -1239,6 +1241,7 @@ async function syncCallLogToAirtable(
   // Build fields
   const fields: Record<string, unknown> = {
     Conversation_Logs: `${campaignHeader}\n\n${conversationLog}`,
+    audio_url: audioUrl || "",
   };
   const durationNum = callDuration != null ? Number(callDuration) : NaN;
   if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
