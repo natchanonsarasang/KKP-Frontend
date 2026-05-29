@@ -1264,36 +1264,32 @@ async function syncCallLogToAirtable(
   let normalizedBotType = normalizeBot(rawBotType);
   console.log("Campaign detection (primary):", { rawBotType, normalizedBotType });
 
-  const toCampaignHeader = (b: string): string => {
-    const s = String(b || "").toLowerCase();
-    if (!s) return "";
-    if (s.includes("3")) return "Campaign 3";
-    if (s.includes("2")) return "Campaign 2";
-    if (s.includes("1") || s.includes("consent")) return "Campaign 1";
-    return "";
-  };
+  // Campaign header is driven by Customer Policy_Status, NOT bot flow.
+  // Overdue -> Campaign 2, Prospect -> Campaign 3, anything else/blank -> Campaign 1.
+  const rawPolicyStatus = customerRec?.fields?.["Policy_Status (from Policy)"];
+  const policyStatusStr = Array.isArray(rawPolicyStatus)
+    ? String(rawPolicyStatus[0] ?? "")
+    : String(rawPolicyStatus ?? "");
+  const policyStatusNorm = policyStatusStr
+    .toLowerCase()
+    .replace(/_(en|isan|th)$/i, "")
+    .trim();
 
-  let campaignHeader = toCampaignHeader(normalizedBotType);
-
-  // Fallback 1: use Campaign field from already-fetched Customer record
-  if (!campaignHeader) {
-    const custCampaign = customerRec?.fields?.Campaign;
-    const custCampaignNorm = normalizeBot(custCampaign);
-    if (custCampaignNorm) {
-      campaignHeader = toCampaignHeader(custCampaignNorm);
-      if (campaignHeader) {
-        normalizedBotType = custCampaignNorm;
-        console.log("Campaign detection (customer fallback):", { custCampaign, campaignHeader });
-      }
-    }
-  }
-
-  // Smart default
-  if (!campaignHeader) {
+  let campaignHeader: string;
+  if (policyStatusNorm === "overdue") {
+    campaignHeader = "Campaign 2";
+  } else if (policyStatusNorm === "prospect") {
+    campaignHeader = "Campaign 3";
+  } else {
     campaignHeader = "Campaign 1";
-    console.log("Campaign detection (default fallback): Campaign 1");
   }
-  console.log("Campaign detection (final):", { normalizedBotType, campaignHeader });
+  console.log("Campaign detection (policy status):", {
+    rawPolicyStatus,
+    policyStatusNorm,
+    campaignHeader,
+    normalizedBotType,
+  });
+
 
 
 
