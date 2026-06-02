@@ -632,6 +632,7 @@ const DhipayaAnalytics = () => {
       <OutcomeAndPolicyCharts
         customers={customers}
         logs={filteredLogs}
+        consentById={consentById}
       />
 
       {/* Customer Table */}
@@ -679,7 +680,7 @@ const DhipayaAnalytics = () => {
                       </TableRow>
                     ) : (
                       customers.map((c) => {
-                        const status = getConsentLabel(c, logs);
+                        const status = getConsentLabel(c, logs, consentById);
                         const expiry =
                           policyMap.byCustomer.get(c.id) ||
                           (c.policyNumber ? policyMap.byPolicy.get(c.policyNumber) : null);
