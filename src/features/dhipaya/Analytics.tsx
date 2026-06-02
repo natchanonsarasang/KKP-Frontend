@@ -98,20 +98,17 @@ function getConsentLabel(
   logs: CallLog[],
   consentById: Map<string, Consent>,
 ): "given" | "denied" | "called" | "none" {
-  const s = (c.consentStatus ?? "").trim();
-  if (s === CONSENT_GIVEN) return "given";
-  if (s === CONSENT_DENIED) return "denied";
-  const hasLog = logs.some((l) => l.customerId === c.id);
-  if (hasLog) {
-    const consentStatuses = logs
-      .filter((l) => l.customerId === c.id)
-      .map((l) => {
-        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
-        return (consent?.consentStatus ?? "").toLowerCase();
-      })
-      .join(" ");
-    if (consentStatuses.includes("consent given")) return "given";
-    if (consentStatuses.includes("consent denied")) return "denied";
+  const cn = normalizeConsent(c.consentStatus);
+  if (cn === "given") return "given";
+  if (cn === "denied") return "denied";
+  const customerLogs = logs.filter((l) => l.customerId === c.id);
+  if (customerLogs.length > 0) {
+    for (const l of customerLogs) {
+      const consent = l.consentId ? consentById.get(l.consentId) : undefined;
+      const n = normalizeConsent(consent?.consentStatus);
+      if (n === "given") return "given";
+      if (n === "denied") return "denied";
+    }
     return "called";
   }
   return "none";
