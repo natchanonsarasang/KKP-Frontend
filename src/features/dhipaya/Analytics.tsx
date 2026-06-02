@@ -181,7 +181,7 @@ function OutcomeAndPolicyCharts({
       const key = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
       const b = buckets.get(key) || { total: 0, converted: 0 };
       b.total++;
-      if ((c.consentStatus || "").trim() === CONSENT_GIVEN) b.converted++;
+      if (normalizeConsent(c.consentStatus) === "given") b.converted++;
       buckets.set(key, b);
     }
     return Array.from(buckets.entries())
