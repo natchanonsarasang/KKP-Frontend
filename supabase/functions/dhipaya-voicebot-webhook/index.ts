@@ -256,7 +256,9 @@ async function handleWebhook(req: Request): Promise<Response> {
     const consentThenCallLogTask = (async () => {
       let consentRecordId: string | null = null;
       if (consentSyncEnabled) {
-        console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
+        console.log(
+          `Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`,
+        );
         try {
           consentRecordId = await syncConsentToAirtable(phoneNumber!, consentValue!, callId);
           console.log("Airtable consent sync finished", { consentRecordId });
@@ -311,7 +313,6 @@ async function handleWebhook(req: Request): Promise<Response> {
     } else {
       console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
-
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -1208,9 +1209,7 @@ async function findCustomerRecord(
     }
   }
 
-  console.warn(
-    `[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
-  );
+  console.warn(`[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`);
   return null;
 }
 
@@ -1248,11 +1247,7 @@ async function syncConsentToAirtable(
   return consentRecId;
 }
 
-async function syncNoticeToAirtable(
-  phone: string,
-  value: "Yes" | "No",
-  callLogId?: string | null,
-): Promise<void> {
+async function syncNoticeToAirtable(phone: string, value: "Yes" | "No", callLogId?: string | null): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1364,16 +1359,8 @@ async function syncCallLogToAirtable(
   // Campaign header is driven strictly by normalizedBotType (the script used).
   let campaignHeader: string;
 
-  // 1. ถ้ามีข้อมูล Bot Type ระบุมาชัดเจน (ยิงผ่านระบบ) ให้ยึดตามนั้น
-  if (normalizedBotType === "campaign2") {
-    campaignHeader = "Campaign 2";
-  } else if (normalizedBotType === "campaign3") {
-    campaignHeader = "Campaign 3";
-  } else if (normalizedBotType.includes("consent") || normalizedBotType === "เคยได้รับconsentแล้ว") {
-    campaignHeader = "Campaign 1";
-  }
-  // 2. ถ้าเป็น Manual Call (ยิงตรง) ให้คำนวณจากสถานะจริงใน Airtable
-  else if (customerRec) {
+  // 1. ตรวจสอบข้อมูลจาก Airtable เป็นอันดับแรก (Priority 1)
+  if (customerRec) {
     const cStatusRaw = customerRec.fields?.["Consent_Status (from Consents)"];
     const pStatusRaw = customerRec.fields?.["Policy_Status (from Policy)"];
 
@@ -1383,28 +1370,29 @@ async function syncCallLogToAirtable(
       .toLowerCase();
     const policyStatus = (Array.isArray(pStatusRaw) ? pStatusRaw[0] : pStatusRaw || "").toString().trim().toLowerCase();
 
+    // กฎเหล็ก: ถ้า Consent ว่าง ต้องเป็น Campaign 1 เสมอ
     if (consentStatus === "" || consentStatus === "blank") {
       campaignHeader = "Campaign 1";
-    } else if (policyStatus === "overdue") {
+    }
+    // ถ้ามี Consent แล้ว ค่อยเช็คเงื่อนไขอื่นต่อ
+    else if (policyStatus === "overdue" || normalizedBotType === "campaign2") {
       campaignHeader = "Campaign 2";
-    } else if (policyStatus === "prospect" && consentStatus === "consent given") {
+    } else if (policyStatus === "prospect" || normalizedBotType === "campaign3") {
       campaignHeader = "Campaign 3";
     } else {
       campaignHeader = "Campaign 1";
     }
-
-    console.log("Campaign Calculated from Airtable Status (Manual Call):", {
-      consentStatus,
-      policyStatus,
-      result: campaignHeader,
-    });
   }
-  // 3. กรณีหาข้อมูลลูกค้าไม่เจอ ให้เป็น Campaign 1 ไว้ก่อน (Safe Default)
+  // 2. ถ้าหาข้อมูลใน Airtable ไม่เจอ (เช่น เบอร์ใหม่จริงๆ) ค่อยไปเชื่อ Bot Type (Priority 2)
   else {
-    campaignHeader = "Campaign 1";
+    if (normalizedBotType === "campaign2") {
+      campaignHeader = "Campaign 2";
+    } else if (normalizedBotType === "campaign3") {
+      campaignHeader = "Campaign 3";
+    } else {
+      campaignHeader = "Campaign 1";
+    }
   }
-
-  console.log("Final Campaign determined:", campaignHeader);
 
   // Build fields
   const fields: Record<string, unknown> = {
