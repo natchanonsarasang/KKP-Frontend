@@ -1438,6 +1438,8 @@ async function syncCallLogToAirtable(
   if (consentRecordId && typeof consentRecordId === "string" && consentRecordId.startsWith("rec")) {
     createFields.Consents = [consentRecordId];
   }
+  const callTimestamp = formatBangkokTimestamp(payload?.timestamp);
+  if (callTimestamp) createFields.Call_Timestamp = callTimestamp;
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
   await airtableFetch(
@@ -1446,6 +1448,6 @@ async function syncCallLogToAirtable(
     pat,
   );
   console.log(
-    `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}`,
+    `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}${callTimestamp ? ` at ${callTimestamp}` : ""}`,
   );
 }
