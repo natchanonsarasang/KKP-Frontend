@@ -173,11 +173,11 @@ export async function listCallLogs(opts?: {
   return {
     logs: res.records.map((r) => ({
       id: r.id,
+      callLogId: str(r.fields[CALL_LOG_FIELDS.callLogId]),
       customerId: firstLinked(r.fields[CALL_LOG_FIELDS.customer]),
-      policyId: firstLinked(r.fields[CALL_LOG_FIELDS.policy]),
-      outcome: str(r.fields[CALL_LOG_FIELDS.outcome]),
+      consentId: firstLinked(r.fields[CALL_LOG_FIELDS.consent]),
       duration: num(r.fields[CALL_LOG_FIELDS.duration]),
-      transcript: str(r.fields[CALL_LOG_FIELDS.transcript]),
+      conversationLogs: str(r.fields[CALL_LOG_FIELDS.conversationLogs]),
       audioUrl: str(r.fields[CALL_LOG_FIELDS.audioUrl]),
       calledAt: str(r.fields[CALL_LOG_FIELDS.calledAt]),
     })),
