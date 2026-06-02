@@ -1287,6 +1287,7 @@ async function syncCallLogToAirtable(
   callOutcome: string | null,
   callDuration: any,
   audioUrl: string | null,
+  consentRecordId?: string | null,
 ): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
