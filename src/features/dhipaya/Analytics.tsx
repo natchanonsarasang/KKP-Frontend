@@ -68,8 +68,8 @@ const CONSENT_DENIED = "Consent Denied";
 function normalizeConsent(s?: string): "given" | "denied" | "" {
   const v = (s ?? "").toLowerCase().trim();
   if (!v) return "";
-  if (v.includes("given") || v.includes("yes") || v.includes("ยินยอม") && !v.includes("ไม่")) return "given";
-  if (v.includes("denied") || v.includes("deny") || v.includes("no") || v.includes("ไม่ยินยอม") || v.includes("ปฏิเสธ")) return "denied";
+  if (v.includes("denied") || v.includes("deny") || v.includes("ไม่ยินยอม") || v.includes("ปฏิเสธ")) return "denied";
+  if (v.includes("given") || v.includes("granted") || v.includes("ยินยอม") || v.includes("yes")) return "given";
   return "";
 }
 
