@@ -53,6 +53,13 @@ export interface CallLog {
   transcript?: string;
 }
 
+export interface Consent {
+  id: string;
+  customerId?: number;
+  consentStatus?: string;
+}
+
+
 export interface InstallmentKb {
   id: string;
   planCode?: string;
