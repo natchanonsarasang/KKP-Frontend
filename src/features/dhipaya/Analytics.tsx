@@ -326,6 +326,10 @@ const DhipayaAnalytics = () => {
     queryKey: ["dhipaya-call-logs-dashboard"],
     queryFn: () => listCallLogs({ pageSize: 100 }),
   });
+  const consentsQuery = useQuery({
+    queryKey: ["dhipaya-consents-dashboard"],
+    queryFn: () => listConsents({ pageSize: 100 }),
+  });
   const policiesQuery = useQuery({
     queryKey: ["dhipaya-policies-dashboard"],
     queryFn: () => listPolicies({ pageSize: 100 }),
