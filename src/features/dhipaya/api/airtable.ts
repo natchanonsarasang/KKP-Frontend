@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { AirtableRecord, Customer, Policy, CallLog, InstallmentKb } from "../types";
+import type { AirtableRecord, Customer, Policy, CallLog, Consent, InstallmentKb } from "../types";
 import { CUSTOMER_FIELDS, POLICY_FIELDS, CALL_LOG_FIELDS, CONSENT_FIELDS, INSTALLMENT_KB_FIELDS } from "../fieldMap";
 
 type AnyFields = Record<string, unknown>;
