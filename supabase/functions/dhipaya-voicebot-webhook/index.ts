@@ -269,7 +269,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     const noticeValue = aiResult.noticeReceived;
     if (phoneNumber && pickedUp && noticeValue && checkCallAllowed) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
-      const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue)
+      const noticePromise = syncNoticeToAirtable(phoneNumber, noticeValue, callId)
         .then(() => console.log("Airtable notice sync finished"))
         .catch((err) => console.error("Airtable notice sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
