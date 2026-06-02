@@ -440,8 +440,7 @@ const DhipayaAnalytics = () => {
     for (const log of filteredLogs) {
       const date = ymd(log.calledAt);
       if (!date) continue;
-      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const norm = normalizeConsent(consent?.consentStatus);
+      const norm = resolveLogConsent(log, consentById);
       const isGiven = norm === "given";
       const isDenied = norm === "denied";
       if (!isGiven && !isDenied) continue;
