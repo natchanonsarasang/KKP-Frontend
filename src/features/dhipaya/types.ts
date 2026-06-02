@@ -47,6 +47,10 @@ export interface CallLog {
   conversationLogs?: string;
   audioUrl?: string;
   calledAt?: string;
+  /** @deprecated kept for backward compatibility with Analytics UI */
+  outcome?: string;
+  /** @deprecated use conversationLogs */
+  transcript?: string;
 }
 
 export interface InstallmentKb {
