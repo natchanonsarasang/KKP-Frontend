@@ -1287,6 +1287,17 @@ function mapCallStatus(raw: unknown): string | null {
   return null;
 }
 
+function formatBangkokTimestamp(unixTs: number | string | null | undefined): string | null {
+  const ts = unixTs != null ? Number(unixTs) : NaN;
+  if (!Number.isFinite(ts) || ts <= 0) return null;
+  const d = new Date(ts * 1000);
+  // Bangkok is UTC+7 (no DST)
+  const bangkokOffsetMs = 7 * 60 * 60 * 1000;
+  const bangkokDate = new Date(d.getTime() + bangkokOffsetMs);
+  // After adding offset, the UTC ISO string equals Bangkok local time
+  return bangkokDate.toISOString().replace("Z", "+07:00");
+}
+
 async function syncCallLogToAirtable(
   payload: any,
   conversationLog: string,
