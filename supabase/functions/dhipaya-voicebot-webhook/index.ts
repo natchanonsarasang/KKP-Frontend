@@ -1230,12 +1230,13 @@ async function syncConsentToAirtable(
   if (!customerRec?.id) return null;
 
   // Always create a new Consents row (no upsert).
+  const consentUuid = crypto.randomUUID();
   const created = await airtableFetch(
     `${baseId}/Consents`,
     {
       method: "POST",
       body: JSON.stringify({
-        fields: { Consent_Status: aiCategory, Customer: [customerRec.id] },
+        fields: { Consent_ID: consentUuid, Consent_Status: aiCategory, Customer: [customerRec.id] },
       }),
     },
     pat,
