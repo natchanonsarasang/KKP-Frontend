@@ -123,13 +123,9 @@ function ConsentBadge({ status }: { status: ReturnType<typeof getConsentLabel> }
 }
 
 const DhipayaAnalytics = () => {
-  const today = new Date();
-  const monthAgo = new Date();
-  monthAgo.setDate(today.getDate() - 30);
-
-  const [fromDate, setFromDate] = useState<string>(monthAgo.toISOString().slice(0, 10));
-  const [toDate, setToDate] = useState<string>(today.toISOString().slice(0, 10));
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [logModal, setLogModal] = useState<Customer | null>(null);
+
 
   const customersQuery = useQuery({
     queryKey: ["dhipaya-customers-dashboard"],
