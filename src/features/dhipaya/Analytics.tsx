@@ -95,9 +95,9 @@ function getConsentLabel(
   logs: CallLog[],
   consentById: Map<string, Consent>,
 ): "given" | "denied" | "called" | "none" {
-  const s = (c.consentStatus ?? "").trim();
-  if (s === CONSENT_GIVEN) return "given";
-  if (s === CONSENT_DENIED) return "denied";
+  const s = normalizeConsent(c.consentStatus);
+  if (s === "given") return "given";
+  if (s === "denied") return "denied";
   const hasLog = logs.some((l) => l.customerId === c.id);
   if (hasLog) {
     const consentStatuses = logs
