@@ -1324,23 +1324,8 @@ async function syncCallLogToAirtable(
     );
   }
 
-  // Step C: search Call Logs for existing record linked to this Customer
+  // Always create a new Call Logs row (no lookup / no upsert)
   const tablePath = "Call%20Logs";
-  let existing: any = null;
-  const customerLinkId = customerRec?.fields?.["Customer_ID"];
-  if (customerLinkId != null) {
-    const callLogFormula = `{Customer}=${typeof customerLinkId === "number" ? customerLinkId : `'${String(customerLinkId).replace(/'/g, "\\'")}'`}`;
-    try {
-      const callLogRes = await airtableFetch(
-        `${baseId}/${tablePath}?filterByFormula=${encodeURIComponent(callLogFormula)}&maxRecords=1`,
-        { method: "GET" },
-        pat,
-      );
-      existing = callLogRes?.records?.[0] ?? null;
-    } catch (e) {
-      console.warn("Airtable call log: lookup failed", e);
-    }
-  }
 
   // Determine campaign header from payload.variables or result_data.
 
@@ -1424,32 +1409,22 @@ async function syncCallLogToAirtable(
   if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
   const mappedStatus = mapCallStatus(callOutcome) ?? mapCallStatus(payload?.status);
   if (mappedStatus) fields.Call_Status = mappedStatus;
-  // Step D: upsert by Customer link — PATCH if a Call Log already exists for
-  // this Customer, otherwise POST a new row. Call_Log_ID is NOT used for lookup.
+  // Step D: always CREATE a new Call Logs row. No lookup, no PATCH.
   if (!customerRec?.id) {
-    console.warn("Airtable call log: no Customer matched; skipping upsert to avoid orphan row");
+    console.warn("Airtable call log: no Customer matched; skipping create to avoid orphan row");
     return;
   }
 
-  if (existing) {
-    await airtableFetch(
-      `${baseId}/${tablePath}/${existing.id}`,
-      { method: "PATCH", body: JSON.stringify({ fields }) },
-      pat,
-    );
-    console.log(`Airtable call log PATCHED for Customer ${customerRec.id} (existing ${existing.id})`);
-  } else {
-    const createFields: Record<string, unknown> = {
-      ...fields,
-      Customer: [customerRec.id],
-    };
-    const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
-    if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
-    await airtableFetch(
-      `${baseId}/${tablePath}`,
-      { method: "POST", body: JSON.stringify({ fields: createFields }) },
-      pat,
-    );
-    console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
-  }
+  const createFields: Record<string, unknown> = {
+    ...fields,
+    Customer: [customerRec.id],
+  };
+  const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
+  if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
+  await airtableFetch(
+    `${baseId}/${tablePath}`,
+    { method: "POST", body: JSON.stringify({ fields: createFields }) },
+    pat,
+  );
+  console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
 }
