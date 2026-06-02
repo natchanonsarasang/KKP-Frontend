@@ -72,7 +72,7 @@ export async function updateCustomer(
  */
 export async function setCustomerConsent(customerId: number, consentStatus: string): Promise<void> {
   // Find an existing Consents row by Customer_ID (numeric foreign key).
-  const formula = `FIND("${customerId}", ARRAYJOIN({Customer_ID (from Customer)}, ","))`;
+  const formula = `{${CONSENT_FIELDS.customer}} = ${customerId}`;
   const found = await call<ListResponse>({
     action: "list",
     table: "Consents",
@@ -97,7 +97,7 @@ export async function setCustomerConsent(customerId: number, consentStatus: stri
       table: "Consents",
       fields: {
         ...fields,
-        [CONSENT_FIELDS.customer]: [String(customerId)],
+        [CONSENT_FIELDS.customer]: customerId,
       },
     });
   }
@@ -241,11 +241,7 @@ export async function listConsents(opts?: {
               : firstValue(r.fields[CONSENT_FIELDS.customer]) != null
                 ? Number(firstValue(r.fields[CONSENT_FIELDS.customer]))
                 : undefined,
-        customerRecordId:
-          customerLinks[0] ??
-          (typeof firstValue(r.fields[CONSENT_FIELDS.customer]) === "string" && /^rec[A-Za-z0-9]{14}$/.test(firstValue(r.fields[CONSENT_FIELDS.customer]) ?? "")
-            ? firstValue(r.fields[CONSENT_FIELDS.customer])
-              : undefined,
+        customerRecordId: customerLinks[0],
         customerRecordIds: customerLinks.length ? customerLinks : undefined,
         consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
       });
