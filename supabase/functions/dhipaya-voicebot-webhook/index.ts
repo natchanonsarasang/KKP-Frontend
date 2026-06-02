@@ -1283,27 +1283,63 @@ function mapCallStatus(raw: unknown): string | null {
   return null;
 }
 
-async function syncCallLogToAirtable(
-  payload: any,
-  conversationLog: string,
-  phone: string | null,
-  callOutcome: string | null,
-  callDuration: any,
-  audioUrl: string | null,
-  consentRecordId?: string | null,
-): Promise<void> {
-  const pat = Deno.env.get("AIRTABLE_PAT");
-  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
-  if (!pat || !baseId) {
-    console.warn("Airtable credentials missing; skipping call log sync");
-    return;
-  }
+export type CampaignResolution = {
+  campaignHeader: string;
+  normalizedBotType: string;
+  customerRec: any;
+  resultData: any;
+};
 
-  // Call_Log_ID is volatile (changes every call) — kept only for traceability,
-  // never used for lookup. Lookup is by Customer link only.
+const normalizeBot = (v: unknown) =>
+  String(v ?? "")
+    .toLowerCase()
+    .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
+    .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
+    .trim();
+
+async function fetchLatestConsentStatus(
+  customerRec: any,
+  pat: string,
+  baseId: string,
+): Promise<{ id: string | null; status: string; createdTime: string | null }> {
+  const linked = customerRec?.fields?.["Consents"];
+  const ids: string[] = Array.isArray(linked)
+    ? linked.filter((x) => typeof x === "string" && x.startsWith("rec"))
+    : [];
+  if (ids.length === 0) {
+    return { id: null, status: "", createdTime: null };
+  }
+  try {
+    const orExpr = ids.map((id) => `RECORD_ID()='${id}'`).join(",");
+    const formula = ids.length === 1 ? `RECORD_ID()='${ids[0]}'` : `OR(${orExpr})`;
+    const url =
+      `${baseId}/Consents` +
+      `?filterByFormula=${encodeURIComponent(formula)}` +
+      `&fields%5B%5D=${encodeURIComponent("Consent_Status")}` +
+      `&pageSize=${ids.length}`;
+    const data = await airtableFetch(url, { method: "GET" }, pat);
+    const records: any[] = Array.isArray(data?.records) ? data.records : [];
+    if (records.length === 0) return { id: null, status: "", createdTime: null };
+    records.sort((a, b) => String(b?.createdTime ?? "").localeCompare(String(a?.createdTime ?? "")));
+    const latest = records[0];
+    const statusRaw = latest?.fields?.["Consent_Status"];
+    const status = (Array.isArray(statusRaw) ? statusRaw[0] : statusRaw || "").toString();
+    return { id: latest?.id ?? null, status, createdTime: latest?.createdTime ?? null };
+  } catch (e) {
+    console.warn("fetchLatestConsentStatus failed", e);
+    return { id: null, status: "", createdTime: null };
+  }
+}
+
+async function resolveCampaignHeader(
+  payload: any,
+  phone: string | null,
+  pat: string,
+  baseId: string,
+): Promise<CampaignResolution> {
   const callLogId = payload?.outbound_id || payload?.call_id;
 
-  // Step A: load result_data from call_records (single lookup; reused for customer + campaign)
+  // Step A: load result_data from call_records
   let resultData: any = null;
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -1319,19 +1355,13 @@ async function syncCallLogToAirtable(
       console.log("Result data from call_records: ", resultData);
     }
   } catch (e) {
-    console.warn("Airtable call log: call_records lookup failed", e);
+    console.warn("resolveCampaignHeader: call_records lookup failed", e);
   }
 
-  // Step B: find Customer via shared helper (customer_rec_id first, phone fallback)
-  const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Airtable call log");
+  // Step B: find Customer
+  const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Campaign resolver");
 
-  // Always create a new Call Logs row (no lookup / no upsert)
-  const tablePath = "Call%20Logs";
-
-  // Determine campaign header from payload.variables or result_data.
-
-  // Intents can come back with language suffixes like "campaign2[ENG]" or
-  // "consent_EN" / "consent_ISAN" — strip those before matching.
+  // Step C: bot type from payload / result_data
   const rawBotType: unknown =
     payload?.variables?.campaign_determined ||
     payload?.variables?.bot_type ||
@@ -1347,44 +1377,34 @@ async function syncCallLogToAirtable(
     resultData?.variables?.bot_type ||
     resultData?.variables?.next_intent ||
     resultData?.variables?.intent;
-  const normalizeBot = (v: unknown) =>
-    String(v ?? "")
-      .toLowerCase()
-      .replace(/\[[^\]]*\]/g, "") // strip [ENG], [ภาษาถิ่นอีสาน] etc.
-      .replace(/_(en|isan|th)$/i, "") // strip _EN / _ISAN / _TH suffix
-      .trim();
-  let normalizedBotType = normalizeBot(rawBotType);
+  const normalizedBotType = normalizeBot(rawBotType);
   console.log("Campaign detection (primary):", { rawBotType, normalizedBotType });
 
-  // Campaign header is driven strictly by normalizedBotType (the script used).
   let campaignHeader: string;
 
-  // 1. ตรวจสอบข้อมูลจาก Airtable เป็นอันดับแรก (Priority 1)
   if (customerRec) {
-    const cStatusRaw = customerRec.fields?.["Consent_Status (from Consents)"];
+    // Use the LATEST Consents row (not the rollup's first element)
+    const latest = await fetchLatestConsentStatus(customerRec, pat, baseId);
     const pStatusRaw = customerRec.fields?.["Policy_Status (from Policy)"];
-    console.log("DEBUG Airtable Raw:", { cStatusRaw, pStatusRaw });
-    const consentStatus = (Array.isArray(cStatusRaw) ? cStatusRaw[0] : cStatusRaw || "")
-      .toString()
-      .trim()
-      .toLowerCase();
+    console.log("DEBUG Airtable Raw:", {
+      latestConsent: latest,
+      pStatusRaw,
+    });
+    console.log("Latest Consent picked:", latest);
+
+    const consentStatus = latest.status.trim().toLowerCase();
     const policyStatus = (Array.isArray(pStatusRaw) ? pStatusRaw[0] : pStatusRaw || "").toString().trim().toLowerCase();
 
-    // กฎเหล็ก: ถ้า Consent ว่าง ต้องเป็น Campaign 1 เสมอ
     if (consentStatus === "" || consentStatus === "blank") {
       campaignHeader = "Campaign 1";
-    }
-    // ถ้ามี Consent แล้ว ค่อยเช็คเงื่อนไขอื่นต่อ
-    else if (policyStatus === "overdue" || normalizedBotType === "campaign2") {
+    } else if (policyStatus === "overdue" || normalizedBotType === "campaign2") {
       campaignHeader = "Campaign 2";
     } else if (policyStatus === "prospect" || normalizedBotType === "campaign3") {
       campaignHeader = "Campaign 3";
     } else {
       campaignHeader = "Campaign 1";
     }
-  }
-  // 2. ถ้าหาข้อมูลใน Airtable ไม่เจอ (เช่น เบอร์ใหม่จริงๆ) ค่อยไปเชื่อ Bot Type (Priority 2)
-  else {
+  } else {
     if (normalizedBotType === "campaign2") {
       campaignHeader = "Campaign 2";
     } else if (normalizedBotType === "campaign3") {
@@ -1393,6 +1413,38 @@ async function syncCallLogToAirtable(
       campaignHeader = "Campaign 1";
     }
   }
+
+  return { campaignHeader, normalizedBotType, customerRec, resultData };
+}
+
+async function syncCallLogToAirtable(
+  payload: any,
+  conversationLog: string,
+  phone: string | null,
+  callOutcome: string | null,
+  callDuration: any,
+  audioUrl: string | null,
+  consentRecordId?: string | null,
+  precomputed?: CampaignResolution | null,
+): Promise<void> {
+  const pat = Deno.env.get("AIRTABLE_PAT");
+  const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+  if (!pat || !baseId) {
+    console.warn("Airtable credentials missing; skipping call log sync");
+    return;
+  }
+
+  // Call_Log_ID is volatile (changes every call) — kept only for traceability,
+  // never used for lookup. Lookup is by Customer link only.
+  const callLogId = payload?.outbound_id || payload?.call_id;
+
+  // Use precomputed campaign resolution when available; otherwise fall back
+  // to resolving now (degraded path — Airtable lookup will reflect post-update state).
+  const resolved: CampaignResolution = precomputed ?? (await resolveCampaignHeader(payload, phone, pat, baseId));
+  const { campaignHeader, customerRec } = resolved;
+
+  // Always create a new Call Logs row (no lookup / no upsert)
+  const tablePath = "Call%20Logs";
 
   // Build fields
   const fields: Record<string, unknown> = {
