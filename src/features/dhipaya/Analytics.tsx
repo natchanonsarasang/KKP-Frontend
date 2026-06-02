@@ -121,7 +121,7 @@ function getConsentLabel(
   if (hasLog) {
     const norms = logs
       .filter((l) => l.customerId === c.id)
-      .map((l) => normalizeConsent(consentById.get(l.consentId ?? "")?.consentStatus));
+      .map((l) => resolveLogConsent(l, consentById));
     if (norms.includes("given")) return "given";
     if (norms.includes("denied")) return "denied";
     return "called";
