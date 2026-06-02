@@ -1409,38 +1409,22 @@ async function syncCallLogToAirtable(
   if (Number.isFinite(durationNum)) fields.Call_Duration = Math.round(durationNum);
   const mappedStatus = mapCallStatus(callOutcome) ?? mapCallStatus(payload?.status);
   if (mappedStatus) fields.Call_Status = mappedStatus;
-  // Step D: upsert by Customer link — PATCH if a Call Log already exists for
-  // this Customer, otherwise POST a new row. Call_Log_ID is NOT used for lookup.
-  if (existing) {
-    await airtableFetch(
-      `${baseId}/${tablePath}/${existing.id}`,
-      { method: "PATCH", body: JSON.stringify({ fields }) },
-      pat,
-    );
-    console.log(`Airtable call log PATCHED for Customer ${customerRec.id} (existing ${existing.id})`);
-  } else {
-    const createFields: Record<string, unknown> = {
-      ...fields,
-      Customer: [customerRec.id],
-    };
-    await airtableFetch(
-      `${baseId}/${tablePath}/${existing.id}`,
-      { method: "PATCH", body: JSON.stringify({ fields }) },
-      pat,
-    );
-    console.log(`Airtable call log PATCHED for Customer ${customerRec.id} (existing ${existing.id})`);
-  } else {
-    const createFields: Record<string, unknown> = {
-      ...fields,
-      Customer: [customerRec.id],
-    };
-    const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
-    if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
-    await airtableFetch(
-      `${baseId}/${tablePath}`,
-      { method: "POST", body: JSON.stringify({ fields: createFields }) },
-      pat,
-    );
-    console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
+  // Step D: always CREATE a new Call Logs row. No lookup, no PATCH.
+  if (!customerRec?.id) {
+    console.warn("Airtable call log: no Customer matched; skipping create to avoid orphan row");
+    return;
   }
+
+  const createFields: Record<string, unknown> = {
+    ...fields,
+    Customer: [customerRec.id],
+  };
+  const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
+  if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
+  await airtableFetch(
+    `${baseId}/${tablePath}`,
+    { method: "POST", body: JSON.stringify({ fields: createFields }) },
+    pat,
+  );
+  console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
 }
