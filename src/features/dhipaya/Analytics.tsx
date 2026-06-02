@@ -185,12 +185,17 @@ const DhipayaAnalytics = () => {
     return { byCustomer, byPolicy };
   }, [policies]);
 
-  // Date-filtered logs
+  // Date-filtered logs (no range = all logs)
+  const fromDate = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const toDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : fromDate;
   const filteredLogs = useMemo(() => {
+    if (!fromDate && !toDate) return logs;
     return logs.filter((l) => {
       const d = ymd(l.calledAt);
       if (!d) return false;
-      return d >= fromDate && d <= toDate;
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
     });
   }, [logs, fromDate, toDate]);
 
