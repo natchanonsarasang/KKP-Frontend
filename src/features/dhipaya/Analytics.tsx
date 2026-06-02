@@ -46,6 +46,30 @@ import {
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
 
+/** Normalize a consent status to "given" | "denied" | "" — tolerates casing,
+ *  whitespace, Thai variants, and synonyms. */
+function normalizeConsent(raw: unknown): "given" | "denied" | "" {
+  if (raw == null) return "";
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return "";
+  if (
+    s === "consent given" ||
+    s === "given" ||
+    s === "granted" ||
+    s === "yes" ||
+    s.includes("ยินยอม") && !s.includes("ไม่")
+  ) return "given";
+  if (
+    s === "consent denied" ||
+    s === "denied" ||
+    s === "deny" ||
+    s === "no" ||
+    s.includes("ไม่ยินยอม") ||
+    s.includes("ปฏิเสธ")
+  ) return "denied";
+  return "";
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
