@@ -46,6 +46,30 @@ import {
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
 
+/** Normalize a consent status to "given" | "denied" | "" — tolerates casing,
+ *  whitespace, Thai variants, and synonyms. */
+function normalizeConsent(raw: unknown): "given" | "denied" | "" {
+  if (raw == null) return "";
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return "";
+  if (
+    s === "consent given" ||
+    s === "given" ||
+    s === "granted" ||
+    s === "yes" ||
+    s.includes("ยินยอม") && !s.includes("ไม่")
+  ) return "given";
+  if (
+    s === "consent denied" ||
+    s === "denied" ||
+    s === "deny" ||
+    s === "no" ||
+    s.includes("ไม่ยินยอม") ||
+    s.includes("ปฏิเสธ")
+  ) return "denied";
+  return "";
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -71,20 +95,16 @@ function getConsentLabel(
   logs: CallLog[],
   consentById: Map<string, Consent>,
 ): "given" | "denied" | "called" | "none" {
-  const s = (c.consentStatus ?? "").trim();
-  if (s === CONSENT_GIVEN) return "given";
-  if (s === CONSENT_DENIED) return "denied";
+  const s = normalizeConsent(c.consentStatus);
+  if (s === "given") return "given";
+  if (s === "denied") return "denied";
   const hasLog = logs.some((l) => l.customerId === c.id);
   if (hasLog) {
-    const consentStatuses = logs
+    const norms = logs
       .filter((l) => l.customerId === c.id)
-      .map((l) => {
-        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
-        return (consent?.consentStatus ?? "").toLowerCase();
-      })
-      .join(" ");
-    if (consentStatuses.includes("consent given")) return "given";
-    if (consentStatuses.includes("consent denied")) return "denied";
+      .map((l) => normalizeConsent(consentById.get(l.consentId ?? "")?.consentStatus));
+    if (norms.includes("given")) return "given";
+    if (norms.includes("denied")) return "denied";
     return "called";
   }
   return "none";
@@ -133,9 +153,9 @@ function OutcomeAndPolicyCharts({
     let noAnswer = 0;
     for (const log of logs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const norm = normalizeConsent(consent?.consentStatus);
+      if (norm === "given") given++;
+      else if (norm === "denied") denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
@@ -157,7 +177,7 @@ function OutcomeAndPolicyCharts({
       const key = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
       const b = buckets.get(key) || { total: 0, converted: 0 };
       b.total++;
-      if ((c.consentStatus || "").trim() === CONSENT_GIVEN) b.converted++;
+      if (normalizeConsent(c.consentStatus) === "given") b.converted++;
       buckets.set(key, b);
     }
     return Array.from(buckets.entries())
@@ -336,8 +356,25 @@ const DhipayaAnalytics = () => {
   const consentById = useMemo(() => {
     const map = new Map<string, Consent>();
     for (const c of consents) map.set(c.id, c);
+    // Diagnostic: count distinct status values and sample of unmatched logs
+    const statusCounts: Record<string, number> = {};
+    for (const c of consents) {
+      const k = (c.consentStatus ?? "(empty)").toString();
+      statusCounts[k] = (statusCounts[k] ?? 0) + 1;
+    }
+    console.log("[Analytics] consents loaded:", consents.length, "status counts:", statusCounts);
+    const missing: string[] = [];
+    for (const l of logs) {
+      if (l.consentId && !map.has(l.consentId)) missing.push(l.consentId);
+    }
+    if (missing.length) {
+      console.warn(
+        `[Analytics] ${missing.length} call log(s) reference a consentId not in consentById. First 5:`,
+        missing.slice(0, 5),
+      );
+    }
     return map;
-  }, [consents]);
+  }, [consents, logs]);
 
   const policyMap = useMemo(() => {
     const byCustomer = new Map<string, string>();
@@ -372,10 +409,11 @@ const DhipayaAnalytics = () => {
     let denied = 0;
     for (const log of filteredLogs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const norm = normalizeConsent(consent?.consentStatus);
+      if (norm === "given") given++;
+      else if (norm === "denied") denied++;
     }
+    console.log("[Analytics] kpis", { totalCalls, given, denied });
     return { totalCalls, given, denied };
   }, [filteredLogs, consentById]);
 
@@ -386,9 +424,9 @@ const DhipayaAnalytics = () => {
       const date = ymd(log.calledAt);
       if (!date) continue;
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      const isGiven = consentStatus === CONSENT_GIVEN;
-      const isDenied = consentStatus === CONSENT_DENIED;
+      const norm = normalizeConsent(consent?.consentStatus);
+      const isGiven = norm === "given";
+      const isDenied = norm === "denied";
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
@@ -759,9 +797,9 @@ const DhipayaAnalytics = () => {
               <div className="space-y-3">
                 {modalLogs.map((log) => {
                   const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-                  const consentStatus = consent?.consentStatus || "";
-                  const isGiven = consentStatus === CONSENT_GIVEN;
-                  const isDenied = consentStatus === CONSENT_DENIED;
+                  const norm = normalizeConsent(consent?.consentStatus);
+                  const isGiven = norm === "given";
+                  const isDenied = norm === "denied";
                   const campaign = logModal?.campaign || "";
                   return (
                     <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
