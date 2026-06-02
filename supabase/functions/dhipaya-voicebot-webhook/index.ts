@@ -256,9 +256,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     const consentThenCallLogTask = (async () => {
       let consentRecordId: string | null = null;
       if (consentSyncEnabled) {
-        console.log(
-          `Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`,
-        );
+        console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
         try {
           consentRecordId = await syncConsentToAirtable(phoneNumber!, consentValue!, callId);
           console.log("Airtable consent sync finished", { consentRecordId });
@@ -313,6 +311,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     } else {
       console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
+
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -1209,7 +1208,9 @@ async function findCustomerRecord(
     }
   }
 
-  console.warn(`[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`);
+  console.warn(
+    `[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
+  );
   return null;
 }
 
@@ -1246,7 +1247,11 @@ async function syncConsentToAirtable(
   return consentRecId;
 }
 
-async function syncNoticeToAirtable(phone: string, value: "Yes" | "No", callLogId?: string | null): Promise<void> {
+async function syncNoticeToAirtable(
+  phone: string,
+  value: "Yes" | "No",
+  callLogId?: string | null,
+): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1280,35 +1285,6 @@ function mapCallStatus(raw: unknown): string | null {
   if (["voicemail", "machine", "answeringmachine"].includes(s)) return "Voicemail";
   if (["transferred", "transfer"].includes(s)) return "Transferred";
   return null;
-}
-
-function formatBangkokTimestamp(unixTs: number | string | null | undefined): string | null {
-  const ts = unixTs != null ? Number(unixTs) : NaN;
-  if (!Number.isFinite(ts) || ts <= 0) return null;
-  const d = new Date(ts * 1000);
-  // Bangkok is UTC+7 (no DST)
-  const bangkokOffsetMs = 7 * 60 * 60 * 1000;
-  const bangkokDate = new Date(d.getTime() + bangkokOffsetMs);
-  // After adding offset, the UTC ISO string equals Bangkok local time
-  return bangkokDate.toISOString().replace("Z", "+07:00");
-}
-
-/**
- * Extract Call_Timestamp from the first entry of payload.conversation_log.
- * The webhook provides timeStamp as Bangkok local time in "YYYY-MM-DD HH:mm:ss" format.
- * Returns ISO 8601 string with +07:00 offset, or null if unavailable/invalid.
- */
-function extractCallTimestampFromConversation(payload: any): string | null {
-  const log = payload?.conversation_log;
-  if (!Array.isArray(log) || log.length === 0) return null;
-  const first = log[0];
-  const ts = typeof first?.timeStamp === "string" ? first.timeStamp.trim() : "";
-  // Expected format: "YYYY-MM-DD HH:mm:ss" — already Bangkok local time.
-  // Send the wall-clock value as-is (no offset) so Airtable stores the same time shown in the transcript.
-  const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
-  if (!m) return null;
-  const [, y, mo, d, h, mi, s] = m;
-  return `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
 }
 
 async function syncCallLogToAirtable(
@@ -1451,9 +1427,6 @@ async function syncCallLogToAirtable(
   if (consentRecordId && typeof consentRecordId === "string" && consentRecordId.startsWith("rec")) {
     createFields.Consents = [consentRecordId];
   }
-  // const callTimestamp =
-  //   extractCallTimestampFromConversation(payload) ?? formatBangkokTimestamp(payload?.timestamp);
-  // if (callTimestamp) createFields.Call_Timestamp = callTimestamp;
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
   await airtableFetch(
@@ -1462,6 +1435,6 @@ async function syncCallLogToAirtable(
     pat,
   );
   console.log(
-    `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}${callTimestamp ? ` at ${callTimestamp}` : ""}`,
+    `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}`,
   );
 }
