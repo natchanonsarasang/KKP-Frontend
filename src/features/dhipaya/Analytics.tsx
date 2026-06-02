@@ -10,21 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ResponsiveContainer,
@@ -40,13 +27,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import {
-  listCallLogs,
-  listCustomers,
-  listConsents,
-  listInstallmentKb,
-  listPolicies,
-} from "./api/airtable";
+import { listCallLogs, listCustomers, listConsents, listInstallmentKb, listPolicies } from "./api/airtable";
 import type { CallLog, Customer, Consent } from "./types";
 import {
   PhoneCall,
@@ -64,14 +45,6 @@ import {
 
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
-
-function normalizeConsent(s?: string): "given" | "denied" | "" {
-  const v = (s ?? "").toLowerCase().trim();
-  if (!v) return "";
-  if (v.includes("denied") || v.includes("deny") || v.includes("ไม่ยินยอม") || v.includes("ปฏิเสธ")) return "denied";
-  if (v.includes("given") || v.includes("granted") || v.includes("ยินยอม") || v.includes("yes")) return "given";
-  return "";
-}
 
 function ymd(iso?: string): string | null {
   if (!iso) return null;
@@ -98,17 +71,20 @@ function getConsentLabel(
   logs: CallLog[],
   consentById: Map<string, Consent>,
 ): "given" | "denied" | "called" | "none" {
-  const cn = normalizeConsent(c.consentStatus);
-  if (cn === "given") return "given";
-  if (cn === "denied") return "denied";
-  const customerLogs = logs.filter((l) => l.customerId === c.id);
-  if (customerLogs.length > 0) {
-    for (const l of customerLogs) {
-      const consent = l.consentId ? consentById.get(l.consentId) : undefined;
-      const n = normalizeConsent(consent?.consentStatus);
-      if (n === "given") return "given";
-      if (n === "denied") return "denied";
-    }
+  const s = (c.consentStatus ?? "").trim();
+  if (s === CONSENT_GIVEN) return "given";
+  if (s === CONSENT_DENIED) return "denied";
+  const hasLog = logs.some((l) => l.customerId === c.id);
+  if (hasLog) {
+    const consentStatuses = logs
+      .filter((l) => l.customerId === c.id)
+      .map((l) => {
+        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
+        return (consent?.consentStatus ?? "").toLowerCase();
+      })
+      .join(" ");
+    if (consentStatuses.includes("consent given")) return "given";
+    if (consentStatuses.includes("consent denied")) return "denied";
     return "called";
   }
   return "none";
@@ -128,11 +104,7 @@ function ConsentBadge({ status }: { status: ReturnType<typeof getConsentLabel> }
       </Badge>
     );
   if (status === "called")
-    return (
-      <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-transparent font-medium">
-        ● Called
-      </Badge>
-    );
+    return <Badge className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-transparent font-medium">● Called</Badge>;
   return (
     <Badge variant="secondary" className="font-medium">
       — Not Called
@@ -161,9 +133,9 @@ function OutcomeAndPolicyCharts({
     let noAnswer = 0;
     for (const log of logs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const n = normalizeConsent(consent?.consentStatus);
-      if (n === "given") given++;
-      else if (n === "denied") denied++;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
@@ -176,7 +148,6 @@ function OutcomeAndPolicyCharts({
       ],
     };
   }, [logs, consentById]);
-
 
   const policyData = useMemo(() => {
     const buckets = new Map<string, { total: number; converted: number }>();
@@ -228,9 +199,7 @@ function OutcomeAndPolicyCharts({
                     </Pie>
                     <Tooltip
                       formatter={(value: number, name) => {
-                        const pct = outcomeData.total
-                          ? ((value / outcomeData.total) * 100).toFixed(1)
-                          : "0";
+                        const pct = outcomeData.total ? ((value / outcomeData.total) * 100).toFixed(1) : "0";
                         return [`${value} (${pct}%)`, name];
                       }}
                     />
@@ -239,16 +208,11 @@ function OutcomeAndPolicyCharts({
               </div>
               <div className="mt-2 space-y-1.5">
                 {outcomeData.slices.map((s) => {
-                  const pct = outcomeData.total
-                    ? ((s.value / outcomeData.total) * 100).toFixed(1)
-                    : "0.0";
+                  const pct = outcomeData.total ? ((s.value / outcomeData.total) * 100).toFixed(1) : "0.0";
                   return (
                     <div key={s.key} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ background: s.color }}
-                        />
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
                         <span className="text-foreground">{s.name}</span>
                       </div>
                       <span className="text-muted-foreground tabular-nums">
@@ -276,11 +240,7 @@ function OutcomeAndPolicyCharts({
             <>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={policyData}
-                    layout="vertical"
-                    margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
-                  >
+                  <BarChart data={policyData} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                     <XAxis
                       type="number"
@@ -303,9 +263,7 @@ function OutcomeAndPolicyCharts({
                 {policyData.map((p) => (
                   <div key={p.name} className="flex items-center justify-between text-sm">
                     <span className="text-foreground">{p.name}</span>
-                    <span className="text-muted-foreground tabular-nums">
-                      {p.conversion.toFixed(1)}% conversion
-                    </span>
+                    <span className="text-muted-foreground tabular-nums">{p.conversion.toFixed(1)}% conversion</span>
                   </div>
                 ))}
               </div>
@@ -317,11 +275,9 @@ function OutcomeAndPolicyCharts({
   );
 }
 
-
 const DhipayaAnalytics = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [logModal, setLogModal] = useState<Customer | null>(null);
-
 
   const customersQuery = useQuery({
     queryKey: ["dhipaya-customers-dashboard"],
@@ -416,9 +372,9 @@ const DhipayaAnalytics = () => {
     let denied = 0;
     for (const log of filteredLogs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const n = normalizeConsent(consent?.consentStatus);
-      if (n === "given") given++;
-      else if (n === "denied") denied++;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
     }
     return { totalCalls, given, denied };
   }, [filteredLogs, consentById]);
@@ -430,9 +386,9 @@ const DhipayaAnalytics = () => {
       const date = ymd(log.calledAt);
       if (!date) continue;
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const n = normalizeConsent(consent?.consentStatus);
-      const isGiven = n === "given";
-      const isDenied = n === "denied";
+      const consentStatus = consent?.consentStatus || "";
+      const isGiven = consentStatus === CONSENT_GIVEN;
+      const isDenied = consentStatus === CONSENT_DENIED;
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
@@ -471,14 +427,12 @@ const DhipayaAnalytics = () => {
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Enhanced Call &amp; Consent Dashboard
-            </h2>
-            <Badge variant="secondary" className="ml-1">Airtable</Badge>
+            <h2 className="text-2xl font-semibold tracking-tight">Enhanced Call &amp; Consent Dashboard</h2>
+            <Badge variant="secondary" className="ml-1">
+              Airtable
+            </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Calls and consent outcomes across your customer base.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Calls and consent outcomes across your customer base.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Popover>
@@ -630,11 +584,7 @@ const DhipayaAnalytics = () => {
       </Card>
 
       {/* Outcome Breakdown + Policy Status Performance */}
-      <OutcomeAndPolicyCharts
-        customers={customers}
-        logs={filteredLogs}
-        consentById={consentById}
-      />
+      <OutcomeAndPolicyCharts customers={customers} logs={filteredLogs} consentById={consentById} />
 
       {/* Customer Table */}
       <Card>
@@ -658,11 +608,24 @@ const DhipayaAnalytics = () => {
                   <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                     <TableRow className="hover:bg-transparent border-b border-border/60">
                       {[
-                        "Name", "Phone", "Routing", "Consent", "Policy", "Policy Status",
-                        "Renewal Premium", "Outstanding", "Plan Code", "Notice Sent",
-                        "Payment Date", "Expiry Date", "Policy (Detail)",
+                        "Name",
+                        "Phone",
+                        "Routing",
+                        "Consent",
+                        "Policy",
+                        "Policy Status",
+                        "Renewal Premium",
+                        "Outstanding",
+                        "Plan Code",
+                        "Notice Sent",
+                        "Payment Date",
+                        "Expiry Date",
+                        "Policy (Detail)",
                       ].map((h) => (
-                        <TableHead key={h} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                        <TableHead
+                          key={h}
+                          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap"
+                        >
                           {h}
                         </TableHead>
                       ))}
@@ -695,7 +658,9 @@ const DhipayaAnalytics = () => {
                                 </div>
                                 <span>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}</span>
                                 {c.duplicateFlag && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">dup</Badge>
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                    dup
+                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
@@ -707,13 +672,17 @@ const DhipayaAnalytics = () => {
                             <TableCell className="text-sm">
                               {c.routingGroup || <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell><ConsentBadge status={status} /></TableCell>
+                            <TableCell>
+                              <ConsentBadge status={status} />
+                            </TableCell>
                             <TableCell className="font-mono text-xs">
                               {c.policyNumber || <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="text-sm">
                               {c.policyStatus ? (
-                                <Badge variant="outline" className="font-normal">{c.policyStatus}</Badge>
+                                <Badge variant="outline" className="font-normal">
+                                  {c.policyStatus}
+                                </Badge>
                               ) : (
                                 <span className="text-muted-foreground">—</span>
                               )}
@@ -725,7 +694,11 @@ const DhipayaAnalytics = () => {
                               {c.outstandingBalance || <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="text-sm">
-                              {c.planCodeId ? (planCodeMap.get(c.planCodeId) ?? c.planCodeId) : <span className="text-muted-foreground">—</span>}
+                              {c.planCodeId ? (
+                                (planCodeMap.get(c.planCodeId) ?? c.planCodeId)
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-sm">
                               {c.noticeSent || <span className="text-muted-foreground">—</span>}
@@ -740,12 +713,7 @@ const DhipayaAnalytics = () => {
                               {c.policy || <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setLogModal(c)}
-                                className="h-8"
-                              >
+                              <Button size="sm" variant="outline" onClick={() => setLogModal(c)} className="h-8">
                                 <FileText className="w-3.5 h-3.5 mr-1.5" />
                                 View Log
                                 {logCount > 0 && (
@@ -791,9 +759,9 @@ const DhipayaAnalytics = () => {
               <div className="space-y-3">
                 {modalLogs.map((log) => {
                   const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-                  const n = normalizeConsent(consent?.consentStatus);
-                  const isGiven = n === "given";
-                  const isDenied = n === "denied";
+                  const consentStatus = consent?.consentStatus || "";
+                  const isGiven = consentStatus === CONSENT_GIVEN;
+                  const isDenied = consentStatus === CONSENT_DENIED;
                   const campaign = logModal?.campaign || "";
                   return (
                     <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
@@ -814,9 +782,7 @@ const DhipayaAnalytics = () => {
                               ✓ Consent Given
                             </Badge>
                           ) : isDenied ? (
-                            <Badge className="bg-rose-100 text-rose-700 border-transparent">
-                              ✗ Consent Denied
-                            </Badge>
+                            <Badge className="bg-rose-100 text-rose-700 border-transparent">✗ Consent Denied</Badge>
                           ) : null}
                         </div>
                       </div>
@@ -832,7 +798,11 @@ const DhipayaAnalytics = () => {
 
                       {/* Audio player */}
                       {log.audioUrl && (
-                        <audio controls src={log.audioUrl} className="w-full h-9" />
+                        <audio
+                          controls
+                          src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(log.audioUrl)}`}
+                          className="w-full h-9"
+                        />
                       )}
 
                       {/* Conversation log */}
@@ -857,9 +827,7 @@ const DhipayaAnalytics = () => {
                                         : "bg-muted/40 text-foreground"
                                   }`}
                                 >
-                                  <span className="font-semibold mr-1">
-                                    {isBot ? "Bot:" : isUser ? "User:" : ""}
-                                  </span>
+                                  <span className="font-semibold mr-1">{isBot ? "Bot:" : isUser ? "User:" : ""}</span>
                                   {cleanLine}
                                 </div>
                               );
@@ -899,9 +867,7 @@ function KpiCard({
           <Icon className="w-7 h-7" />
         </div>
         <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground truncate">
-            {label}
-          </div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground truncate">{label}</div>
           <div className="text-3xl font-semibold tabular-nums">{value}</div>
         </div>
       </CardContent>
