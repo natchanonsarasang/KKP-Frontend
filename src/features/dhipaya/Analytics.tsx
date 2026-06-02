@@ -65,6 +65,14 @@ import {
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
 
+function normalizeConsent(s?: string): "given" | "denied" | "" {
+  const v = (s ?? "").toLowerCase().trim();
+  if (!v) return "";
+  if (v.includes("given") || v.includes("yes") || v.includes("ยินยอม") && !v.includes("ไม่")) return "given";
+  if (v.includes("denied") || v.includes("deny") || v.includes("no") || v.includes("ไม่ยินยอม") || v.includes("ปฏิเสธ")) return "denied";
+  return "";
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
