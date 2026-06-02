@@ -65,6 +65,14 @@ import {
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
 
+function normalizeConsent(s?: string): "given" | "denied" | "" {
+  const v = (s ?? "").toLowerCase().trim();
+  if (!v) return "";
+  if (v.includes("denied") || v.includes("deny") || v.includes("ไม่ยินยอม") || v.includes("ปฏิเสธ")) return "denied";
+  if (v.includes("given") || v.includes("granted") || v.includes("ยินยอม") || v.includes("yes")) return "given";
+  return "";
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -90,20 +98,17 @@ function getConsentLabel(
   logs: CallLog[],
   consentById: Map<string, Consent>,
 ): "given" | "denied" | "called" | "none" {
-  const s = (c.consentStatus ?? "").trim();
-  if (s === CONSENT_GIVEN) return "given";
-  if (s === CONSENT_DENIED) return "denied";
-  const hasLog = logs.some((l) => l.customerId === c.id);
-  if (hasLog) {
-    const consentStatuses = logs
-      .filter((l) => l.customerId === c.id)
-      .map((l) => {
-        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
-        return (consent?.consentStatus ?? "").toLowerCase();
-      })
-      .join(" ");
-    if (consentStatuses.includes("consent given")) return "given";
-    if (consentStatuses.includes("consent denied")) return "denied";
+  const cn = normalizeConsent(c.consentStatus);
+  if (cn === "given") return "given";
+  if (cn === "denied") return "denied";
+  const customerLogs = logs.filter((l) => l.customerId === c.id);
+  if (customerLogs.length > 0) {
+    for (const l of customerLogs) {
+      const consent = l.consentId ? consentById.get(l.consentId) : undefined;
+      const n = normalizeConsent(consent?.consentStatus);
+      if (n === "given") return "given";
+      if (n === "denied") return "denied";
+    }
     return "called";
   }
   return "none";
@@ -156,9 +161,9 @@ function OutcomeAndPolicyCharts({
     let noAnswer = 0;
     for (const log of logs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const n = normalizeConsent(consent?.consentStatus);
+      if (n === "given") given++;
+      else if (n === "denied") denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
@@ -411,9 +416,9 @@ const DhipayaAnalytics = () => {
     let denied = 0;
     for (const log of filteredLogs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const n = normalizeConsent(consent?.consentStatus);
+      if (n === "given") given++;
+      else if (n === "denied") denied++;
     }
     return { totalCalls, given, denied };
   }, [filteredLogs, consentById]);
@@ -425,9 +430,9 @@ const DhipayaAnalytics = () => {
       const date = ymd(log.calledAt);
       if (!date) continue;
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      const isGiven = consentStatus === CONSENT_GIVEN;
-      const isDenied = consentStatus === CONSENT_DENIED;
+      const n = normalizeConsent(consent?.consentStatus);
+      const isGiven = n === "given";
+      const isDenied = n === "denied";
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
@@ -786,9 +791,9 @@ const DhipayaAnalytics = () => {
               <div className="space-y-3">
                 {modalLogs.map((log) => {
                   const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-                  const consentStatus = consent?.consentStatus || "";
-                  const isGiven = consentStatus === CONSENT_GIVEN;
-                  const isDenied = consentStatus === CONSENT_DENIED;
+                  const n = normalizeConsent(consent?.consentStatus);
+                  const isGiven = n === "given";
+                  const isDenied = n === "denied";
                   const campaign = logModal?.campaign || "";
                   return (
                     <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
