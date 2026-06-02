@@ -185,6 +185,29 @@ export async function listCallLogs(opts?: {
   };
 }
 
+// -------- Consents --------
+export async function listConsents(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ consents: Consent[]; offset?: string }> {
+  const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
+  if (opts?.offset) params.offset = opts.offset;
+  const res = await call<ListResponse>({ action: "list", table: "Consents", params });
+  return {
+    consents: res.records.map((r) => ({
+      id: r.id,
+      customerId:
+        typeof r.fields[CONSENT_FIELDS.customer] === "number"
+          ? (r.fields[CONSENT_FIELDS.customer] as number)
+          : r.fields[CONSENT_FIELDS.customer] != null
+            ? Number(r.fields[CONSENT_FIELDS.customer])
+            : undefined,
+      consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
+    })),
+    offset: res.offset,
+  };
+}
+
 // -------- Installment KB --------
 export async function listInstallmentKb(opts?: {
   pageSize?: number;
