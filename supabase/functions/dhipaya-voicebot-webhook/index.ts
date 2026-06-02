@@ -1324,23 +1324,8 @@ async function syncCallLogToAirtable(
     );
   }
 
-  // Step C: search Call Logs for existing record linked to this Customer
+  // Always create a new Call Logs row (no lookup / no upsert)
   const tablePath = "Call%20Logs";
-  let existing: any = null;
-  const customerLinkId = customerRec?.fields?.["Customer_ID"];
-  if (customerLinkId != null) {
-    const callLogFormula = `{Customer}=${typeof customerLinkId === "number" ? customerLinkId : `'${String(customerLinkId).replace(/'/g, "\\'")}'`}`;
-    try {
-      const callLogRes = await airtableFetch(
-        `${baseId}/${tablePath}?filterByFormula=${encodeURIComponent(callLogFormula)}&maxRecords=1`,
-        { method: "GET" },
-        pat,
-      );
-      existing = callLogRes?.records?.[0] ?? null;
-    } catch (e) {
-      console.warn("Airtable call log: lookup failed", e);
-    }
-  }
 
   // Determine campaign header from payload.variables or result_data.
 
