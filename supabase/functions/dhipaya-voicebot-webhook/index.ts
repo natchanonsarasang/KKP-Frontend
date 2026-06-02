@@ -1145,7 +1145,73 @@ async function isCheckCallAllowed(phone: string): Promise<boolean> {
   }
 }
 
-async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" | "Consent Denied"): Promise<void> {
+// Shared customer lookup: try customer_rec_id (from call_records.result_data) first,
+// then fall back to phone via phoneCheckCallFormula. Prevents duplicate-phone collisions.
+async function findCustomerRecord(
+  callLogId: string | null | undefined,
+  phone: string | null | undefined,
+  pat: string,
+  baseId: string,
+  context: string,
+): Promise<any | null> {
+  let resultData: any = null;
+  if (callLogId) {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && supabaseKey) {
+        const sb = createClient(supabaseUrl, supabaseKey);
+        const { data } = await sb
+          .from("call_records")
+          .select("result_data")
+          .eq("botnoi_call_id", String(callLogId))
+          .maybeSingle();
+        resultData = data?.result_data ?? null;
+      }
+    } catch (e) {
+      console.warn(`[${context}] call_records lookup failed`, e);
+    }
+  }
+
+  const customerRecId: string | undefined = resultData?.customer_rec_id;
+  if (customerRecId && typeof customerRecId === "string" && customerRecId.startsWith("rec")) {
+    try {
+      const rec = await airtableFetch(`${baseId}/Customer/${customerRecId}`, { method: "GET" }, pat);
+      if (rec?.id) return rec;
+    } catch (e) {
+      console.warn(`[${context}] direct Customer fetch failed for ${customerRecId}`, e);
+    }
+  }
+
+  if (phone) {
+    const normalized = normalizePhone(phone);
+    if (normalized) {
+      const phoneFormula = phoneCheckCallFormula(normalized);
+      try {
+        const customerRes = await airtableFetch(
+          `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
+          { method: "GET" },
+          pat,
+        );
+        const rec = customerRes?.records?.[0] ?? null;
+        if (rec) return rec;
+      } catch (e) {
+        console.warn(`[${context}] customer lookup by phone failed`, e);
+      }
+    }
+  }
+
+  console.warn(
+    `[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
+  );
+  return null;
+}
+
+async function syncConsentToAirtable(
+  phone: string,
+  aiCategory: "Consent Given" | "Consent Denied",
+  callLogId?: string | null,
+): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1153,59 +1219,28 @@ async function syncConsentToAirtable(phone: string, aiCategory: "Consent Given" 
     return;
   }
 
-  const normalized = normalizePhone(phone);
-  if (!normalized) return;
+  const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Airtable consent");
+  if (!customerRec?.id) return;
 
-  const phoneFormula = phoneCheckCallFormula(normalized);
-
-  const customerRes = await airtableFetch(
-    `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
-    { method: "GET" },
+  // Always create a new Consents row (no upsert).
+  await airtableFetch(
+    `${baseId}/Consents`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        fields: { Consent_Status: aiCategory, Customer: [customerRec.id] },
+      }),
+    },
     pat,
   );
-  const customerRec = customerRes?.records?.[0];
-  if (!customerRec) {
-    console.warn(`Airtable: no Customer found for phone ${normalized}`);
-    return;
-  }
-  const customerId = customerRec.fields?.["Customer_ID"];
-  if (customerId == null) {
-    console.warn("Airtable: Customer row missing Customer_ID");
-    return;
-  }
-
-  const consentFormula = `{Customer} = ${customerId}`;
-  const consentRes = await airtableFetch(
-    `${baseId}/Consents?filterByFormula=${encodeURIComponent(consentFormula)}&maxRecords=1`,
-    { method: "GET" },
-    pat,
-  );
-  const existing = consentRes?.records?.[0];
-  const fields = { Consent_Status: aiCategory };
-
-  if (existing) {
-    await airtableFetch(
-      `${baseId}/Consents/${existing.id}`,
-      { method: "PATCH", body: JSON.stringify({ fields }) },
-      pat,
-    );
-    console.log(`Airtable consent updated for Customer_ID ${customerId}: ${aiCategory}`);
-  } else {
-    await airtableFetch(
-      `${baseId}/Consents`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          fields: { ...fields, Customer: [customerRec.id] },
-        }),
-      },
-      pat,
-    );
-    console.log(`Airtable consent created for Customer_ID ${customerId} (rec ${customerRec.id}): ${aiCategory}`);
-  }
+  console.log(`Airtable consent CREATED for Customer rec ${customerRec.id}: ${aiCategory}`);
 }
 
-async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise<void> {
+async function syncNoticeToAirtable(
+  phone: string,
+  value: "Yes" | "No",
+  callLogId?: string | null,
+): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1213,21 +1248,8 @@ async function syncNoticeToAirtable(phone: string, value: "Yes" | "No"): Promise
     return;
   }
 
-  const normalized = normalizePhone(phone);
-  if (!normalized) return;
-
-  const phoneFormula = phoneCheckCallFormula(normalized);
-
-  const customerRes = await airtableFetch(
-    `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
-    { method: "GET" },
-    pat,
-  );
-  const customerRec = customerRes?.records?.[0];
-  if (!customerRec) {
-    console.warn(`Airtable: no Customer found for phone ${normalized} (notice sync)`);
-    return;
-  }
+  const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Airtable notice");
+  if (!customerRec?.id) return;
 
   await airtableFetch(
     `${baseId}/Customer/${customerRec.id}`,
