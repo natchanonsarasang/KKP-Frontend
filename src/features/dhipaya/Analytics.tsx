@@ -789,8 +789,10 @@ const DhipayaAnalytics = () => {
                   const consentStatus = consent?.consentStatus || "";
                   const isGiven = consentStatus === CONSENT_GIVEN;
                   const isDenied = consentStatus === CONSENT_DENIED;
+                  const campaign = logModal?.campaign || "";
                   return (
-                    <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-2 bg-card">
+                    <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
+                      {/* Header row: timestamp, duration, consent */}
                       <div className="flex flex-wrap items-center gap-2 justify-between">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-3.5 h-3.5" />
@@ -813,18 +815,52 @@ const DhipayaAnalytics = () => {
                           ) : null}
                         </div>
                       </div>
+
+                      {/* Campaign */}
+                      {campaign && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs font-medium">
+                            {campaign}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Audio player */}
                       {log.audioUrl && (
                         <audio controls src={log.audioUrl} className="w-full h-9" />
                       )}
-                      {log.transcript && (
-                        <details className="text-sm">
-                          <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
-                            View transcript
-                          </summary>
-                          <pre className="mt-2 whitespace-pre-wrap text-xs bg-muted/50 rounded p-3 font-sans">
-                            {log.transcript}
-                          </pre>
-                        </details>
+
+                      {/* Conversation log */}
+                      {log.conversationLogs && (
+                        <div className="text-sm space-y-1">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Conversation
+                          </p>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {log.conversationLogs.split("\n").map((line, idx) => {
+                              const isBot = line.startsWith("Bot:") || line.startsWith("Assistant:");
+                              const isUser = line.startsWith("User:") || line.startsWith("Customer:");
+                              const cleanLine = line.replace(/^(Bot|Assistant|User|Customer):\s*/, "");
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`text-xs leading-relaxed rounded px-2 py-1 ${
+                                    isBot
+                                      ? "bg-blue-50 text-blue-900"
+                                      : isUser
+                                        ? "bg-emerald-50 text-emerald-900"
+                                        : "bg-muted/40 text-foreground"
+                                  }`}
+                                >
+                                  <span className="font-semibold mr-1">
+                                    {isBot ? "Bot:" : isUser ? "User:" : ""}
+                                  </span>
+                                  {cleanLine}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
