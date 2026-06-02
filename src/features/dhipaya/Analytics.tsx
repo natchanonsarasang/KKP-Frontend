@@ -43,10 +43,11 @@ import {
 import {
   listCallLogs,
   listCustomers,
+  listConsents,
   listInstallmentKb,
   listPolicies,
 } from "./api/airtable";
-import type { CallLog, Customer } from "./types";
+import type { CallLog, Customer, Consent } from "./types";
 import {
   PhoneCall,
   CheckCircle2,
