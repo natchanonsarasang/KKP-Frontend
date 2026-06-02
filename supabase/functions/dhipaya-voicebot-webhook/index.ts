@@ -1363,7 +1363,7 @@ async function syncCallLogToAirtable(
   if (customerRec) {
     const cStatusRaw = customerRec.fields?.["Consent_Status (from Consents)"];
     const pStatusRaw = customerRec.fields?.["Policy_Status (from Policy)"];
-
+    console.log("DEBUG Airtable Raw:", { cStatusRaw, pStatusRaw });
     const consentStatus = (Array.isArray(cStatusRaw) ? cStatusRaw[0] : cStatusRaw || "")
       .toString()
       .trim()
