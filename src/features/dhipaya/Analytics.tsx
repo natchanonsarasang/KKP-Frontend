@@ -70,6 +70,25 @@ function normalizeConsent(raw: unknown): "given" | "denied" | "" {
   return "";
 }
 
+/** Resolve a CallLog's consent status to "given"|"denied"|"".
+ *  Tolerates two Airtable shapes for the Call Logs `Consents` column:
+ *   1. Linked record  → `consentId` is an Airtable record ID ("recXXX") that
+ *      must be looked up in the Consents table (consentById map).
+ *   2. Lookup/rollup  → `consentId` already contains the status string. */
+function resolveLogConsent(
+  log: { consentId?: string },
+  consentById: Map<string, { consentStatus?: string }>,
+): "given" | "denied" | "" {
+  const raw = log.consentId;
+  if (!raw) return "";
+  // Linked-record IDs always start with "rec" and are 17 chars.
+  if (/^rec[A-Za-z0-9]{14}$/.test(raw)) {
+    return normalizeConsent(consentById.get(raw)?.consentStatus);
+  }
+  // Otherwise treat the value itself as the status string.
+  return normalizeConsent(raw);
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -102,7 +121,7 @@ function getConsentLabel(
   if (hasLog) {
     const norms = logs
       .filter((l) => l.customerId === c.id)
-      .map((l) => normalizeConsent(consentById.get(l.consentId ?? "")?.consentStatus));
+      .map((l) => resolveLogConsent(l, consentById));
     if (norms.includes("given")) return "given";
     if (norms.includes("denied")) return "denied";
     return "called";
@@ -152,8 +171,7 @@ function OutcomeAndPolicyCharts({
     let denied = 0;
     let noAnswer = 0;
     for (const log of logs) {
-      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const norm = normalizeConsent(consent?.consentStatus);
+      const norm = resolveLogConsent(log, consentById);
       if (norm === "given") given++;
       else if (norm === "denied") denied++;
       else noAnswer++;
@@ -364,12 +382,29 @@ const DhipayaAnalytics = () => {
     }
     console.log("[Analytics] consents loaded:", consents.length, "status counts:", statusCounts);
     const missing: string[] = [];
+    let looksLikeStatus = 0;
+    let looksLikeRecId = 0;
+    let empty = 0;
     for (const l of logs) {
-      if (l.consentId && !map.has(l.consentId)) missing.push(l.consentId);
+      const v = l.consentId;
+      if (!v) { empty++; continue; }
+      if (/^rec[A-Za-z0-9]{14}$/.test(v)) {
+        looksLikeRecId++;
+        if (!map.has(v)) missing.push(v);
+      } else {
+        looksLikeStatus++;
+      }
     }
+    console.log("[Analytics] call-log consentId shape:", {
+      total: logs.length,
+      empty,
+      looksLikeRecId,
+      looksLikeStatus,
+      sample: logs.slice(0, 3).map((l) => l.consentId),
+    });
     if (missing.length) {
       console.warn(
-        `[Analytics] ${missing.length} call log(s) reference a consentId not in consentById. First 5:`,
+        `[Analytics] ${missing.length} log(s) have a rec-id consentId not in consentById (probable pagination/permission issue). First 5:`,
         missing.slice(0, 5),
       );
     }
@@ -408,8 +443,7 @@ const DhipayaAnalytics = () => {
     let given = 0;
     let denied = 0;
     for (const log of filteredLogs) {
-      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const norm = normalizeConsent(consent?.consentStatus);
+      const norm = resolveLogConsent(log, consentById);
       if (norm === "given") given++;
       else if (norm === "denied") denied++;
     }
@@ -423,8 +457,7 @@ const DhipayaAnalytics = () => {
     for (const log of filteredLogs) {
       const date = ymd(log.calledAt);
       if (!date) continue;
-      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const norm = normalizeConsent(consent?.consentStatus);
+      const norm = resolveLogConsent(log, consentById);
       const isGiven = norm === "given";
       const isDenied = norm === "denied";
       if (!isGiven && !isDenied) continue;
@@ -796,8 +829,7 @@ const DhipayaAnalytics = () => {
             ) : (
               <div className="space-y-3">
                 {modalLogs.map((log) => {
-                  const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-                  const norm = normalizeConsent(consent?.consentStatus);
+                  const norm = resolveLogConsent(log, consentById);
                   const isGiven = norm === "given";
                   const isDenied = norm === "denied";
                   const campaign = logModal?.campaign || "";
