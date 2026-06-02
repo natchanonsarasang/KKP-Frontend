@@ -164,9 +164,9 @@ function OutcomeAndPolicyCharts({
     let noAnswer = 0;
     for (const log of logs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const n = normalizeConsent(consent?.consentStatus);
+      if (n === "given") given++;
+      else if (n === "denied") denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
