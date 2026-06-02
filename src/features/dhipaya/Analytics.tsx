@@ -144,21 +144,21 @@ const OUTCOME_COLORS = {
 function OutcomeAndPolicyCharts({
   customers,
   logs,
+  consentById,
 }: {
   customers: Customer[];
   logs: CallLog[];
+  consentById: Map<string, Consent>;
 }) {
   const outcomeData = useMemo(() => {
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     let given = 0;
     let denied = 0;
     let noAnswer = 0;
     for (const log of logs) {
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      if (outcome.includes("consent_given") || status === CONSENT_GIVEN) given++;
-      else if (outcome.includes("consent_denied") || status === CONSENT_DENIED) denied++;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
@@ -170,7 +170,8 @@ function OutcomeAndPolicyCharts({
         { key: "noAnswer", name: "No Answer", value: noAnswer, color: OUTCOME_COLORS.noAnswer },
       ],
     };
-  }, [customers, logs]);
+  }, [logs, consentById]);
+
 
   const policyData = useMemo(() => {
     const buckets = new Map<string, { total: number; converted: number }>();
