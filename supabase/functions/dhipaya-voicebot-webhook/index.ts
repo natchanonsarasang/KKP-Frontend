@@ -254,6 +254,21 @@ async function handleWebhook(req: Request): Promise<Response> {
 
     // --- Sequenced consent -> call log task (avoids race on Consents FK) ---
     const consentThenCallLogTask = (async () => {
+      // Resolve campaign BEFORE syncing consent so Airtable lookup reflects pre-update state.
+      let campaignResolution: CampaignResolution | null = null;
+      if (callId && checkCallAllowed) {
+        try {
+          const pat = Deno.env.get("AIRTABLE_PAT");
+          const baseId = Deno.env.get("AIRTABLE_BASE_ID");
+          if (pat && baseId) {
+            campaignResolution = await resolveCampaignHeader(payload, phoneNumber, pat, baseId);
+            console.log(`Campaign resolved before consent sync: ${campaignResolution.campaignHeader}`);
+          }
+        } catch (err) {
+          console.error("Campaign pre-resolution failed:", err);
+        }
+      }
+
       let consentRecordId: string | null = null;
       if (consentSyncEnabled) {
         console.log(
@@ -277,6 +292,7 @@ async function handleWebhook(req: Request): Promise<Response> {
             callDuration,
             payload.audio_url ?? null,
             consentRecordId,
+            campaignResolution,
           );
         } catch (err) {
           console.error("Airtable call log sync failed:", err);
@@ -287,6 +303,7 @@ async function handleWebhook(req: Request): Promise<Response> {
         console.log("Airtable call log sync skipped: CheckCall != 'Y'");
       }
     })();
+
 
     // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
     if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
