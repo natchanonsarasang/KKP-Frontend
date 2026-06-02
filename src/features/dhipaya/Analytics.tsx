@@ -428,6 +428,12 @@ const DhipayaAnalytics = () => {
         </CardContent>
       </Card>
 
+      {/* Outcome Breakdown + Policy Status Performance */}
+      <OutcomeAndPolicyCharts
+        customers={customers}
+        logs={filteredLogs}
+      />
+
       {/* Customer Table */}
       <Card>
         <CardHeader className="pb-3">
