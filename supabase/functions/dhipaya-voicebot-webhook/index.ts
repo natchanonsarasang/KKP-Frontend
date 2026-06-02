@@ -1455,7 +1455,8 @@ async function syncCallLogToAirtable(
   if (consentRecordId && typeof consentRecordId === "string" && consentRecordId.startsWith("rec")) {
     createFields.Consents = [consentRecordId];
   }
-  const callTimestamp = formatBangkokTimestamp(payload?.timestamp);
+  const callTimestamp =
+    extractCallTimestampFromConversation(payload) ?? formatBangkokTimestamp(payload?.timestamp);
   if (callTimestamp) createFields.Call_Timestamp = callTimestamp;
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
