@@ -341,23 +341,27 @@ const DhipayaAnalytics = () => {
 
   const customers = customersQuery.data?.customers ?? [];
   const logs = callLogsQuery.data?.logs ?? [];
+  const consents = consentsQuery.data?.consents ?? [];
   const policies = policiesQuery.data?.policies ?? [];
   const kbItems = installmentKbQuery.data?.items ?? [];
 
-  const isLoading = customersQuery.isLoading || callLogsQuery.isLoading;
+  const isLoading = customersQuery.isLoading || callLogsQuery.isLoading || consentsQuery.isLoading;
   const isFetching =
     customersQuery.isFetching ||
     callLogsQuery.isFetching ||
+    consentsQuery.isFetching ||
     policiesQuery.isFetching ||
     installmentKbQuery.isFetching;
-  const isError = customersQuery.isError || callLogsQuery.isError;
+  const isError = customersQuery.isError || callLogsQuery.isError || consentsQuery.isError;
   const errorMessage =
     (customersQuery.error as Error)?.message ||
-    (callLogsQuery.error as Error)?.message;
+    (callLogsQuery.error as Error)?.message ||
+    (consentsQuery.error as Error)?.message;
 
   const handleRefresh = () => {
     customersQuery.refetch();
     callLogsQuery.refetch();
+    consentsQuery.refetch();
     policiesQuery.refetch();
     installmentKbQuery.refetch();
   };
