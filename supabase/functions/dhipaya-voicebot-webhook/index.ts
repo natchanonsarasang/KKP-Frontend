@@ -1211,19 +1211,19 @@ async function syncConsentToAirtable(
   phone: string,
   aiCategory: "Consent Given" | "Consent Denied",
   callLogId?: string | null,
-): Promise<void> {
+): Promise<string | null> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
     console.warn("Airtable credentials missing; skipping consent sync");
-    return;
+    return null;
   }
 
   const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Airtable consent");
-  if (!customerRec?.id) return;
+  if (!customerRec?.id) return null;
 
   // Always create a new Consents row (no upsert).
-  await airtableFetch(
+  const created = await airtableFetch(
     `${baseId}/Consents`,
     {
       method: "POST",
@@ -1233,7 +1233,11 @@ async function syncConsentToAirtable(
     },
     pat,
   );
-  console.log(`Airtable consent CREATED for Customer rec ${customerRec.id}: ${aiCategory}`);
+  const consentRecId: string | null = created?.id ?? null;
+  console.log(
+    `Airtable consent CREATED for Customer rec ${customerRec.id}: ${aiCategory} (Consent rec ${consentRecId ?? "unknown"})`,
+  );
+  return consentRecId;
 }
 
 async function syncNoticeToAirtable(
