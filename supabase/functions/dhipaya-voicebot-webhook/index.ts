@@ -1314,37 +1314,8 @@ async function syncCallLogToAirtable(
     console.warn("Airtable call log: call_records lookup failed", e);
   }
 
-  // Step B: find Customer — try customer_rec_id from result_data first, then phone
-  let customerRec: any = null;
-  const customerRecId: string | undefined = resultData?.customer_rec_id;
-  if (customerRecId && typeof customerRecId === "string" && customerRecId.startsWith("rec")) {
-    try {
-      customerRec = await airtableFetch(`${baseId}/Customer/${customerRecId}`, { method: "GET" }, pat);
-    } catch (e) {
-      console.warn(`Airtable call log: direct Customer fetch failed for ${customerRecId}`, e);
-    }
-  }
-  if (!customerRec && phone) {
-    const normalized = normalizePhone(phone);
-    if (normalized) {
-      const phoneFormula = phoneCheckCallFormula(normalized);
-      try {
-        const customerRes = await airtableFetch(
-          `${baseId}/Customer?filterByFormula=${encodeURIComponent(phoneFormula)}&maxRecords=1`,
-          { method: "GET" },
-          pat,
-        );
-        customerRec = customerRes?.records?.[0] ?? null;
-      } catch (e) {
-        console.warn("Airtable call log: customer lookup by phone failed", e);
-      }
-    }
-  }
-  if (!customerRec) {
-    console.warn(
-      `Airtable call log: no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
-    );
-  }
+  // Step B: find Customer via shared helper (customer_rec_id first, phone fallback)
+  const customerRec = await findCustomerRecord(callLogId, phone, pat, baseId, "Airtable call log");
 
   // Always create a new Call Logs row (no lookup / no upsert)
   const tablePath = "Call%20Logs";
