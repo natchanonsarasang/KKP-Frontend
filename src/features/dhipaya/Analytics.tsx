@@ -812,8 +812,7 @@ const DhipayaAnalytics = () => {
             ) : (
               <div className="space-y-3">
                 {modalLogs.map((log) => {
-                  const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-                  const norm = normalizeConsent(consent?.consentStatus);
+                  const norm = resolveLogConsent(log, consentById);
                   const isGiven = norm === "given";
                   const isDenied = norm === "denied";
                   const campaign = logModal?.campaign || "";
