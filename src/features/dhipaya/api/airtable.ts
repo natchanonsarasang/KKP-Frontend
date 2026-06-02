@@ -72,7 +72,7 @@ export async function updateCustomer(
  */
 export async function setCustomerConsent(customerId: number, consentStatus: string): Promise<void> {
   // Find an existing Consents row by Customer_ID (numeric foreign key).
-  const formula = `{${CONSENT_FIELDS.customer}} = ${customerId}`;
+  const formula = `FIND("${customerId}", ARRAYJOIN({Customer_ID (from Customer)}, ","))`;
   const found = await call<ListResponse>({
     action: "list",
     table: "Consents",
@@ -97,7 +97,7 @@ export async function setCustomerConsent(customerId: number, consentStatus: stri
       table: "Consents",
       fields: {
         ...fields,
-        [CONSENT_FIELDS.customer]: customerId,
+        [CONSENT_FIELDS.customer]: [String(customerId)],
       },
     });
   }
@@ -137,6 +137,18 @@ function mapCustomer(rec: AirtableRecord): Customer {
     paymentDate: str(f[CUSTOMER_FIELDS.paymentDate]),
     policy: firstLinked(f[CUSTOMER_FIELDS.policy]),
   };
+}
+
+function linked(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String).filter(Boolean);
+  if (typeof v === "string" && v) return [v];
+  return [];
+}
+
+function firstValue(v: unknown): string | undefined {
+  if (Array.isArray(v)) return v.length > 0 ? String(v[0]) : undefined;
+  if (v === null || v === undefined || v === "") return undefined;
+  return String(v);
 }
 
 // -------- Policies --------
@@ -180,11 +192,13 @@ export async function listCallLogs(opts?: {
       console.log("[listCallLogs] sample raw fields:", res.records[0].fields);
     }
     for (const r of res.records) {
+      const consentLinks = linked(r.fields[CALL_LOG_FIELDS.consent]);
       all.push({
         id: r.id,
         callLogId: str(r.fields[CALL_LOG_FIELDS.callLogId]),
-        customerId: firstLinked(r.fields[CALL_LOG_FIELDS.customer]),
-        consentId: firstLinked(r.fields[CALL_LOG_FIELDS.consent]),
+        customerId: firstValue(r.fields[CALL_LOG_FIELDS.customer]),
+        consentId: firstValue(r.fields[CALL_LOG_FIELDS.consent]),
+        consentIds: consentLinks.length ? consentLinks : undefined,
         duration: num(r.fields[CALL_LOG_FIELDS.duration]),
         conversationLogs: str(r.fields[CALL_LOG_FIELDS.conversationLogs]),
         audioUrl: str(r.fields[CALL_LOG_FIELDS.audioUrl]),
@@ -216,14 +230,23 @@ export async function listConsents(opts?: {
       console.log("[listConsents] sample raw fields:", res.records[0].fields);
     }
     for (const r of res.records) {
+      const customerLinks = linked(r.fields[CONSENT_FIELDS.customer]);
       all.push({
         id: r.id,
         customerId:
-          typeof r.fields[CONSENT_FIELDS.customer] === "number"
-            ? (r.fields[CONSENT_FIELDS.customer] as number)
-            : r.fields[CONSENT_FIELDS.customer] != null
-              ? Number(r.fields[CONSENT_FIELDS.customer])
+          typeof firstValue(r.fields["Customer_ID (from Customer)"]) === "string"
+            ? Number(firstValue(r.fields["Customer_ID (from Customer)"]))
+            : typeof r.fields[CONSENT_FIELDS.customer] === "number"
+              ? (r.fields[CONSENT_FIELDS.customer] as number)
+              : firstValue(r.fields[CONSENT_FIELDS.customer]) != null
+                ? Number(firstValue(r.fields[CONSENT_FIELDS.customer]))
+                : undefined,
+        customerRecordId:
+          customerLinks[0] ??
+          (typeof firstValue(r.fields[CONSENT_FIELDS.customer]) === "string" && /^rec[A-Za-z0-9]{14}$/.test(firstValue(r.fields[CONSENT_FIELDS.customer]) ?? "")
+            ? firstValue(r.fields[CONSENT_FIELDS.customer])
               : undefined,
+        customerRecordIds: customerLinks.length ? customerLinks : undefined,
         consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
       });
     }
