@@ -428,9 +428,9 @@ const DhipayaAnalytics = () => {
       const date = ymd(log.calledAt);
       if (!date) continue;
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      const isGiven = consentStatus === CONSENT_GIVEN;
-      const isDenied = consentStatus === CONSENT_DENIED;
+      const norm = normalizeConsent(consent?.consentStatus);
+      const isGiven = norm === "given";
+      const isDenied = norm === "denied";
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
