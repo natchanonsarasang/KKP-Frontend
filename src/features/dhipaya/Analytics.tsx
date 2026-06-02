@@ -360,8 +360,25 @@ const DhipayaAnalytics = () => {
   const consentById = useMemo(() => {
     const map = new Map<string, Consent>();
     for (const c of consents) map.set(c.id, c);
+    // Diagnostic: count distinct status values and sample of unmatched logs
+    const statusCounts: Record<string, number> = {};
+    for (const c of consents) {
+      const k = (c.consentStatus ?? "(empty)").toString();
+      statusCounts[k] = (statusCounts[k] ?? 0) + 1;
+    }
+    console.log("[Analytics] consents loaded:", consents.length, "status counts:", statusCounts);
+    const missing: string[] = [];
+    for (const l of logs) {
+      if (l.consentId && !map.has(l.consentId)) missing.push(l.consentId);
+    }
+    if (missing.length) {
+      console.warn(
+        `[Analytics] ${missing.length} call log(s) reference a consentId not in consentById. First 5:`,
+        missing.slice(0, 5),
+      );
+    }
     return map;
-  }, [consents]);
+  }, [consents, logs]);
 
   const policyMap = useMemo(() => {
     const byCustomer = new Map<string, string>();
