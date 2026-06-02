@@ -70,6 +70,25 @@ function normalizeConsent(raw: unknown): "given" | "denied" | "" {
   return "";
 }
 
+/** Resolve a CallLog's consent status to "given"|"denied"|"".
+ *  Tolerates two Airtable shapes for the Call Logs `Consents` column:
+ *   1. Linked record  → `consentId` is an Airtable record ID ("recXXX") that
+ *      must be looked up in the Consents table (consentById map).
+ *   2. Lookup/rollup  → `consentId` already contains the status string. */
+function resolveLogConsent(
+  log: { consentId?: string },
+  consentById: Map<string, { consentStatus?: string }>,
+): "given" | "denied" | "" {
+  const raw = log.consentId;
+  if (!raw) return "";
+  // Linked-record IDs always start with "rec" and are 17 chars.
+  if (/^rec[A-Za-z0-9]{14}$/.test(raw)) {
+    return normalizeConsent(consentById.get(raw)?.consentStatus);
+  }
+  // Otherwise treat the value itself as the status string.
+  return normalizeConsent(raw);
+}
+
 function ymd(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
