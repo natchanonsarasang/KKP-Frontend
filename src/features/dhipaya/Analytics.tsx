@@ -407,31 +407,27 @@ const DhipayaAnalytics = () => {
   // KPIs
   const kpis = useMemo(() => {
     const totalCalls = filteredLogs.length;
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     let given = 0;
     let denied = 0;
     for (const log of filteredLogs) {
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      if (outcome.includes("consent_given") || status === CONSENT_GIVEN) given++;
-      else if (outcome.includes("consent_denied") || status === CONSENT_DENIED) denied++;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
     }
     return { totalCalls, given, denied };
-  }, [filteredLogs, customers]);
+  }, [filteredLogs, consentById]);
 
   // Chart series
   const series = useMemo(() => {
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     const buckets = new Map<string, { given: number; denied: number }>();
     for (const log of filteredLogs) {
       const date = ymd(log.calledAt);
       if (!date) continue;
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      const isGiven = outcome.includes("consent_given") || status === CONSENT_GIVEN;
-      const isDenied = outcome.includes("consent_denied") || status === CONSENT_DENIED;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      const isGiven = consentStatus === CONSENT_GIVEN;
+      const isDenied = consentStatus === CONSENT_DENIED;
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
@@ -445,7 +441,7 @@ const DhipayaAnalytics = () => {
         const rate = tot === 0 ? 0 : Math.round((given / tot) * 1000) / 10;
         return { date: shortDate(date), rate, given, denied };
       });
-  }, [filteredLogs, customers]);
+  }, [filteredLogs, consentById]);
 
   const logsByCustomer = useMemo(() => {
     const map = new Map<string, CallLog[]>();
@@ -789,9 +785,10 @@ const DhipayaAnalytics = () => {
             ) : (
               <div className="space-y-3">
                 {modalLogs.map((log) => {
-                  const outcome = (log.outcome || "").toLowerCase();
-                  const isGiven = outcome.includes("consent_given");
-                  const isDenied = outcome.includes("consent_denied");
+                  const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+                  const consentStatus = consent?.consentStatus || "";
+                  const isGiven = consentStatus === CONSENT_GIVEN;
+                  const isDenied = consentStatus === CONSENT_DENIED;
                   return (
                     <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-2 bg-card">
                       <div className="flex flex-wrap items-center gap-2 justify-between">
@@ -813,8 +810,6 @@ const DhipayaAnalytics = () => {
                             <Badge className="bg-rose-100 text-rose-700 border-transparent">
                               ✗ Consent Denied
                             </Badge>
-                          ) : log.outcome ? (
-                            <Badge variant="secondary">{log.outcome}</Badge>
                           ) : null}
                         </div>
                       </div>
