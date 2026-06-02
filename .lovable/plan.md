@@ -1,27 +1,39 @@
 ## Goal
 
-Change `syncCallLogToAirtable` in `supabase/functions/dhipaya-voicebot-webhook/index.ts` so that every webhook invocation creates a **new** Call Logs record in Airtable, instead of updating an existing one when found.
+Apply the "lookup Customer by `customer_rec_id` first, then phone" pattern (already used in `syncCallLogToAirtable`) to **`syncConsentToAirtable`** and **`syncNoticeToAirtable`** in `supabase/functions/dhipaya-voicebot-webhook/index.ts`. Also make `syncConsentToAirtable` always create a new Consents row instead of upserting.
 
 ## Changes
 
-In `supabase/functions/dhipaya-voicebot-webhook/index.ts` (around lines 1327–1452):
+### 1. `handleWebhook` (around line 248)
 
-1. **Remove the existing-record lookup (Step C, lines 1327–1343).** The `{Customer}=...` search and `existing` variable are no longer needed.
+- Compute `const callLogId = payload?.outbound_id || payload?.call_id` once near the consent/notice sync block.
+- Pass it as a 3rd argument to both `syncConsentToAirtable(phone, consentValue, callLogId)` and `syncNoticeToAirtable(phone, value, callLogId)`.
 
-2. **Remove the PATCH branch (lines 1434–1440).** Always run the POST/create path.
+### 2. Shared helper
 
-3. **Keep the customer guard.** Still bail out with the existing warning if `customerRec?.id` is missing, to avoid orphan rows.
+Add a small helper `findCustomerRecord(callLogId, phone, pat, baseId)` that returns the Airtable Customer record (or null) by:
+1. Loading `result_data` from `call_records` via Supabase service-role (`botnoi_call_id = callLogId`).
+2. If `result_data.customer_rec_id` starts with `rec`, fetching `Customer/{recId}` directly.
+3. Otherwise, falling back to `phoneCheckCallFormula(normalizePhone(phone))` against `Customer`.
+4. Logging a warning and returning null if nothing matches.
 
-4. **Keep everything else intact:**
-   - Customer lookup via `customer_rec_id` then phone (`phoneCheckCallFormula`).
-   - Campaign header determination logic.
-   - `fields` payload (Conversation_Logs, audio_url, Call_Duration, Call_Status).
-   - Linking the new row via `Customer: [customerRec.id]` and attaching `Call_Log_ID` when present.
-   - 429-aware retry via `airtableFetch`.
+This is the same logic that's currently inlined in `syncCallLogToAirtable` (lines 1276–1325). Refactor `syncCallLogToAirtable` to call the new helper as well, removing the duplicated lookup block.
 
-5. **Logging:** replace the PATCH/created log lines with a single `console.log("Airtable call log CREATED for Customer ...")` after the POST.
+### 3. `syncConsentToAirtable` (line 1148)
+
+- Accept new optional `callLogId?: string` arg.
+- Replace existing phone-only customer lookup (lines 1156–1175) with `findCustomerRecord(callLogId, phone, pat, baseId)`.
+- **Remove** the `{Customer} = customerId` Consents lookup and PATCH branch (lines 1177–1192).
+- Always POST to `Consents` with `{ Consent_Status: aiCategory, Customer: [customerRec.id] }` via the existing 429-aware `airtableFetch`.
+- Single log: `Airtable consent CREATED for Customer rec ${customerRec.id}: ${aiCategory}`.
+
+### 4. `syncNoticeToAirtable` (line 1208)
+
+- Accept new optional `callLogId?: string` arg.
+- Replace phone-only customer lookup (lines 1216–1230) with `findCustomerRecord(callLogId, phone, pat, baseId)`.
+- Keep the existing PATCH that sets `notice_received` on the located Customer.
 
 ## Out of scope
 
-- No changes to consent/notice sync, intent routing, or campaign header logic.
-- No frontend changes.
+- No changes to intent routing, CheckCall filter, campaign header logic, retry/backoff, or frontend.
+- `syncCallLogToAirtable`'s "always create new Call Logs row" behavior stays as-is.
