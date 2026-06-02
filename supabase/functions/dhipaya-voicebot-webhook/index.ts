@@ -1417,6 +1417,9 @@ async function syncCallLogToAirtable(
     ...fields,
     Customer: [customerRec.id],
   };
+  if (consentRecordId && typeof consentRecordId === "string" && consentRecordId.startsWith("rec")) {
+    createFields.Consents = [consentRecordId];
+  }
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
   await airtableFetch(
@@ -1424,5 +1427,7 @@ async function syncCallLogToAirtable(
     { method: "POST", body: JSON.stringify({ fields: createFields }) },
     pat,
   );
-  console.log(`Airtable call log CREATED for Customer ${customerRec.id}`);
+  console.log(
+    `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}`,
+  );
 }
