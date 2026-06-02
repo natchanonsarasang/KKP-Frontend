@@ -1298,6 +1298,23 @@ function formatBangkokTimestamp(unixTs: number | string | null | undefined): str
   return bangkokDate.toISOString().replace("Z", "+07:00");
 }
 
+/**
+ * Extract Call_Timestamp from the first entry of payload.conversation_log.
+ * The webhook provides timeStamp as Bangkok local time in "YYYY-MM-DD HH:mm:ss" format.
+ * Returns ISO 8601 string with +07:00 offset, or null if unavailable/invalid.
+ */
+function extractCallTimestampFromConversation(payload: any): string | null {
+  const log = payload?.conversation_log;
+  if (!Array.isArray(log) || log.length === 0) return null;
+  const first = log[0];
+  const ts = typeof first?.timeStamp === "string" ? first.timeStamp.trim() : "";
+  // Expected format: "YYYY-MM-DD HH:mm:ss" (Bangkok local)
+  const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  return `${y}-${mo}-${d}T${h}:${mi}:${s}+07:00`;
+}
+
 async function syncCallLogToAirtable(
   payload: any,
   conversationLog: string,
