@@ -245,7 +245,7 @@ async function handleWebhook(req: Request): Promise<Response> {
           : null;
     if (phoneNumber && pickedUp && consentValue && checkCallAllowed) {
       console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
-      const syncPromise = syncConsentToAirtable(phoneNumber, consentValue)
+      const syncPromise = syncConsentToAirtable(phoneNumber, consentValue, callId)
         .then(() => console.log("Airtable consent sync finished"))
         .catch((err) => console.error("Airtable consent sync failed:", err));
       // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
