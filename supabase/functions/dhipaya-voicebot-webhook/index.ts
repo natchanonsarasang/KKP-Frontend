@@ -1429,6 +1429,12 @@ async function syncCallLogToAirtable(
   }
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
+
+  // Add Call_Timestamp from the first conversation_log entry
+  const firstTimestamp = payload?.conversation_log?.[0]?.timeStamp;
+  if (firstTimestamp && typeof firstTimestamp === "string") {
+    createFields.Call_Timestamp = firstTimestamp;
+  }
   await airtableFetch(
     `${baseId}/${tablePath}`,
     { method: "POST", body: JSON.stringify({ fields: createFields }) },
