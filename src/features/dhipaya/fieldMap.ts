@@ -38,13 +38,13 @@ export const POLICY_FIELDS = {
 } as const;
 
 export const CALL_LOG_FIELDS = {
-  customer: "customer",
-  policy: "policy",
-  outcome: "outcome",
-  duration: "duration",
-  transcript: "transcript",
+  callLogId: "Call_Log_ID",
+  customer: "Customer",
+  duration: "Call_Duration",
+  calledAt: "Call_Timestamp",
+  consent: "Consents",
+  conversationLogs: "Conversation_Logs",
   audioUrl: "audio_url",
-  calledAt: "called_at",
 } as const;
 
 export const INSTALLMENT_KB_FIELDS = {
