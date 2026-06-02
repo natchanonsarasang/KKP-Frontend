@@ -256,7 +256,9 @@ async function handleWebhook(req: Request): Promise<Response> {
     const consentThenCallLogTask = (async () => {
       let consentRecordId: string | null = null;
       if (consentSyncEnabled) {
-        console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
+        console.log(
+          `Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`,
+        );
         try {
           consentRecordId = await syncConsentToAirtable(phoneNumber!, consentValue!, callId);
           console.log("Airtable consent sync finished", { consentRecordId });
@@ -311,7 +313,6 @@ async function handleWebhook(req: Request): Promise<Response> {
     } else {
       console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
-
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
@@ -1208,9 +1209,7 @@ async function findCustomerRecord(
     }
   }
 
-  console.warn(
-    `[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`,
-  );
+  console.warn(`[${context}] no Customer match (rec_id=${customerRecId ?? "none"}, phone=${phone ?? "unknown"})`);
   return null;
 }
 
@@ -1247,11 +1246,7 @@ async function syncConsentToAirtable(
   return consentRecId;
 }
 
-async function syncNoticeToAirtable(
-  phone: string,
-  value: "Yes" | "No",
-  callLogId?: string | null,
-): Promise<void> {
+async function syncNoticeToAirtable(phone: string, value: "Yes" | "No", callLogId?: string | null): Promise<void> {
   const pat = Deno.env.get("AIRTABLE_PAT");
   const baseId = Deno.env.get("AIRTABLE_BASE_ID");
   if (!pat || !baseId) {
@@ -1456,9 +1451,9 @@ async function syncCallLogToAirtable(
   if (consentRecordId && typeof consentRecordId === "string" && consentRecordId.startsWith("rec")) {
     createFields.Consents = [consentRecordId];
   }
-  const callTimestamp =
-    extractCallTimestampFromConversation(payload) ?? formatBangkokTimestamp(payload?.timestamp);
-  if (callTimestamp) createFields.Call_Timestamp = callTimestamp;
+  // const callTimestamp =
+  //   extractCallTimestampFromConversation(payload) ?? formatBangkokTimestamp(payload?.timestamp);
+  // if (callTimestamp) createFields.Call_Timestamp = callTimestamp;
   const callLogIdStr = callLogId != null ? String(callLogId).trim() : "";
   if (callLogIdStr) createFields.Call_Log_ID = callLogIdStr; // traceability only
   await airtableFetch(
