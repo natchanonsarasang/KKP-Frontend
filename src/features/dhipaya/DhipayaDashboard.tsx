@@ -5,12 +5,12 @@ import DhipayaCustomersList from "./CustomersList";
 import DhipayaCallList from "./CallList";
 import DhipayaAnalytics from "./Analytics";
 
-type TabType = "customers" | "call-list" | "analytics";
+type TabType = "analytics" | "customers" | "call-list";
 
 const steps: { id: TabType; label: string; icon: LucideIcon }[] = [
-  { id: "customers", label: "Select Customers", icon: Users },
+  { id: "analytics", label: "Dashboard", icon: BarChart3 },
+  { id: "customers", label: "Select Customer", icon: Users },
   { id: "call-list", label: "Start Calling", icon: Phone },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 const StepIndicator = ({
@@ -75,16 +75,16 @@ const StepIndicator = ({
 };
 
 const DhipayaDashboard = () => {
-  const [tab, setTab] = useState<TabType>("customers");
+  const [tab, setTab] = useState<TabType>("analytics");
 
   return (
     <div>
       <StepIndicator activeTab={tab} onTabClick={setTab} />
+      {tab === "analytics" && <DhipayaAnalytics />}
       {tab === "customers" && (
         <DhipayaCustomersList onNextStep={() => setTab("call-list")} />
       )}
       {tab === "call-list" && <DhipayaCallList />}
-      {tab === "analytics" && <DhipayaAnalytics />}
     </div>
   );
 };
