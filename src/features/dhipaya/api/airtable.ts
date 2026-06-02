@@ -139,18 +139,6 @@ function mapCustomer(rec: AirtableRecord): Customer {
   };
 }
 
-function linked(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map(String).filter(Boolean);
-  if (typeof v === "string" && v) return [v];
-  return [];
-}
-
-function firstValue(v: unknown): string | undefined {
-  if (Array.isArray(v)) return v.length > 0 ? String(v[0]) : undefined;
-  if (v === null || v === undefined || v === "") return undefined;
-  return String(v);
-}
-
 // -------- Policies --------
 export async function listPolicies(opts?: {
   pageSize?: number;
@@ -192,13 +180,11 @@ export async function listCallLogs(opts?: {
       console.log("[listCallLogs] sample raw fields:", res.records[0].fields);
     }
     for (const r of res.records) {
-      const consentLinks = linked(r.fields[CALL_LOG_FIELDS.consent]);
       all.push({
         id: r.id,
         callLogId: str(r.fields[CALL_LOG_FIELDS.callLogId]),
-        customerId: firstValue(r.fields[CALL_LOG_FIELDS.customer]),
-        consentId: firstValue(r.fields[CALL_LOG_FIELDS.consent]),
-        consentIds: consentLinks.length ? consentLinks : undefined,
+        customerId: firstLinked(r.fields[CALL_LOG_FIELDS.customer]),
+        consentId: firstLinked(r.fields[CALL_LOG_FIELDS.consent]),
         duration: num(r.fields[CALL_LOG_FIELDS.duration]),
         conversationLogs: str(r.fields[CALL_LOG_FIELDS.conversationLogs]),
         audioUrl: str(r.fields[CALL_LOG_FIELDS.audioUrl]),
@@ -230,19 +216,14 @@ export async function listConsents(opts?: {
       console.log("[listConsents] sample raw fields:", res.records[0].fields);
     }
     for (const r of res.records) {
-      const customerLinks = linked(r.fields[CONSENT_FIELDS.customer]);
       all.push({
         id: r.id,
         customerId:
-          typeof firstValue(r.fields["Customer_ID (from Customer)"]) === "string"
-            ? Number(firstValue(r.fields["Customer_ID (from Customer)"]))
-            : typeof r.fields[CONSENT_FIELDS.customer] === "number"
-              ? (r.fields[CONSENT_FIELDS.customer] as number)
-              : firstValue(r.fields[CONSENT_FIELDS.customer]) != null
-                ? Number(firstValue(r.fields[CONSENT_FIELDS.customer]))
-                : undefined,
-        customerRecordId: customerLinks[0],
-        customerRecordIds: customerLinks.length ? customerLinks : undefined,
+          typeof r.fields[CONSENT_FIELDS.customer] === "number"
+            ? (r.fields[CONSENT_FIELDS.customer] as number)
+            : r.fields[CONSENT_FIELDS.customer] != null
+              ? Number(r.fields[CONSENT_FIELDS.customer])
+              : undefined,
         consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
       });
     }
