@@ -46,6 +46,10 @@ import {
 const CONSENT_GIVEN = "Consent Given";
 const CONSENT_DENIED = "Consent Denied";
 
+function isAirtableRecordId(raw?: string): boolean {
+  return !!raw && /^rec[A-Za-z0-9]{14}$/.test(raw);
+}
+
 /** Normalize a consent status to "given" | "denied" | "" — tolerates casing,
  *  whitespace, Thai variants, and synonyms. */
 function normalizeConsent(raw: unknown): "given" | "denied" | "" {
@@ -72,21 +76,27 @@ function normalizeConsent(raw: unknown): "given" | "denied" | "" {
 
 /** Resolve a CallLog's consent status to "given"|"denied"|"".
  *  Tolerates two Airtable shapes for the Call Logs `Consents` column:
- *   1. Linked record  → `consentId` is an Airtable record ID ("recXXX") that
- *      must be looked up in the Consents table (consentById map).
- *   2. Lookup/rollup  → `consentId` already contains the status string. */
+ *   1. Linked record(s) → `consentIds` / `consentId` are Airtable record IDs
+ *      that must be looked up in the Consents table (consentById map).
+ *   2. Lookup/rollup   → `consentId` already contains the status string. */
 function resolveLogConsent(
-  log: { consentId?: string },
+  log: { consentId?: string; consentIds?: string[] },
   consentById: Map<string, { consentStatus?: string }>,
 ): "given" | "denied" | "" {
-  const raw = log.consentId;
-  if (!raw) return "";
-  // Linked-record IDs always start with "rec" and are 17 chars.
-  if (/^rec[A-Za-z0-9]{14}$/.test(raw)) {
-    return normalizeConsent(consentById.get(raw)?.consentStatus);
+  const rawValues = log.consentIds?.length ? log.consentIds : log.consentId ? [log.consentId] : [];
+
+  for (const raw of rawValues) {
+    if (!isAirtableRecordId(raw)) continue;
+    const normalized = normalizeConsent(consentById.get(raw)?.consentStatus);
+    if (normalized) return normalized;
   }
-  // Otherwise treat the value itself as the status string.
-  return normalizeConsent(raw);
+
+  for (const raw of rawValues) {
+    const normalized = normalizeConsent(raw);
+    if (normalized) return normalized;
+  }
+
+  return "";
 }
 
 function ymd(iso?: string): string | null {
@@ -386,11 +396,11 @@ const DhipayaAnalytics = () => {
     let looksLikeRecId = 0;
     let empty = 0;
     for (const l of logs) {
-      const v = l.consentId;
-      if (!v) { empty++; continue; }
-      if (/^rec[A-Za-z0-9]{14}$/.test(v)) {
+      const values = l.consentIds?.length ? l.consentIds : l.consentId ? [l.consentId] : [];
+      if (!values.length) { empty++; continue; }
+      if (values.some(isAirtableRecordId)) {
         looksLikeRecId++;
-        if (!map.has(v)) missing.push(v);
+        for (const v of values) if (isAirtableRecordId(v) && !map.has(v)) missing.push(v);
       } else {
         looksLikeStatus++;
       }
@@ -400,7 +410,7 @@ const DhipayaAnalytics = () => {
       empty,
       looksLikeRecId,
       looksLikeStatus,
-      sample: logs.slice(0, 3).map((l) => l.consentId),
+      sample: logs.slice(0, 3).map((l) => l.consentIds ?? l.consentId),
     });
     if (missing.length) {
       console.warn(
