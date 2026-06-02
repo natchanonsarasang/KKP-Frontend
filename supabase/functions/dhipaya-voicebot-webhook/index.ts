@@ -243,19 +243,8 @@ async function handleWebhook(req: Request): Promise<Response> {
         : aiResult.consentDecision === "Denied"
           ? "Consent Denied"
           : null;
-    if (phoneNumber && pickedUp && consentValue && checkCallAllowed) {
-      console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
-      const syncPromise = syncConsentToAirtable(phoneNumber, consentValue, callId)
-        .then(() => console.log("Airtable consent sync finished"))
-        .catch((err) => console.error("Airtable consent sync failed:", err));
-      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
-      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
-        // @ts-ignore
-        EdgeRuntime.waitUntil(syncPromise);
-      } else {
-        await syncPromise;
-      }
-    } else {
+    const consentSyncEnabled = Boolean(phoneNumber && pickedUp && consentValue && checkCallAllowed);
+    if (!consentSyncEnabled) {
       console.log("Airtable consent sync skipped:", {
         phoneNumber,
         pickedUp,
@@ -263,9 +252,49 @@ async function handleWebhook(req: Request): Promise<Response> {
       });
     }
 
-    // --- Airtable notice_received sync (Dhipaya) ---
-    // Independent of callOutcome — sync whenever the call was picked up and the
-    // AI captured a notice_received signal from the transcript.
+    // --- Sequenced consent -> call log task (avoids race on Consents FK) ---
+    const consentThenCallLogTask = (async () => {
+      let consentRecordId: string | null = null;
+      if (consentSyncEnabled) {
+        console.log(`Airtable consent sync starting for ${phoneNumber} -> ${consentValue} (callOutcome=${callOutcome})`);
+        try {
+          consentRecordId = await syncConsentToAirtable(phoneNumber!, consentValue!, callId);
+          console.log("Airtable consent sync finished", { consentRecordId });
+        } catch (err) {
+          console.error("Airtable consent sync failed:", err);
+        }
+      }
+
+      if (callId && checkCallAllowed) {
+        try {
+          await syncCallLogToAirtable(
+            payload,
+            conversationLog || "",
+            phoneNumber,
+            callOutcome,
+            callDuration,
+            payload.audio_url ?? null,
+            consentRecordId,
+          );
+        } catch (err) {
+          console.error("Airtable call log sync failed:", err);
+        }
+      } else if (!callId) {
+        console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
+      } else {
+        console.log("Airtable call log sync skipped: CheckCall != 'Y'");
+      }
+    })();
+
+    // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(consentThenCallLogTask);
+    } else {
+      await consentThenCallLogTask;
+    }
+
+    // --- Airtable notice_received sync (Dhipaya) — independent of consent/call log ---
     const noticeValue = aiResult.noticeReceived;
     if (phoneNumber && pickedUp && noticeValue && checkCallAllowed) {
       console.log(`Airtable notice sync starting for ${phoneNumber} -> ${noticeValue}`);
@@ -283,28 +312,6 @@ async function handleWebhook(req: Request): Promise<Response> {
       console.log("Airtable notice sync skipped:", { phoneNumber, pickedUp, noticeReceived: aiResult.noticeReceived });
     }
 
-    // --- Airtable Call Logs sync (Dhipaya) ---
-    if (callId && checkCallAllowed) {
-      const callLogPromise = syncCallLogToAirtable(
-        payload,
-        conversationLog || "",
-        phoneNumber,
-        callOutcome,
-        callDuration,
-        payload.audio_url ?? null,
-      ).catch((err) => console.error("Airtable call log sync failed:", err));
-      // @ts-ignore EdgeRuntime is provided by Supabase Edge runtime
-      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
-        // @ts-ignore
-        EdgeRuntime.waitUntil(callLogPromise);
-      } else {
-        await callLogPromise;
-      }
-    } else if (!callId) {
-      console.warn("Airtable call log sync skipped: missing outbound_id/call_id");
-    } else {
-      console.log("Airtable call log sync skipped: CheckCall != 'Y'");
-    }
 
     // --- Resolve user_id and workspace_id ---
     let resolvedUserId: string | null = null;
