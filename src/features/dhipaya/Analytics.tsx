@@ -127,6 +127,183 @@ function ConsentBadge({ status }: { status: ReturnType<typeof getConsentLabel> }
   );
 }
 
+const OUTCOME_COLORS = {
+  given: "#10b981",
+  denied: "#ef4444",
+  noAnswer: "#9ca3af",
+} as const;
+
+function OutcomeAndPolicyCharts({
+  customers,
+  logs,
+}: {
+  customers: Customer[];
+  logs: CallLog[];
+}) {
+  const outcomeData = useMemo(() => {
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    let given = 0;
+    let denied = 0;
+    let noAnswer = 0;
+    for (const log of logs) {
+      const outcome = (log.outcome || "").toLowerCase();
+      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
+      const status = cust?.consentStatus || "";
+      if (outcome.includes("consent_given") || status === CONSENT_GIVEN) given++;
+      else if (outcome.includes("consent_denied") || status === CONSENT_DENIED) denied++;
+      else noAnswer++;
+    }
+    const total = given + denied + noAnswer;
+    return {
+      total,
+      slices: [
+        { key: "given", name: "Consent Given", value: given, color: OUTCOME_COLORS.given },
+        { key: "denied", name: "Consent Denied", value: denied, color: OUTCOME_COLORS.denied },
+        { key: "noAnswer", name: "No Answer", value: noAnswer, color: OUTCOME_COLORS.noAnswer },
+      ],
+    };
+  }, [customers, logs]);
+
+  const policyData = useMemo(() => {
+    const buckets = new Map<string, { total: number; converted: number }>();
+    for (const c of customers) {
+      const raw = (c.policyStatus || "").trim();
+      if (!raw) continue;
+      const key = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+      const b = buckets.get(key) || { total: 0, converted: 0 };
+      b.total++;
+      if ((c.consentStatus || "").trim() === CONSENT_GIVEN) b.converted++;
+      buckets.set(key, b);
+    }
+    return Array.from(buckets.entries())
+      .map(([name, v]) => ({
+        name,
+        conversion: v.total > 0 ? Math.round((v.converted / v.total) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.conversion - a.conversion);
+  }, [customers]);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Outcome Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {outcomeData.total === 0 ? (
+            <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">
+              No call data in range.
+            </div>
+          ) : (
+            <>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={outcomeData.slices}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={70}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {outcomeData.slices.map((s) => (
+                        <Cell key={s.key} fill={s.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name) => {
+                        const pct = outcomeData.total
+                          ? ((value / outcomeData.total) * 100).toFixed(1)
+                          : "0";
+                        return [`${value} (${pct}%)`, name];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {outcomeData.slices.map((s) => {
+                  const pct = outcomeData.total
+                    ? ((s.value / outcomeData.total) * 100).toFixed(1)
+                    : "0.0";
+                  return (
+                    <div key={s.key} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ background: s.color }}
+                        />
+                        <span className="text-foreground">{s.name}</span>
+                      </div>
+                      <span className="text-muted-foreground tabular-nums">
+                        {s.value} ({pct}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Policy Status Performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {policyData.length === 0 ? (
+            <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">
+              No policy data available.
+            </div>
+          ) : (
+            <>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={policyData}
+                    layout="vertical"
+                    margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                    <XAxis
+                      type="number"
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      width={80}
+                    />
+                    <Tooltip formatter={(v: number) => [`${v}% conversion`, "Conversion"]} />
+                    <Bar dataKey="conversion" fill="#2563eb" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {policyData.map((p) => (
+                  <div key={p.name} className="flex items-center justify-between text-sm">
+                    <span className="text-foreground">{p.name}</span>
+                    <span className="text-muted-foreground tabular-nums">
+                      {p.conversion.toFixed(1)}% conversion
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
 const DhipayaAnalytics = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [logModal, setLogModal] = useState<Customer | null>(null);
