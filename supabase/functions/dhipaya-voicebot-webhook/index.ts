@@ -1308,11 +1308,12 @@ function extractCallTimestampFromConversation(payload: any): string | null {
   if (!Array.isArray(log) || log.length === 0) return null;
   const first = log[0];
   const ts = typeof first?.timeStamp === "string" ? first.timeStamp.trim() : "";
-  // Expected format: "YYYY-MM-DD HH:mm:ss" (Bangkok local)
+  // Expected format: "YYYY-MM-DD HH:mm:ss" — already Bangkok local time.
+  // Send the wall-clock value as-is (no offset) so Airtable stores the same time shown in the transcript.
   const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/);
   if (!m) return null;
   const [, y, mo, d, h, mi, s] = m;
-  return `${y}-${mo}-${d}T${h}:${mi}:${s}+07:00`;
+  return `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
 }
 
 async function syncCallLogToAirtable(
