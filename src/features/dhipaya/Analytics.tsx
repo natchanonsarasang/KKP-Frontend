@@ -413,10 +413,11 @@ const DhipayaAnalytics = () => {
     let denied = 0;
     for (const log of filteredLogs) {
       const consent = log.consentId ? consentById.get(log.consentId) : undefined;
-      const consentStatus = consent?.consentStatus || "";
-      if (consentStatus === CONSENT_GIVEN) given++;
-      else if (consentStatus === CONSENT_DENIED) denied++;
+      const norm = normalizeConsent(consent?.consentStatus);
+      if (norm === "given") given++;
+      else if (norm === "denied") denied++;
     }
+    console.log("[Analytics] kpis", { totalCalls, given, denied });
     return { totalCalls, given, denied };
   }, [filteredLogs, consentById]);
 
