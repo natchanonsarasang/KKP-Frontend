@@ -43,6 +43,7 @@ export interface CallLog {
   callLogId?: string;
   customerId?: string;
   consentId?: string;
+  consentIds?: string[];
   duration?: number;
   conversationLogs?: string;
   audioUrl?: string;
@@ -56,6 +57,8 @@ export interface CallLog {
 export interface Consent {
   id: string;
   customerId?: number;
+  customerRecordId?: string;
+  customerRecordIds?: string[];
   consentStatus?: string;
 }
 
