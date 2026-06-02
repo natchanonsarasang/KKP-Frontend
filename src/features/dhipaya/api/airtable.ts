@@ -190,22 +190,35 @@ export async function listConsents(opts?: {
   pageSize?: number;
   offset?: string;
 }): Promise<{ consents: Consent[]; offset?: string }> {
-  const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
-  if (opts?.offset) params.offset = opts.offset;
-  const res = await call<ListResponse>({ action: "list", table: "Consents", params });
-  return {
-    consents: res.records.map((r) => ({
-      id: r.id,
-      customerId:
-        typeof r.fields[CONSENT_FIELDS.customer] === "number"
-          ? (r.fields[CONSENT_FIELDS.customer] as number)
-          : r.fields[CONSENT_FIELDS.customer] != null
-            ? Number(r.fields[CONSENT_FIELDS.customer])
-            : undefined,
-      consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
-    })),
-    offset: res.offset,
-  };
+  // Fetch ALL pages so consentById lookup is complete.
+  const pageSize = opts?.pageSize ?? 100;
+  const all: Consent[] = [];
+  let offset: string | undefined = opts?.offset;
+  let pages = 0;
+  do {
+    const params: Record<string, string | number> = { pageSize };
+    if (offset) params.offset = offset;
+    const res = await call<ListResponse>({ action: "list", table: "Consents", params });
+    if (pages === 0 && res.records[0]) {
+      console.log("[listConsents] sample raw fields:", res.records[0].fields);
+    }
+    for (const r of res.records) {
+      all.push({
+        id: r.id,
+        customerId:
+          typeof r.fields[CONSENT_FIELDS.customer] === "number"
+            ? (r.fields[CONSENT_FIELDS.customer] as number)
+            : r.fields[CONSENT_FIELDS.customer] != null
+              ? Number(r.fields[CONSENT_FIELDS.customer])
+              : undefined,
+        consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
+      });
+    }
+    offset = res.offset;
+    pages++;
+  } while (offset && pages < 50);
+  console.log(`[listConsents] fetched ${all.length} consents across ${pages} page(s)`);
+  return { consents: all, offset: undefined };
 }
 
 // -------- Installment KB --------
