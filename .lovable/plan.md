@@ -1,39 +1,44 @@
 ## Goal
 
-Apply the "lookup Customer by `customer_rec_id` first, then phone" pattern (already used in `syncCallLogToAirtable`) to **`syncConsentToAirtable`** and **`syncNoticeToAirtable`** in `supabase/functions/dhipaya-voicebot-webhook/index.ts`. Also make `syncConsentToAirtable` always create a new Consents row instead of upserting.
+When the webhook creates a new Airtable **Consents** record, the new **Call Logs** row created right after should link back to it via a `Consents` foreign-key field. Today, both syncs are kicked off in parallel as fire-and-forget promises, so the Call Log can be created before (or without knowing) the Consent record id — we need to remove that race.
 
-## Changes
+## Changes (single file: `supabase/functions/dhipaya-voicebot-webhook/index.ts`)
 
-### 1. `handleWebhook` (around line 248)
+### 1. `syncConsentToAirtable` returns the new record id
 
-- Compute `const callLogId = payload?.outbound_id || payload?.call_id` once near the consent/notice sync block.
-- Pass it as a 3rd argument to both `syncConsentToAirtable(phone, consentValue, callLogId)` and `syncNoticeToAirtable(phone, value, callLogId)`.
+- Change signature from `Promise<void>` to `Promise<string | null>`.
+- After the `POST ${baseId}/Consents` call (~line 1226), capture the response and `return created?.id ?? null`.
+- All early-return branches (missing creds, no customer match) return `null`.
 
-### 2. Shared helper
+### 2. `syncCallLogToAirtable` accepts an optional consent record id
 
-Add a small helper `findCustomerRecord(callLogId, phone, pat, baseId)` that returns the Airtable Customer record (or null) by:
-1. Loading `result_data` from `call_records` via Supabase service-role (`botnoi_call_id = callLogId`).
-2. If `result_data.customer_rec_id` starts with `rec`, fetching `Customer/{recId}` directly.
-3. Otherwise, falling back to `phoneCheckCallFormula(normalizePhone(phone))` against `Customer`.
-4. Logging a warning and returning null if nothing matches.
+- Add new parameter `consentRecordId?: string | null` (last arg).
+- In the `createFields` block (~line 1411), if `consentRecordId` is a string starting with `rec`, add `Consents: [consentRecordId]` to `createFields`. Field name is exactly `Consents` (matching the Airtable column the user is adding) — confirm in QA log.
+- No other logic changes; campaign/customer logic stays as-is.
 
-This is the same logic that's currently inlined in `syncCallLogToAirtable` (lines 1276–1325). Refactor `syncCallLogToAirtable` to call the new helper as well, removing the duplicated lookup block.
+### 3. `handleWebhook` — sequence consent → call log to avoid the race
 
-### 3. `syncConsentToAirtable` (line 1148)
+Current flow (lines ~246–307): consent, notice, and call log are each wrapped in `EdgeRuntime.waitUntil` and effectively run in parallel.
 
-- Accept new optional `callLogId?: string` arg.
-- Replace existing phone-only customer lookup (lines 1156–1175) with `findCustomerRecord(callLogId, phone, pat, baseId)`.
-- **Remove** the `{Customer} = customerId` Consents lookup and PATCH branch (lines 1177–1192).
-- Always POST to `Consents` with `{ Consent_Status: aiCategory, Customer: [customerRec.id] }` via the existing 429-aware `airtableFetch`.
-- Single log: `Airtable consent CREATED for Customer rec ${customerRec.id}: ${aiCategory}`.
+New flow:
 
-### 4. `syncNoticeToAirtable` (line 1208)
+- Build a single background task that:
+  1. `await`s `syncConsentToAirtable(...)` when `consentValue` is set and gating passes, capturing `consentRecordId` (or `null` if skipped/failed).
+  2. Then `await`s `syncCallLogToAirtable(..., consentRecordId)` when `callId && checkCallAllowed`.
+- Keep `syncNoticeToAirtable` independent — it can stay parallel (still wrapped in its own `waitUntil`), since notice writes to `Customer`, not to `Call Logs`.
+- Wrap the new combined consent→callLog task in `EdgeRuntime.waitUntil` (with the existing `if (typeof EdgeRuntime !== "undefined")` fallback to `await`). All `try/catch` per step preserved so a consent failure still allows the call log to be created (just without the `Consents` link).
+- If consent sync is skipped (no `consentValue`, not picked up, or CheckCall denied), `consentRecordId` stays `null` and the call log is created without the link — same as today.
 
-- Accept new optional `callLogId?: string` arg.
-- Replace phone-only customer lookup (lines 1216–1230) with `findCustomerRecord(callLogId, phone, pat, baseId)`.
-- Keep the existing PATCH that sets `notice_received` on the located Customer.
+### 4. Logging
+
+- On call-log create, log whether `Consents` link was attached: `Airtable call log CREATED for Customer ${customerRec.id}${consentRecordId ? ` linked to Consent ${consentRecordId}` : ""}`.
 
 ## Out of scope
 
-- No changes to intent routing, CheckCall filter, campaign header logic, retry/backoff, or frontend.
-- `syncCallLogToAirtable`'s "always create new Call Logs row" behavior stays as-is.
+- Airtable schema work (user is adding the `Consents` column on the Call Logs table themselves).
+- Notice flow, AI categorization, campaign header logic, retry/backoff, frontend.
+- Back-filling existing Call Logs rows with consent links.
+
+## Race-condition note
+
+By awaiting the Consent POST before the Call Log POST inside the same background task, the Call Log create always sees a definitive `consentRecordId` (string or `null`) — no read-after-write lookup against Airtable is needed, which also avoids Airtable's eventual-consistency window on freshly created records.
