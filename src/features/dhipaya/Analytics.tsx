@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -118,13 +123,9 @@ function ConsentBadge({ status }: { status: ReturnType<typeof getConsentLabel> }
 }
 
 const DhipayaAnalytics = () => {
-  const today = new Date();
-  const monthAgo = new Date();
-  monthAgo.setDate(today.getDate() - 30);
-
-  const [fromDate, setFromDate] = useState<string>(monthAgo.toISOString().slice(0, 10));
-  const [toDate, setToDate] = useState<string>(today.toISOString().slice(0, 10));
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [logModal, setLogModal] = useState<Customer | null>(null);
+
 
   const customersQuery = useQuery({
     queryKey: ["dhipaya-customers-dashboard"],
@@ -184,12 +185,17 @@ const DhipayaAnalytics = () => {
     return { byCustomer, byPolicy };
   }, [policies]);
 
-  // Date-filtered logs
+  // Date-filtered logs (no range = all logs)
+  const fromDate = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const toDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : fromDate;
   const filteredLogs = useMemo(() => {
+    if (!fromDate && !toDate) return logs;
     return logs.filter((l) => {
       const d = ymd(l.calledAt);
       if (!d) return false;
-      return d >= fromDate && d <= toDate;
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
     });
   }, [logs, fromDate, toDate]);
 
@@ -268,31 +274,46 @@ const DhipayaAnalytics = () => {
             Calls and consent outcomes across your customer base.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">From</label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="pl-9 h-9 w-[170px]"
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "h-9 justify-start text-left font-normal min-w-[240px]",
+                  !dateRange?.from && "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} – {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>เลือกช่วงวันที่</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
               />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">To</label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="pl-9 h-9 w-[170px]"
-              />
-            </div>
-          </div>
+            </PopoverContent>
+          </Popover>
+          {dateRange?.from && (
+            <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} className="h-9">
+              Clear
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="h-9">
             <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
