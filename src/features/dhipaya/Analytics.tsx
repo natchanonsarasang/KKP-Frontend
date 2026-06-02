@@ -382,12 +382,29 @@ const DhipayaAnalytics = () => {
     }
     console.log("[Analytics] consents loaded:", consents.length, "status counts:", statusCounts);
     const missing: string[] = [];
+    let looksLikeStatus = 0;
+    let looksLikeRecId = 0;
+    let empty = 0;
     for (const l of logs) {
-      if (l.consentId && !map.has(l.consentId)) missing.push(l.consentId);
+      const v = l.consentId;
+      if (!v) { empty++; continue; }
+      if (/^rec[A-Za-z0-9]{14}$/.test(v)) {
+        looksLikeRecId++;
+        if (!map.has(v)) missing.push(v);
+      } else {
+        looksLikeStatus++;
+      }
     }
+    console.log("[Analytics] call-log consentId shape:", {
+      total: logs.length,
+      empty,
+      looksLikeRecId,
+      looksLikeStatus,
+      sample: logs.slice(0, 3).map((l) => l.consentId),
+    });
     if (missing.length) {
       console.warn(
-        `[Analytics] ${missing.length} call log(s) reference a consentId not in consentById. First 5:`,
+        `[Analytics] ${missing.length} log(s) have a rec-id consentId not in consentById (probable pagination/permission issue). First 5:`,
         missing.slice(0, 5),
       );
     }
