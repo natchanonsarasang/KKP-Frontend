@@ -372,6 +372,12 @@ const DhipayaAnalytics = () => {
     return map;
   }, [kbItems]);
 
+  const consentById = useMemo(() => {
+    const map = new Map<string, Consent>();
+    for (const c of consents) map.set(c.id, c);
+    return map;
+  }, [consents]);
+
   const policyMap = useMemo(() => {
     const byCustomer = new Map<string, string>();
     const byPolicy = new Map<string, string>();
