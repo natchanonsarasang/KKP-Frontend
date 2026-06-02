@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { AirtableRecord, Customer, Policy, CallLog, InstallmentKb } from "../types";
+import type { AirtableRecord, Customer, Policy, CallLog, Consent, InstallmentKb } from "../types";
 import { CUSTOMER_FIELDS, POLICY_FIELDS, CALL_LOG_FIELDS, CONSENT_FIELDS, INSTALLMENT_KB_FIELDS } from "../fieldMap";
 
 type AnyFields = Record<string, unknown>;
@@ -180,6 +180,29 @@ export async function listCallLogs(opts?: {
       conversationLogs: str(r.fields[CALL_LOG_FIELDS.conversationLogs]),
       audioUrl: str(r.fields[CALL_LOG_FIELDS.audioUrl]),
       calledAt: str(r.fields[CALL_LOG_FIELDS.calledAt]),
+    })),
+    offset: res.offset,
+  };
+}
+
+// -------- Consents --------
+export async function listConsents(opts?: {
+  pageSize?: number;
+  offset?: string;
+}): Promise<{ consents: Consent[]; offset?: string }> {
+  const params: Record<string, string | number> = { pageSize: opts?.pageSize ?? 50 };
+  if (opts?.offset) params.offset = opts.offset;
+  const res = await call<ListResponse>({ action: "list", table: "Consents", params });
+  return {
+    consents: res.records.map((r) => ({
+      id: r.id,
+      customerId:
+        typeof r.fields[CONSENT_FIELDS.customer] === "number"
+          ? (r.fields[CONSENT_FIELDS.customer] as number)
+          : r.fields[CONSENT_FIELDS.customer] != null
+            ? Number(r.fields[CONSENT_FIELDS.customer])
+            : undefined,
+      consentStatus: str(r.fields[CONSENT_FIELDS.consentStatus]),
     })),
     offset: res.offset,
   };

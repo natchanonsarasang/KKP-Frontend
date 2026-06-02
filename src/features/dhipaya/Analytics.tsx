@@ -43,10 +43,11 @@ import {
 import {
   listCallLogs,
   listCustomers,
+  listConsents,
   listInstallmentKb,
   listPolicies,
 } from "./api/airtable";
-import type { CallLog, Customer } from "./types";
+import type { CallLog, Customer, Consent } from "./types";
 import {
   PhoneCall,
   CheckCircle2,
@@ -84,18 +85,25 @@ function formatDateTime(iso?: string): string {
   return d.toLocaleString();
 }
 
-function getConsentLabel(c: Customer, logs: CallLog[]): "given" | "denied" | "called" | "none" {
+function getConsentLabel(
+  c: Customer,
+  logs: CallLog[],
+  consentById: Map<string, Consent>,
+): "given" | "denied" | "called" | "none" {
   const s = (c.consentStatus ?? "").trim();
   if (s === CONSENT_GIVEN) return "given";
   if (s === CONSENT_DENIED) return "denied";
   const hasLog = logs.some((l) => l.customerId === c.id);
   if (hasLog) {
-    const outcome = logs
+    const consentStatuses = logs
       .filter((l) => l.customerId === c.id)
-      .map((l) => (l.outcome || "").toLowerCase())
+      .map((l) => {
+        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
+        return (consent?.consentStatus ?? "").toLowerCase();
+      })
       .join(" ");
-    if (outcome.includes("consent_given")) return "given";
-    if (outcome.includes("consent_denied")) return "denied";
+    if (consentStatuses.includes("consent given")) return "given";
+    if (consentStatuses.includes("consent denied")) return "denied";
     return "called";
   }
   return "none";
@@ -136,21 +144,21 @@ const OUTCOME_COLORS = {
 function OutcomeAndPolicyCharts({
   customers,
   logs,
+  consentById,
 }: {
   customers: Customer[];
   logs: CallLog[];
+  consentById: Map<string, Consent>;
 }) {
   const outcomeData = useMemo(() => {
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     let given = 0;
     let denied = 0;
     let noAnswer = 0;
     for (const log of logs) {
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      if (outcome.includes("consent_given") || status === CONSENT_GIVEN) given++;
-      else if (outcome.includes("consent_denied") || status === CONSENT_DENIED) denied++;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
       else noAnswer++;
     }
     const total = given + denied + noAnswer;
@@ -162,7 +170,8 @@ function OutcomeAndPolicyCharts({
         { key: "noAnswer", name: "No Answer", value: noAnswer, color: OUTCOME_COLORS.noAnswer },
       ],
     };
-  }, [customers, logs]);
+  }, [logs, consentById]);
+
 
   const policyData = useMemo(() => {
     const buckets = new Map<string, { total: number; converted: number }>();
@@ -317,6 +326,10 @@ const DhipayaAnalytics = () => {
     queryKey: ["dhipaya-call-logs-dashboard"],
     queryFn: () => listCallLogs({ pageSize: 100 }),
   });
+  const consentsQuery = useQuery({
+    queryKey: ["dhipaya-consents-dashboard"],
+    queryFn: () => listConsents({ pageSize: 100 }),
+  });
   const policiesQuery = useQuery({
     queryKey: ["dhipaya-policies-dashboard"],
     queryFn: () => listPolicies({ pageSize: 100 }),
@@ -328,23 +341,27 @@ const DhipayaAnalytics = () => {
 
   const customers = customersQuery.data?.customers ?? [];
   const logs = callLogsQuery.data?.logs ?? [];
+  const consents = consentsQuery.data?.consents ?? [];
   const policies = policiesQuery.data?.policies ?? [];
   const kbItems = installmentKbQuery.data?.items ?? [];
 
-  const isLoading = customersQuery.isLoading || callLogsQuery.isLoading;
+  const isLoading = customersQuery.isLoading || callLogsQuery.isLoading || consentsQuery.isLoading;
   const isFetching =
     customersQuery.isFetching ||
     callLogsQuery.isFetching ||
+    consentsQuery.isFetching ||
     policiesQuery.isFetching ||
     installmentKbQuery.isFetching;
-  const isError = customersQuery.isError || callLogsQuery.isError;
+  const isError = customersQuery.isError || callLogsQuery.isError || consentsQuery.isError;
   const errorMessage =
     (customersQuery.error as Error)?.message ||
-    (callLogsQuery.error as Error)?.message;
+    (callLogsQuery.error as Error)?.message ||
+    (consentsQuery.error as Error)?.message;
 
   const handleRefresh = () => {
     customersQuery.refetch();
     callLogsQuery.refetch();
+    consentsQuery.refetch();
     policiesQuery.refetch();
     installmentKbQuery.refetch();
   };
@@ -354,6 +371,12 @@ const DhipayaAnalytics = () => {
     for (const item of kbItems) if (item.planCode) map.set(item.id, item.planCode);
     return map;
   }, [kbItems]);
+
+  const consentById = useMemo(() => {
+    const map = new Map<string, Consent>();
+    for (const c of consents) map.set(c.id, c);
+    return map;
+  }, [consents]);
 
   const policyMap = useMemo(() => {
     const byCustomer = new Map<string, string>();
@@ -384,31 +407,27 @@ const DhipayaAnalytics = () => {
   // KPIs
   const kpis = useMemo(() => {
     const totalCalls = filteredLogs.length;
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     let given = 0;
     let denied = 0;
     for (const log of filteredLogs) {
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      if (outcome.includes("consent_given") || status === CONSENT_GIVEN) given++;
-      else if (outcome.includes("consent_denied") || status === CONSENT_DENIED) denied++;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      if (consentStatus === CONSENT_GIVEN) given++;
+      else if (consentStatus === CONSENT_DENIED) denied++;
     }
     return { totalCalls, given, denied };
-  }, [filteredLogs, customers]);
+  }, [filteredLogs, consentById]);
 
   // Chart series
   const series = useMemo(() => {
-    const customerById = new Map(customers.map((c) => [c.id, c]));
     const buckets = new Map<string, { given: number; denied: number }>();
     for (const log of filteredLogs) {
       const date = ymd(log.calledAt);
       if (!date) continue;
-      const outcome = (log.outcome || "").toLowerCase();
-      const cust = log.customerId ? customerById.get(log.customerId) : undefined;
-      const status = cust?.consentStatus || "";
-      const isGiven = outcome.includes("consent_given") || status === CONSENT_GIVEN;
-      const isDenied = outcome.includes("consent_denied") || status === CONSENT_DENIED;
+      const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+      const consentStatus = consent?.consentStatus || "";
+      const isGiven = consentStatus === CONSENT_GIVEN;
+      const isDenied = consentStatus === CONSENT_DENIED;
       if (!isGiven && !isDenied) continue;
       const b = buckets.get(date) || { given: 0, denied: 0 };
       if (isGiven) b.given++;
@@ -422,7 +441,7 @@ const DhipayaAnalytics = () => {
         const rate = tot === 0 ? 0 : Math.round((given / tot) * 1000) / 10;
         return { date: shortDate(date), rate, given, denied };
       });
-  }, [filteredLogs, customers]);
+  }, [filteredLogs, consentById]);
 
   const logsByCustomer = useMemo(() => {
     const map = new Map<string, CallLog[]>();
@@ -609,6 +628,7 @@ const DhipayaAnalytics = () => {
       <OutcomeAndPolicyCharts
         customers={customers}
         logs={filteredLogs}
+        consentById={consentById}
       />
 
       {/* Customer Table */}
@@ -656,7 +676,7 @@ const DhipayaAnalytics = () => {
                       </TableRow>
                     ) : (
                       customers.map((c) => {
-                        const status = getConsentLabel(c, logs);
+                        const status = getConsentLabel(c, logs, consentById);
                         const expiry =
                           policyMap.byCustomer.get(c.id) ||
                           (c.policyNumber ? policyMap.byPolicy.get(c.policyNumber) : null);
@@ -765,9 +785,10 @@ const DhipayaAnalytics = () => {
             ) : (
               <div className="space-y-3">
                 {modalLogs.map((log) => {
-                  const outcome = (log.outcome || "").toLowerCase();
-                  const isGiven = outcome.includes("consent_given");
-                  const isDenied = outcome.includes("consent_denied");
+                  const consent = log.consentId ? consentById.get(log.consentId) : undefined;
+                  const consentStatus = consent?.consentStatus || "";
+                  const isGiven = consentStatus === CONSENT_GIVEN;
+                  const isDenied = consentStatus === CONSENT_DENIED;
                   return (
                     <div key={log.id} className="rounded-lg border border-border/60 p-4 space-y-2 bg-card">
                       <div className="flex flex-wrap items-center gap-2 justify-between">
@@ -789,8 +810,6 @@ const DhipayaAnalytics = () => {
                             <Badge className="bg-rose-100 text-rose-700 border-transparent">
                               ✗ Consent Denied
                             </Badge>
-                          ) : log.outcome ? (
-                            <Badge variant="secondary">{log.outcome}</Badge>
                           ) : null}
                         </div>
                       </div>
