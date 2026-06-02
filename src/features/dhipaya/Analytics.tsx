@@ -85,18 +85,25 @@ function formatDateTime(iso?: string): string {
   return d.toLocaleString();
 }
 
-function getConsentLabel(c: Customer, logs: CallLog[]): "given" | "denied" | "called" | "none" {
+function getConsentLabel(
+  c: Customer,
+  logs: CallLog[],
+  consentById: Map<string, Consent>,
+): "given" | "denied" | "called" | "none" {
   const s = (c.consentStatus ?? "").trim();
   if (s === CONSENT_GIVEN) return "given";
   if (s === CONSENT_DENIED) return "denied";
   const hasLog = logs.some((l) => l.customerId === c.id);
   if (hasLog) {
-    const outcome = logs
+    const consentStatuses = logs
       .filter((l) => l.customerId === c.id)
-      .map((l) => (l.outcome || "").toLowerCase())
+      .map((l) => {
+        const consent = l.consentId ? consentById.get(l.consentId) : undefined;
+        return (consent?.consentStatus ?? "").toLowerCase();
+      })
       .join(" ");
-    if (outcome.includes("consent_given")) return "given";
-    if (outcome.includes("consent_denied")) return "denied";
+    if (consentStatuses.includes("consent given")) return "given";
+    if (consentStatuses.includes("consent denied")) return "denied";
     return "called";
   }
   return "none";
