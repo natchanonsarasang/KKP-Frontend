@@ -7,6 +7,7 @@ import { AdminProvider } from "@/contexts/AdminContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
+import TestDashboard from "./pages/test-Dashboard";
 import Admin from "./pages/Admin";
 import Dhipaya from "./pages/Dhipaya";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/test" element={<TestDashboard />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dhipaya" element={<Dhipaya />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
