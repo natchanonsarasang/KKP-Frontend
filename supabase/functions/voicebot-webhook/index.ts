@@ -48,16 +48,7 @@ serve(async (req) => {
 
     console.log("Extracted:", { callId, status, action, phoneNumber });
 
-    // GLOBAL FILTER: Completely ignore "hanged_up" payloads.
-    // These must NOT be mapped, stored, queued, displayed, or analyzed anywhere.
-    const rawStatusEarly = String(status || "").toLowerCase();
-    if (rawStatusEarly === "hanged_up" || rawStatusEarly === "hangup" || rawStatusEarly === "hung_up") {
-      console.log("Ignoring 'hanged_up' payload — excluded from all processing.");
-      return new Response(
-        JSON.stringify({ success: true, message: "hanged_up ignored" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Note: "hanged_up" payloads are now processed normally and mapped to "hanged_up" status.
 
     if (!callId && !phoneNumber) {
       return new Response(JSON.stringify({ success: true, message: "No identifiable data" }), {
@@ -66,9 +57,18 @@ serve(async (req) => {
     }
 
     // Check if user actually spoke in the conversation
-    // A valid pickup should have at least one "User:" entry with some text after it
+    // A valid pickup should have at least one "User:" entry with real speech
+    // "TIMEOUT" markers from ASR indicate the user turn existed but the customer stayed silent.
     const userParts = conversationLog ? conversationLog.split("User:") : [];
-    const hasUserSpoken = userParts.length > 1 && userParts[1].trim().length > 0;
+    const hasUserSpoken =
+      userParts.length > 1 &&
+      userParts.some(
+        (p, i) =>
+          i > 0 &&
+          p.trim().length > 0 &&
+          !p.toUpperCase().includes("TIMEOUT"),
+      );
+    const isSilence = userParts.length > 1 && !hasUserSpoken;
 
     // Map Botnoi status to our internal status
     const rawStatus = (status || "").toLowerCase();
@@ -80,11 +80,14 @@ serve(async (req) => {
       mappedStatus = "declined";
     } else if (["Unknown", "unknown"].includes(action)) {
       mappedStatus = "no_response";
-    // NOTE: "hanged_up" / "hangup" / "hung_up" are filtered out at the top of this handler.
-    // They never reach this mapping block. Do not add a branch for them here.
+    } else if (rawStatus === "hanged_up" || rawStatus === "hangup" || rawStatus === "hung_up") {
+      mappedStatus = "hanged_up";
     } else if (rawStatus === "completed") {
       // If Botnoi says completed but no one actually spoke, treat it as no_answer (retryable)
-      mappedStatus = hasUserSpoken ? "completed" : "no_answer";
+      mappedStatus =
+        (hasUserSpoken || isSilence)
+          ? "completed"
+          : "no_answer";
     } else if (rawStatus === "no answer" || rawStatus === "no_answer") {
       mappedStatus = "no_answer";
     } else if (rawStatus === "busy") {
@@ -97,9 +100,29 @@ serve(async (req) => {
       mappedStatus = "voicemail";
     }
 
+    // If timeout/no-answer happened AFTER the bot already asked about callback
+    // availability (day/time/convenience), reclassify as "Not Convenient" instead.
+    if (mappedStatus === "no_answer" && conversationLog) {
+      const botParts = conversationLog.split(/Bot:|Assistant:/i).slice(1);
+      const lastBotMsg = (botParts[botParts.length - 1] || "").toLowerCase();
+      const allBotText = botParts.join(" ").toLowerCase();
+      const callbackKeywords = [
+        "convenient", "callback", "call back", "call you back",
+        "what day", "what time", "which day", "which time",
+        "when would", "when can", "when is", "available",
+        "สะดวก", "นัด", "วันไหน", "เวลาไหน", "ติดต่อใหม่", "โทรกลับ",
+      ];
+      const askedAboutCallback =
+        callbackKeywords.some((k) => lastBotMsg.includes(k)) ||
+        callbackKeywords.some((k) => allBotText.includes(k));
+      if (askedAboutCallback) {
+        mappedStatus = "not_convenient";
+      }
+    }
+
     const amdHuman = String(payload.last_amd_status || "").toUpperCase() === "HUMAN";
-    const pickedUp = hasUserSpoken || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
-    let finalStatus: string = pickedUp ? "success" : "failed";
+    const pickedUp = hasUserSpoken || isSilence || amdHuman || ["confirmed", "declined", "no_response", "completed"].includes(mappedStatus);
+    let finalStatus: string = mappedStatus === "hanged_up" ? "failed" : (pickedUp ? "success" : "failed");
 
     // Map to English outcome
     const outcomeMap: Record<string, string> = {
@@ -112,6 +135,8 @@ serve(async (req) => {
       busy: "Busy",
       rejected: "Rejected",
       voicemail: "Voicemail",
+      hanged_up: "Hangup",
+      not_convenient: "Not Convenient",
     };
     const callOutcome = outcomeMap[mappedStatus] || "Unknown";
 
@@ -292,7 +317,7 @@ serve(async (req) => {
 
         // Retry logic disabled: failed/no_response calls are marked failed immediately.
         // No pending_retry, no automatic re-call. Manual retry only via the UI.
-        finalStatus = pickedUp ? "success" : "failed";
+        finalStatus = mappedStatus === "hanged_up" ? "failed" : (pickedUp ? "success" : "failed");
         const notesData = JSON.stringify({ audio_url: audioUrl, conversation_log: conversationLog });
 
         if (recentItem) {
@@ -401,8 +426,12 @@ serve(async (req) => {
           updateData.last_response = "unknown";
         }
 
+        // Extract callback date from conversation log (LLM-backed)
+        const dateCon = await extractCallbackDate(conversationLog, LOVABLE_API_KEY);
+        updateData.date_con = dateCon;
+
         await supabase.from("debtors").update(updateData).eq("id", debtor.id);
-        console.log("Debtor stats updated");
+        console.log("Debtor stats updated", { date_con: dateCon });
       }
     }
 
@@ -456,9 +485,11 @@ serve(async (req) => {
   }
 });
 
-// Strict call classifier
-// STEP 1: Check json_log status first → No Answer / Rejected / Busy / Voicemail
-// STEP 2: If none, classify conversation_log into one of 12 conversation categories
+// Strict call classifier — aligned with src/lib/callStatuses.ts (15-status taxonomy)
+// STEP 1: Check json_log status first → Not Reached (no_answer/busy/voicemail/rejected/unreachable)
+// STEP 2: Rule-based audio-quality detection → Background Noise
+// STEP 3: AI classifies conversation_log into one of the 15 Main/Sub categories,
+//         prioritizing the FINAL business outcome over transient behaviors.
 type ClassifyResult = {
   status_id: number;
   status_name: string;
@@ -466,96 +497,181 @@ type ClassifyResult = {
   reason: string;
 };
 
-const SYSTEM_STATUS_MAP: Record<string, { id: number; name: string; category: string; thai: string }> = {
-  no_answer: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  "no answer": { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  unreachable: { id: 1, name: "No Answer", category: "No Answer", thai: "ลูกค้าไม่รับสาย" },
-  rejected: { id: 2, name: "Rejected", category: "Rejected", thai: "ลูกค้าตัดสาย" },
-  busy: { id: 3, name: "Busy", category: "Busy", thai: "ลูกค้าสายไม่ว่าง" },
-  voicemail: { id: 4, name: "Voicemail", category: "Voicemail", thai: "เข้าสู่ระบบฝากข้อความ" },
+// System-level statuses from the telephony layer all collapse to "Not Reached"
+// in the new taxonomy (the customer could not actually be contacted).
+const SYSTEM_STATUS_MAP: Record<string, { name: string; thai: string }> = {
+  no_answer:   { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
+  "no answer": { name: "Not Reached", thai: "ลูกค้าไม่รับสาย" },
+  unreachable: { name: "Not Reached", thai: "ติดต่อไม่ได้" },
+  rejected:    { name: "Not Reached", thai: "ลูกค้าตัดสาย" },
+  busy:        { name: "Not Reached", thai: "ลูกค้าสายไม่ว่าง" },
+  voicemail:   { name: "Not Reached", thai: "เข้าสู่ระบบฝากข้อความ" },
+  failed:      { name: "Not Reached", thai: "โทรไม่สำเร็จ" },
 };
 
-const CONVERSATION_CATEGORIES = [
-  { id: 5, name: "Not Convenient", thai: "ลูกค้าไม่สะดวกคุย" },
-  { id: 6, name: "Already Paid", thai: "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว" },
-  { id: 7, name: "Normal Flow", thai: "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ" },
-  { id: 8, name: "Wrong Person", thai: "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน" },
-  { id: 9, name: "Transfer", thai: "ลูกค้าขอคุยกับเจ้าหน้าที่" },
-  { id: 10, name: "Call Later", thai: "ลูกค้านัดหมายให้ติดต่อใหม่" },
-  { id: 11, name: "Barge-in", thai: "ลูกค้าสอบถามข้อมูลระหว่างสนทนา" },
-  { id: 12, name: "Background Noise", thai: "เสียงแทรก/เสียงรบกวน" },
-  { id: 13, name: "Out of Topic", thai: "ลูกค้าพูดเรื่องอื่น" },
-  { id: 14, name: "Silence", thai: "ลูกค้าเงียบ" },
-  { id: 15, name: "Dropped Call", thai: "สายหลุดระหว่างสนทนา" },
-  { id: 16, name: "Repeat Request", thai: "ลูกค้าแจ้งให้ทวนประโยคเดิม" },
+// 15-status taxonomy — must stay in sync with MAIN_STATUSES + SUB_STATUSES
+// in src/lib/callStatuses.ts. The `name` field is what gets persisted into
+// call_list_items.ai_category and consumed by the Analytics dashboard.
+const CONVERSATION_CATEGORIES: { id: number; name: string; thai: string; group: "main" | "sub" }[] = [
+  // --- Main outcomes ---
+  { id: 1,  name: "Planned More Than 3",   thai: "วางแผนชำระเกิน 3 วัน",        group: "main" },
+  { id: 2,  name: "Promised to Pay",       thai: "รับปากชำระ",                group: "main" },
+  { id: 3,  name: "Restructure Requested", thai: "ขอปรับโครงสร้างหนี้",        group: "main" },
+  { id: 4,  name: "Inconvenient (With Date)",    thai: "ไม่สะดวก (มีนัดหมาย)",      group: "main" },
+  { id: 16, name: "Inconvenient (Without Date)", thai: "ไม่สะดวก (ไม่มีนัดหมาย)",    group: "main" },
+  { id: 5,  name: "Already Paid",          thai: "ชำระเรียบร้อยแล้ว",          group: "main" },
+  { id: 6,  name: "Not Reached",           thai: "ติดต่อไม่ได้",               group: "main" },
+  { id: 7,  name: "Refused",               thai: "ปฏิเสธ",                   group: "main" },
+  // --- Conversation behaviors ---
+  { id: 8,  name: "Not Convenient",        thai: "ไม่สะดวกคุย",                group: "sub"  },
+  { id: 9,  name: "Wrong Person",          thai: "ไม่ใช่ผู้เอาประกัน",          group: "sub"  },
+  { id: 10, name: "Call Later",            thai: "นัดหมายให้ติดต่อใหม่",        group: "sub"  },
+  { id: 11, name: "Transfer",              thai: "ขอคุยกับเจ้าหน้าที่",         group: "sub"  },
+  { id: 12, name: "Background Noise",      thai: "เสียงแทรก/เสียงรบกวน",       group: "sub"  },
+  { id: 13, name: "Silence",               thai: "ลูกค้าเงียบ",                group: "sub"  },
+  { id: 14, name: "Dropped Call",          thai: "สายหลุดระหว่างสนทนา",        group: "sub"  },
+  { id: 15, name: "Out of Topic",          thai: "พูดเรื่องอื่น",              group: "sub"  },
 ];
+
+// Rule-based audio-quality keywords → forces "Background Noise" before AI runs.
+const AUDIO_QUALITY_PATTERNS: RegExp[] = [
+  /can'?t hear/i,
+  /cannot hear/i,
+  /hard to hear/i,
+  /loud noise/i,
+  /too noisy/i,
+  /background noise/i,
+  /unclear audio/i,
+  /audio (is )?unclear/i,
+  /breaking up/i,
+  /ไม่ได้ยิน/,
+  /เสียงไม่ชัด/,
+  /เสียงดัง/,
+  /เสียงรบกวน/,
+  /เสียงแทรก/,
+];
+
+function detectAudioQualityIssue(log: string): boolean {
+  return AUDIO_QUALITY_PATTERNS.some((re) => re.test(log));
+}
+
+function makeResult(name: string, reason: string): ClassifyResult {
+  const cat = CONVERSATION_CATEGORIES.find((c) => c.name === name)!;
+  return { status_id: cat.id, status_name: cat.name, category: cat.name, reason };
+}
 
 async function classifyCall(
   payload: Record<string, unknown>,
   log: string,
   apiKey: string | undefined,
 ): Promise<ClassifyResult> {
-  // STEP 1: System-level status check (json_log)
+  // STEP 1: System-level status check (telephony layer)
   const rawStatus = String(payload.status || "").toLowerCase().trim();
   const sys = SYSTEM_STATUS_MAP[rawStatus];
   if (sys) {
-    return {
-      status_id: sys.id,
-      status_name: sys.name,
-      category: sys.category,
-      reason: `System status: ${rawStatus} → ${sys.thai}`,
-    };
+    return makeResult(sys.name, `System status: ${rawStatus} → ${sys.thai}`);
   }
 
-  // STEP 2: Conversation analysis required
+  // STEP 2: No / empty conversation → Not Reached
   if (!log || log.trim().length < 5) {
-    const silence = CONVERSATION_CATEGORIES.find((c) => c.name === "Silence")!;
-    return {
-      status_id: silence.id,
-      status_name: silence.name,
-      category: silence.name,
-      reason: "No conversation log present",
-    };
+    return makeResult("Not Reached", "No conversation log present");
+  }
+
+  // STEP 3: Rule-based silence detection — customer picked up but never spoke (all User turns are TIMEOUT/empty)
+  const userTurns = log.split("User:").slice(1);
+  const hasRealSpeech = userTurns.some((t) => {
+    const text = t.trim().toUpperCase();
+    return text.length > 0 && !text.includes("TIMEOUT");
+  });
+  if (userTurns.length > 0 && !hasRealSpeech) {
+    return makeResult("Silence", "Customer picked up but remained silent (ASR TIMEOUT)");
+  }
+
+  // STEP 4: Rule-based audio-quality detection (runs before AI)
+  if (detectAudioQualityIssue(log)) {
+    return makeResult("Background Noise", "Detected audio-quality keywords in transcript");
   }
 
   if (!apiKey) {
-    console.warn("LOVABLE_API_KEY not found, defaulting to Normal Flow");
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI key missing" };
+    console.warn("LOVABLE_API_KEY not found, defaulting to Not Reached");
+    return makeResult("Not Reached", "AI key missing");
   }
 
   const categoryList = CONVERSATION_CATEGORIES.map(
-    (c) => `${c.id}. ${c.name} (${c.thai})`,
+    (c) => `${c.id}. ${c.name} (${c.thai}) [${c.group}]`,
   ).join("\n");
 
   const systemPrompt = `You classify Thai debt-collection call transcripts. Return STRICT JSON only.
-Choose exactly ONE conversation category from this list:
+Choose exactly ONE category (use the EXACT English label) from this list:
 ${categoryList}
 
-CRITICAL CLASSIFICATION RULES:
-- ALWAYS classify by the FINAL OUTCOME of the call, not by transient events that occurred mid-conversation.
-- "Repeat Request", "Barge-in", "Background Noise", and "Out of Topic" are TRANSIENT events, NOT final statuses.
-  Only use them if the call ENDED WITHOUT a clear resolution (e.g., the conversation ended while still off-topic, still being interrupted by noise, or still asking to repeat — with no resolved outcome).
-- If the customer eventually confirmed/acknowledged payment info → "Normal Flow".
-- If the customer eventually said they already paid → "Already Paid".
-- If the customer eventually said it's the wrong person → "Wrong Person".
-- If the customer eventually requested to talk to staff → "Transfer".
-- If the customer eventually asked to be called back later → "Call Later".
-- If the customer eventually said it's not convenient → "Not Convenient".
-- Prefer the resolved outcome over any earlier interruption, repeat request, off-topic remark, or background noise.
+CATEGORY DEFINITIONS
 
-BARGE-IN vs DROPPED CALL (IMPORTANT DISTINCTION):
-- "Barge-in" = the customer INTERRUPTED the bot to ASK A QUESTION or interact mid-call. Use this even if the call ended abruptly afterward, as long as there was a customer question/interaction before the end.
-- "Dropped Call" = the call was cut off / disconnected with NO question or interaction from the customer (pure disconnection, silence, or technical drop with no engagement).
-- Examples:
-  * Customer asked a question mid-call → call ended → "Barge-in"
-  * Call suddenly disconnected, no customer interaction at all → "Dropped Call"
+Main Outcomes (business result of the call — ALWAYS PREFER THESE):
+- Planned More Than 3     → Customer indicates a payment plan / will pay, but the agreed date is MORE THAN 3 days from the call date (e.g. "อาทิตย์หน้า", "เกิน 3 วัน", "เดือนหน้า", "อีก 5 วัน", or any specific date > 3 days away). Also use for vague acknowledgement of the debt with no clear near-term commitment.
+- Promised to Pay        → Customer explicitly confirms payment WITHIN 3 days from the call date (today, tomorrow, "พรุ่งนี้", "มะรืน", "อีก 2 วัน", or any specific date ≤ 3 days away).
+- Restructure Requested  → Customer asks for debt restructuring, installment plans, payment negotiation, partial payment, deferral, or settlement discussion.
+- Inconvenient (With Date)    → Customer says it is not convenient right now BUT provides a specific callback date/time (e.g. "call me back tomorrow at 3pm", "next Monday morning"). A concrete schedule is agreed.
+- Inconvenient (Without Date) → Customer says it is not convenient and does NOT provide any specific callback date/time (vague "call me later", "not now", "I'm busy").
+- Already Paid           → Customer states the payment has already been completed/settled.
+- Not Reached            → Customer could not actually be contacted (no answer, line dead, voicemail, unreachable, hung up before any meaningful exchange).
+- Refused                → Customer clearly refuses to pay, denies the debt outright, or terminates the conversation in clear refusal.
 
-Output format (STRICT JSON, no markdown):
+Conversation Behaviors (use ONLY when no clear business outcome above exists):
+- Not Convenient   → Customer says it is not a convenient time but did not commit to a callback time.
+- Wrong Person     → Customer says this is not the policyholder / wrong number.
+- Call Later       → Customer vaguely asks to be called another time without a fixed schedule.
+- Transfer         → Customer asks to speak to a human agent / staff.
+- Background Noise → Audio quality issues, loud background, customer cannot hear clearly, transcript dominated by noise.
+- Silence          → Customer remained silent throughout / no verbal response.
+- Dropped Call     → Call disconnected with no meaningful customer interaction (pure cutoff).
+- Out of Topic     → Customer kept talking about unrelated topics with no resolution.
+
+CRITICAL CLASSIFICATION RULES
+
+1. MANDATORY DEBT DISCLOSURE CHECK (HIGHEST PRIORITY):
+   Before classifying as ANY payment outcome ("Promised to Pay" or "Planned More Than 3"), you MUST verify in the conversation_log that the Bot has already DISCLOSED the "Debt Details" to the customer (e.g. license plate, installment number, outstanding balance, due date).
+   - If the Bot has NOT yet disclosed these details, it is IMPOSSIBLE for the interaction to be a payment outcome. You MUST NOT choose "Promised to Pay" or "Planned More Than 3" under any circumstance.
+
+2. HANDLING "NOT CONVENIENT" & CALLBACK REQUESTS:
+   If the customer indicates they are "not convenient" (ไม่สะดวก), "busy" (ไม่ว่าง), or asks for a callback / to reschedule / to postpone:
+   - If the customer specifies a date/time (e.g. "พรุ่งนี้"/"tomorrow", "อาทิตย์หน้า"/"next week", "เดือนหน้า"/"next month", a specific clock time or date) → classify STRICTLY as "Inconvenient (With Date)".
+   - If no specific date/time is mentioned → classify as "Inconvenient (Without Date)".
+   - STRICT RULE: As long as the debt details have NOT been disclosed, ANY customer request to reschedule or postpone the conversation MUST be classified as "Inconvenient" (With or Without Date), EVEN IF they mention future dates like "tomorrow" or "next week". Never interpret such date mentions as a payment commitment.
+
+3. PAYMENT CLASSIFICATION (ONLY AFTER DISCLOSURE):
+   "Promised to Pay" and "Planned More Than 3" are permitted ONLY if BOTH conditions are true:
+   (a) The Bot has disclosed the debt details in the conversation_log, AND
+   (b) The customer then provides a clear payment commitment tied to that disclosed debt.
+   Then decide:
+   - "Promised to Pay"     → commitment is within ≤ 3 days from the call date (inclusive of exactly 3 days).
+   - "Planned More Than 3" → commitment is STRICTLY > 3 days from the call date (i.e. 4 or more days).
+   If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 before comparing.
+
+   3-DAY BOUNDARY RULE (STRICT):
+   The following Thai phrasings MUST be treated as ≤ 3 days and classified as "Promised to Pay" (assuming debt details were disclosed and a commitment was made). They MUST NEVER be classified as "Planned More Than 3":
+   - "อีก 3 วัน"
+   - "3 วัน"
+   - "ภายใน 3 วัน"
+   - "ไม่เกิน 3 วัน"
+   - any equivalent phrasing meaning "within / no more than / up to 3 days"
+   Only choose "Planned More Than 3" when the customer explicitly commits to a date that is 4 or more days after the call date (e.g. "อีก 5 วัน", "อาทิตย์หน้า", "สิ้นเดือน", a specific date > 3 days out).
+
+4. CLASSIFICATION LOGIC SUMMARY:
+   - IF (Debt details NOT disclosed) → MUST be "Inconvenient (With Date)" or "Inconvenient (Without Date)" (regardless of any time/date mentioned), or another non-payment category if more appropriate (e.g. Wrong Person, Refused, Not Reached).
+   - IF (Debt details disclosed AND payment committed) → "Promised to Pay" (≤ 3 days, inclusive) or "Planned More Than 3" (> 3 days, i.e. ≥ 4 days).
+
+5. ADDITIONAL GUIDELINES:
+   - Conversation Behavior categories should ONLY be chosen when no clear business outcome above applies.
+   - Decide based on the FINAL state of the call, not transient mid-call events.
+   - "Refused" requires a clear refusal — not mere reluctance or "not convenient".
+
+
+Output format (STRICT JSON, no markdown, no commentary):
 {
-  "status_id": <number 5-16>,
-  "status_name": "<exact English label>",
-  "reason": "<short explanation focused on the FINAL outcome>",
-  "chart_update": { "category": "<exact English label>", "increment": 1 }
+  "status_name": "<exact English label from the list>",
+  "confidence": <number between 0 and 1>,
+  "reason": "<short explanation focused on the FINAL outcome>"
 }`;
 
   try {
@@ -575,16 +691,22 @@ Output format (STRICT JSON, no markdown):
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "AI request failed" };
+      return makeResult("Not Reached", "AI request failed");
     }
 
     const result = await response.json();
     const content = result.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(content);
 
-    const chartCategory: string = parsed?.chart_update?.category || parsed?.status_name;
+    const aiName: string = parsed?.status_name || parsed?.chart_update?.category || "";
+    const normalized = String(aiName).trim().toLowerCase();
+    // Map legacy "Acknowledged" responses from older prompts to the new bucket.
+    const aliased =
+      normalized === "acknowledged" || normalized === "acknowledge"
+        ? "planned more than 3"
+        : normalized;
     const match = CONVERSATION_CATEGORIES.find(
-      (c) => c.name.toLowerCase() === String(chartCategory || "").toLowerCase(),
+      (c) => c.name.toLowerCase() === aliased,
     );
 
     if (match) {
@@ -596,10 +718,102 @@ Output format (STRICT JSON, no markdown):
       };
     }
 
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Unmatched AI category" };
+    console.warn("Unmatched AI category, defaulting to Planned More Than 3:", aiName);
+    return makeResult("Planned More Than 3", `Unmatched AI category: ${aiName}`);
   } catch (err) {
     console.error("AI classification error:", err);
-    return { status_id: 7, status_name: "Normal Flow", category: "Normal Flow", reason: "Classifier exception" };
+    return makeResult("Planned More Than 3", "Classifier exception");
   }
 }
+
+// ============================================================================
+// CALLBACK DATE EXTRACTION
+// Extract a future callback date from the customer's words, relative to the
+// timestamp recorded in the conversation log. Returns ISO YYYY-MM-DD or null.
+// ============================================================================
+
+function parseLogReferenceDate(log: string): Date {
+  // Lines look like: "2026-05-21 17:09:16 Bot: ..."
+  const m = log.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    // Treat as Asia/Bangkok local time → UTC equivalent
+    const utcMs = Date.UTC(+y, +mo - 1, +d, +h - 7, +mi, +s);
+    const dt = new Date(utcMs);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return new Date();
+}
+
+function bangkokIsoDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return parts; // en-CA → YYYY-MM-DD
+}
+
+async function extractCallbackDate(
+  conversationLog: string | null,
+  apiKey: string | undefined,
+): Promise<string | null> {
+  if (!conversationLog || conversationLog.trim().length < 5) return null;
+  if (!apiKey) return null;
+
+  const referenceDate = parseLogReferenceDate(conversationLog);
+  const refIso = bangkokIsoDate(referenceDate);
+
+  const systemPrompt = `You extract a callback date from a Thai debt-collection call transcript.
+
+Reference (call) date in Asia/Bangkok timezone: ${refIso}
+
+Rules (apply relative to the reference date):
+- Exact date stated by the customer → return it. If the customer states a Buddhist Era year (พ.ศ., > 2400), subtract 543 to get the Gregorian year.
+- "พรุ่งนี้" → reference date + 1 day
+- "มะรืน" / "มะรืนนี้" → reference date + 2 days
+- "อีก X วัน" → reference date + X days
+- "สัปดาห์หน้า" / "อาทิตย์หน้า" → reference date + 7 days
+- "เดือนหน้า" → reference date + 30 days
+- If multiple dates are mentioned, use the LAST date the customer agreed to.
+- If no callback date / time is mentioned, or only the bot suggested one without customer confirmation → null.
+
+Return STRICT JSON only:
+{ "date_con": "YYYY-MM-DD" | null }`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `conversation_log:\n"""${conversationLog}"""` },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("extractCallbackDate AI error:", response.status, await response.text());
+      return null;
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || "{}";
+    const parsed = JSON.parse(content);
+    const value = parsed?.date_con;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+    return null;
+  } catch (err) {
+    console.error("extractCallbackDate exception:", err);
+    return null;
+  }
+}
+
 

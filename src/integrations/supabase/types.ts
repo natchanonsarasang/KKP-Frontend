@@ -391,6 +391,7 @@ export type Database = {
           call_outcome: string | null
           contact_attempts: number
           created_at: string
+          date_con: string | null
           due_date: string | null
           id: string
           is_blocked: boolean
@@ -420,6 +421,7 @@ export type Database = {
           call_outcome?: string | null
           contact_attempts?: number
           created_at?: string
+          date_con?: string | null
           due_date?: string | null
           id?: string
           is_blocked?: boolean
@@ -449,6 +451,7 @@ export type Database = {
           call_outcome?: string | null
           contact_attempts?: number
           created_at?: string
+          date_con?: string | null
           due_date?: string | null
           id?: string
           is_blocked?: boolean
@@ -616,7 +619,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "dhipaya"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -744,7 +747,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "dhipaya"],
     },
   },
 } as const

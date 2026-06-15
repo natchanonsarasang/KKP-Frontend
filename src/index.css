@@ -147,3 +147,37 @@
     text-wrap: balance;
   }
 }
+
+.page-break-avoid {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.pdf-export,
+.pdf-export * {
+  line-height: 1.5 !important;
+}
+
+.pdf-export [class*="rounded-lg"][class*="border"],
+.pdf-export .card-elevated,
+.pdf-export .stat-card {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-height: auto;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.pdf-export h1,
+.pdf-export h2,
+.pdf-export h3,
+.pdf-export h4,
+.pdf-export h5,
+.pdf-export h6,
+.pdf-export p,
+.pdf-export span,
+.pdf-export div {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+

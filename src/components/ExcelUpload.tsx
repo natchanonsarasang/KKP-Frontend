@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import * as XLSX from "xlsx";
 
+
 interface Template {
   id: string;
   template_id: string | null;
@@ -182,7 +183,7 @@ const ExcelUpload = () => {
             {
               body: {
                 phone_number: row.phone_number,
-                variables: row,
+                variables: { ...row },
               },
             }
           );

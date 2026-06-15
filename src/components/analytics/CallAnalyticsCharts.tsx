@@ -15,6 +15,19 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
+import { MAIN_STATUSES, SUB_STATUSES, resolveMainStatus, resolveSubStatus } from "@/lib/callStatuses";
+
+// Tailwind class palettes for the Main Status cards (mapped by status key).
+const MAIN_STATUS_CARD_CLASSES: Record<string, { bg: string; border: string; text: string }> = {
+  planned_more_than_3: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  promised: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  restructure: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
+  inconvenient_with_date: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  inconvenient_without_date: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
+  already_paid: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
+  not_reached: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700" },
+  refused: { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-700" },
+};
 
 interface CallRecord {
   id: string;
@@ -98,12 +111,7 @@ export const HourlyPickupChart = ({ callListItems }: { callListItems: CallListIt
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 10 }}
-                interval={2}
-                className="text-muted-foreground"
-              />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={2} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
               <Tooltip
                 contentStyle={{
@@ -198,23 +206,19 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       const resultDataStatus = item.call_record?.result_data?.status;
       const rawStatus = (resultDataStatus || item.status || "").toLowerCase().replace(/_/g, " ");
 
-      // GLOBAL EXCLUSION: skip "hanged_up"/"incomplete" entirely
-      if (
-        rawOutcome.includes("hanged") ||
-        rawStatus.includes("hanged") ||
-        rawStatus === "incomplete"
-      ) {
-        return;
-      }
+      // Skip "incomplete" records (hanged_up IS counted)
+      if (rawStatus === "incomplete") return;
 
       let outcome = "pending";
 
       if (rawOutcome.includes("confirmed")) outcome = "confirmed";
       else if (rawOutcome.includes("declined") || rawOutcome.includes("rejected")) outcome = "rejected";
+      else if (rawOutcome.includes("hang")) outcome = "hangup";
       else if (rawOutcome === "no answer") outcome = "no_answer";
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
       else if (rawOutcome === "failed") outcome = "failed";
+      else if (rawStatus.includes("hang")) outcome = "hangup";
       else if (item.picked_up === false) outcome = "no_answer";
       else if (rawStatus === "no answer") outcome = "no_answer";
       else if (rawStatus === "busy") outcome = "busy";
@@ -234,6 +238,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       completed: "Completed",
       busy: "Busy",
       voicemail: "Voicemail",
+      hangup: "Hang up",
     };
 
     return Object.entries(outcomes).map(([key, value]) => ({
@@ -464,8 +469,18 @@ export const TrendChart = ({ callListItems }: { callListItems: CallListItem[] })
 
 export const AICategoryDistributionChart = ({ callListItems }: { callListItems: CallListItem[] }) => {
   const chartColors = [
-    "#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4",
-    "#ec4899", "#f97316", "#14b8a6", "#3b82f6", "#a855f7", "#71717a"
+    "#6366f1",
+    "#22c55e",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4",
+    "#ec4899",
+    "#f97316",
+    "#14b8a6",
+    "#3b82f6",
+    "#a855f7",
+    "#71717a",
   ];
   const categoryData = useMemo(() => {
     // Thai categories as primary display labels
@@ -489,31 +504,33 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       "Already Paid": "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)",
       "Normal Flow": "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)",
       "Wrong Person": "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)",
-      "Transfer": "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
+      Transfer: "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
       "Call Later": "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)",
       "Barge-in": "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)",
       "Background Noise": "เสียงแทรก/เสียงรบกวน (Background Noise)",
       "Out of Topic": "ลูกค้าพูดเรื่องอื่น (Out of Topic)",
-      "Silence": "ลูกค้าเงียบ (Silence)",
+      Silence: "ลูกค้าเงียบ (Silence)",
       "Dropped Call": "สายหลุดระหว่างสนทนา (Dropped Call)",
       "Repeat Request": "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)",
     };
 
     callListItems.forEach((item) => {
       if (!item.ai_category) return;
-      
+
       const rawCategory = item.ai_category;
-      
+
       // 1. Try direct mapping from English if AI returned only English
       let mappedCategory = englishToThai[rawCategory] || null;
 
       // 2. If not found, try to find match among our Thai(English) keys
       if (!mappedCategory) {
-        mappedCategory = Object.keys(categories).find(cat => 
-          rawCategory === cat || 
-          rawCategory.includes(cat.split(" (")[0]) ||
-          (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0]))
-        ) || null;
+        mappedCategory =
+          Object.keys(categories).find(
+            (cat) =>
+              rawCategory === cat ||
+              rawCategory.includes(cat.split(" (")[0]) ||
+              (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0])),
+          ) || null;
       }
 
       if (mappedCategory) {
@@ -523,9 +540,8 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       }
     });
 
-    return Object.entries(categories)
-      .map(([name, value]) => ({ name, value }));
-      // Removed sort to lock the order as defined above
+    return Object.entries(categories).map(([name, value]) => ({ name, value }));
+    // Removed sort to lock the order as defined above
   }, [callListItems]);
 
   return (
@@ -536,11 +552,7 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
       <CardContent>
         <div className="h-[500px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={categoryData}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 220, bottom: 0 }}
-            >
+            <BarChart data={categoryData} layout="vertical" margin={{ top: 10, right: 30, left: 220, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={true} vertical={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} hide />
               <YAxis
@@ -558,15 +570,180 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
                   fontSize: "12px",
                 }}
               />
-              <Bar
-                dataKey="value"
-                name="Calls"
-                radius={[0, 4, 4, 0]}
-                barSize={20}
-                fill="#6366f1"
-              />
+              <Bar dataKey="value" name="Calls" radius={[0, 4, 4, 0]} barSize={20} fill="#6366f1" />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ============================================================
+// Main Status Overview — primary collection outcomes
+// ============================================================
+
+export const MainStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
+  const data = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(MAIN_STATUSES.map((s) => [s.key, 0]));
+
+    callListItems.forEach((item) => {
+      const s = (item.status || "").toLowerCase();
+      const r = (item.call_record?.result_data?.status || "").toLowerCase();
+      const o = (item.call_outcome || "").toLowerCase();
+      if (s === "incomplete" || r === "incomplete") return;
+
+      const matched = resolveMainStatus(item.ai_category, {
+        picked_up: item.picked_up,
+        status: item.status,
+        call_outcome: item.call_outcome,
+        result_status: item.call_record?.result_data?.status ?? null,
+      });
+      if (matched) counts[matched.key]++;
+    });
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return MAIN_STATUSES.map((s) => ({
+      ...s,
+      ...(MAIN_STATUS_CARD_CLASSES[s.key] ?? { bg: "bg-muted", border: "border-border", text: "text-foreground" }),
+      value: counts[s.key],
+      pct: total > 0 ? Math.round((counts[s.key] / total) * 100) : 0,
+      total,
+    }));
+  }, [callListItems]);
+
+  const total = data[0]?.total ?? 0;
+  const pieData = data.filter((d) => d.value > 0).map((d) => ({ name: d.label, value: d.value, color: d.color }));
+
+  return (
+    <Card className="shadow-sm border-blue-100">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-blue-900">Main Status Overview</CardTitle>
+        <p className="text-xs text-muted-foreground">Primary collection outcomes across all calls</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+          <div className="h-64">
+            {pieData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                No data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {pieData.map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    formatter={(v: number, n: string) => [
+                      `${v} (${total > 0 ? Math.round((v / total) * 100) : 0}%)`,
+                      n,
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {data.map((s) => (
+              <div key={s.key} className={`${s.bg} ${s.border} border rounded-lg p-3 transition-all hover:shadow-sm`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                  <span className={`text-[11px] font-semibold ${s.text} uppercase tracking-wide truncate`}>
+                    {s.label}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className={`text-xl font-bold ${s.text}`}>{s.value}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{s.pct}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ============================================================
+// SubStatus Overview — secondary conversation behaviors
+// ============================================================
+
+export const SubStatusOverview = ({ callListItems }: { callListItems: CallListItem[] }) => {
+  const data = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(SUB_STATUSES.map((s) => [s.key, 0]));
+
+    callListItems.forEach((item) => {
+      const s = (item.status || "").toLowerCase();
+      const r = (item.call_record?.result_data?.status || "").toLowerCase();
+      const o = (item.call_outcome || "").toLowerCase();
+      if (s === "incomplete" || r === "incomplete") return;
+
+      const matched = resolveSubStatus(item.ai_category);
+      if (matched) counts[matched.key]++;
+    });
+
+    return SUB_STATUSES.map((s) => ({ name: s.label, value: counts[s.key] }));
+  }, [callListItems]);
+
+  const hasData = data.some((d) => d.value > 0);
+
+  return (
+    <Card className="shadow-sm border-blue-100">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-blue-900">SubStatus Overview</CardTitle>
+        <p className="text-xs text-muted-foreground">Secondary conversation behaviors observed</p>
+      </CardHeader>
+      <CardContent>
+        <div className="h-72">
+          {!hasData ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              No conversation insights yet
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ top: 5, right: 24, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
+                  width={130}
+                  className="text-muted-foreground"
+                />
+                <Tooltip
+                  cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                  formatter={(v: number) => [`${v} calls`, "Count"]}
+                />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 6, 6, 0]} barSize={18} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </CardContent>
     </Card>

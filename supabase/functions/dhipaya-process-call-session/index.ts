@@ -458,10 +458,10 @@ async function processSession(supabase: any, sessionId: string) {
 
   const isTestMode = typedSession.settings.testMode === true;
 
-  const BOT_ID = "6a06964fb875327d960f05f0";
+  const BOT_ID = "6a0c3158b875327d960f0936";
   const CALL_API_URL = "https://bn-voicebot-system-9ehp.onrender.com/api/voicebot/custom/call_message_public";
   const CALL_API_BEARER_TOKEN = "zjqE5tNXw-TYyNG94J9YxyFjofvI5CRe0w2Cv93lPAQ";
-  const BOT_TYPE = "Confirm1";
+  const BOT_TYPE = "init1";
 
   if (isTestMode) {
     console.log(`[Session ${sessionId}] 🧪 TEST MODE ENABLED - No real calls will be made`);
@@ -634,6 +634,7 @@ async function processSession(supabase: any, sessionId: string) {
       } else {
         // REAL MODE: Make actual call via flow payload format
         const ASR_PROVIDER = "botnoi-aws-th-noise-classifier-v17c";
+        const nextIntent = String(vars.next_intent || "{{consent}}").trim();
         const outboundId = `outbound_${item.id}`;
         const eventId = `event_${sessionId}_${item.id}`;
         // flow: "<!outbound_id|<OUTBOUND_REF>!>|||" + "<!customer_name|{{customer_name}}!>|||" + nextIntent,
@@ -642,7 +643,7 @@ async function processSession(supabase: any, sessionId: string) {
           event_id: eventId,
           tel_number: debtor.phone_number,
           phonenumber: debtor.phone_number,
-          variables: vars,
+          variables: preparedVariables,
           sourcephone: "3525<SOURCE_PHONE_NUMBER>",
           speaker: "212",
           language: "th",
@@ -650,7 +651,7 @@ async function processSession(supabase: any, sessionId: string) {
           speed: "1",
           tts: "voicebot-premium",
           bot_id: BOT_ID,
-          bot_type: BOT_TYPE,
+          bot_type: nextIntent,
           asr_provider: ASR_PROVIDER,
           asr_language_code: "th",
           asr_vad_rules: {
@@ -684,8 +685,8 @@ async function processSession(supabase: any, sessionId: string) {
             (data.message && data.message.toLowerCase().includes("success")));
 
         if (isSuccess) {
-          // Use outbound_id from Botnoi response (this is what comes back in webhook)
-          const botnoiCallId = data.outbound_id || data.call_id || `botnoi_${Date.now()}`;
+          // Prioritize data.call_id (UUID used by webhook) over outbound_id
+          const botnoiCallId = data.call_id || data.outbound_id || `botnoi_${Date.now()}`;
 
           // Get current retry_count to determine attempt_number
           const { data: itemData } = await supabase
@@ -696,7 +697,9 @@ async function processSession(supabase: any, sessionId: string) {
           const currentRetryCount = itemData?.retry_count || 0;
           const attemptNumber = currentRetryCount + 1;
 
-          // Create call record and get its ID
+          // Create call record and get its ID. Persist campaign_determined inside
+          // result_data so the webhook can resolve the campaign without extra
+          // Airtable lookups.
           const { data: callRecord } = await supabase
             .from("call_records")
             .insert({
@@ -706,10 +709,11 @@ async function processSession(supabase: any, sessionId: string) {
               status: "pending",
               user_id: typedSession.user_id,
               workspace_id: typedSession.workspace_id,
-              result_data: data,
+              result_data: { ...data, campaign_determined: nextIntent },
             })
             .select("id")
             .single();
+
 
           // Update call list item - keep as "calling" until webhook confirms result
           // Link call_record_id so webhook can find this item reliably

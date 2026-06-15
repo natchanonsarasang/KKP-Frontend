@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import {
   PhoneCall, CheckCircle, XCircle, Clock, AlertCircle,
-  PhoneOff, RefreshCw, Copy, Search, Download,
+  PhoneOff, RefreshCw, Copy, Search, Download, FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -26,7 +28,8 @@ import {
   OutcomeDistributionChart,
   TemplatePerformanceChart,
   TrendChart,
-  AICategoryDistributionChart,
+  MainStatusOverview,
+  SubStatusOverview,
 } from "./analytics/CallAnalyticsCharts";
 import { BestTimeInsights } from "./analytics/BestTimeInsights";
 import { useAdmin } from "@/contexts/AdminContext";
@@ -76,6 +79,9 @@ interface Debtor {
   name: string | null;
   last_name: string | null;
   phone_number: string;
+  total_debt: number | null;
+  due_date: string | null;
+  variables: Record<string, string> | null;
 }
 
 interface Template {
@@ -108,6 +114,114 @@ const CallDashboard = () => {
     to: new Date(),
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const dateRangeLabel = useMemo(() => {
+    if (dateRange === "all") return "ทั้งหมด";
+    if (customRange?.from) {
+      const from = format(customRange.from, "d MMM yyyy", { locale: th });
+      const to = customRange.to ? format(customRange.to, "d MMM yyyy", { locale: th }) : from;
+      return from === to ? from : `${from} - ${to}`;
+    }
+    return "";
+  }, [dateRange, customRange]);
+
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      // Allow charts to layout
+      await new Promise((r) => setTimeout(r, 400));
+      const container = exportRef.current;
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: container.scrollWidth,
+        windowHeight: container.scrollHeight,
+        width: container.scrollWidth,
+        height: container.scrollHeight,
+      });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      // px-per-mm ratio of the rendered canvas
+      const pxPerMm = canvas.width / pageW;
+      const pageHeightPx = Math.floor(pageH * pxPerMm);
+
+      // Collect section boundaries (in canvas pixels) so we can avoid
+      // breaking pages through the middle of a card/chart.
+      const containerRect = container.getBoundingClientRect();
+      const domToCanvas = canvas.height / container.scrollHeight;
+      const sections = Array.from(
+        container.querySelectorAll<HTMLElement>("[data-pdf-section]")
+      ).map((el) => {
+        const r = el.getBoundingClientRect();
+        const top = Math.floor((r.top - containerRect.top) * domToCanvas);
+        const bottom = Math.ceil((r.bottom - containerRect.top) * domToCanvas);
+        return { top, bottom };
+      });
+
+      const totalH = canvas.height;
+      let pageStart = 0;
+      let safetyPages = 0;
+      while (pageStart < totalH && safetyPages < 50) {
+        safetyPages += 1;
+        let pageEnd = Math.min(pageStart + pageHeightPx, totalH);
+
+        if (pageEnd < totalH) {
+          // Find a section that straddles the proposed page break and snap
+          // the break to that section's top (i.e. the whitespace above it).
+          const straddling = sections
+            .filter((s) => s.top > pageStart + 50 && s.top < pageEnd && s.bottom > pageEnd)
+            .sort((a, b) => a.top - b.top)[0];
+          if (straddling) {
+            pageEnd = straddling.top;
+          }
+        }
+
+        const sliceHeight = pageEnd - pageStart;
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) break;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0,
+          pageStart,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight,
+        );
+        const imgData = pageCanvas.toDataURL("image/png");
+        const renderedH = sliceHeight / pxPerMm;
+
+        if (pageStart > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, 0, pageW, renderedH);
+
+        pageStart = pageEnd;
+      }
+
+      const stamp = format(new Date(), "yyyy-MM-dd");
+      pdf.save(`analytics-${stamp}.pdf`);
+      toast.success("ส่งออก PDF เรียบร้อย");
+    } catch (err) {
+      console.error("PDF export failed", err);
+      toast.error("ส่งออก PDF ไม่สำเร็จ");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
 
   const handleDateRangeChange = (v: string) => {
     const range = v as DateRangeType;
@@ -220,7 +334,7 @@ const CallDashboard = () => {
       if (!currentWorkspace?.id) return [];
       const { data, error } = await supabase
         .from("debtors")
-        .select("id, name, last_name, phone_number")
+        .select("id, name, last_name, phone_number, total_debt, due_date, variables")
         .eq("workspace_id", currentWorkspace.id);
       if (error) throw error;
       return data as Debtor[];
@@ -261,9 +375,22 @@ const CallDashboard = () => {
     return callRecords.map((record) => {
       const debtor = debtorByPhone.get(record.phone_number);
       const cli = cliByRecordId.get(record.id);
+      const vars = debtor?.variables || {};
+      const debtorName =
+        vars.name ||
+        (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
+      const amountVal =
+        vars.amount ||
+        vars.outstanding_amount ||
+        (debtor?.total_debt != null ? String(debtor.total_debt) : "") ||
+        record.amount ||
+        "";
+      const dueDateVal = vars.due_date || debtor?.due_date || record.due_date || "";
       return {
         ...record,
-        debtor_name: debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "",
+        debtor_name: debtorName,
+        amount: amountVal,
+        due_date: dueDateVal,
         picked_up: cli?.picked_up ?? null,
         call_outcome: cli?.call_outcome ?? null,
       };
@@ -310,16 +437,65 @@ const CallDashboard = () => {
   };
 
   const getOutcomeBadge = (outcome: string | null, pickedUp: boolean | null) => {
-    if (!outcome && pickedUp === false) return getStatusBadge("no_answer");
-    if (!outcome) return <span className="text-muted-foreground text-xs">-</span>;
-    return getStatusBadge(outcome.toLowerCase());
+    if (outcome) {
+      const o = outcome.toLowerCase();
+      if (o.includes("hang")) {
+        return <Badge variant="secondary" className="bg-warning/10 text-warning gap-1 font-normal">Hang up</Badge>;
+      }
+      return getStatusBadge(o);
+    }
+    if (pickedUp === false) return getStatusBadge("no_answer");
+    return <span className="text-muted-foreground text-xs">-</span>;
+  };
+
+  const formatDueDate = (phone: string, fallback: string): string => {
+    const debtor = debtorByPhone.get(phone);
+    const vars = (debtor?.variables || {}) as Record<string, string>;
+    const thaiMonths: Record<string, string> = {
+      "มกราคม": "01", "กุมภาพันธ์": "02", "มีนาคม": "03", "เมษายน": "04",
+      "พฤษภาคม": "05", "มิถุนายน": "06", "กรกฎาคม": "07", "สิงหาคม": "08",
+      "กันยายน": "09", "ตุลาคม": "10", "พฤศจิกายน": "11", "ธันวาคม": "12",
+    };
+    const engMonths: Record<string, string> = {
+      january: "01", february: "02", march: "03", april: "04", may: "05",
+      june: "06", july: "07", august: "08", september: "09", october: "10",
+      november: "11", december: "12",
+      jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07",
+      aug: "08", sep: "09", sept: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const normalizeMonth = (m: string): string => {
+      const s = String(m || "").trim();
+      if (!s) return "";
+      if (/^\d{1,2}$/.test(s)) return s.padStart(2, "0");
+      if (thaiMonths[s]) return thaiMonths[s];
+      const lower = s.toLowerCase();
+      return engMonths[lower] || "";
+    };
+
+    const dayRaw = String(vars.due_date || "").trim();
+    const monthRaw = String(vars.due_month || "").trim();
+    const yearRaw = String(vars.due_year || "").trim();
+
+    if (dayRaw && monthRaw && yearRaw) {
+      const dd = /^\d{1,2}$/.test(dayRaw) ? dayRaw.padStart(2, "0") : dayRaw;
+      const mm = normalizeMonth(monthRaw);
+      if (mm) return `${dd}/${mm}/${yearRaw}`;
+    }
+
+    const iso = fallback || debtor?.due_date || "";
+    if (iso && /^\d{4}-\d{2}-\d{2}/.test(iso)) {
+      const [y, m, d] = iso.slice(0, 10).split("-");
+      const buddhistYear = String(parseInt(y, 10) + 543);
+      return `${d}/${m}/${buddhistYear}`;
+    }
+    return fallback || "-";
   };
 
   const exportToExcel = () => {
     const rows = filteredRecords.map((r) => ({
       "เบอร์โทร": r.phone_number,
       "ชื่อ": r.debtor_name || "-",
-      "วันครบกำหนด": r.due_date || "-",
+      "วันครบกำหนด": formatDueDate(r.phone_number, r.due_date || ""),
       "จำนวนเงิน": r.amount || "-",
       "สถานะ": r.status || "pending",
       "รับสาย": r.picked_up === true ? "ใช่" : r.picked_up === false ? "ไม่" : "-",
@@ -412,6 +588,15 @@ const CallDashboard = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf || isLoading}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            {isExportingPdf ? "กำลังส่งออก..." : "Export PDF"}
+          </Button>
         </div>
       </div>
 
@@ -430,11 +615,15 @@ const CallDashboard = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <AnalyticsStats callListItems={callListItems || []} />
-            <div className="grid grid-cols-1 gap-4">
-              <AICategoryDistributionChart callListItems={callListItems || []} />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <MainStatusOverview callListItems={callListItems || []} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SubStatusOverview callListItems={callListItems || []} />
               <OutcomeDistributionChart callListItems={callListItems || []} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
               <BestTimeInsights callListItems={callListItems || []} />
             </div>
@@ -493,7 +682,14 @@ const CallDashboard = () => {
                           <TableRow key={record.id}>
                             <TableCell className="font-mono text-sm">{record.phone_number}</TableCell>
                             <TableCell className="text-sm">{record.debtor_name || "-"}</TableCell>
-                            <TableCell className="text-sm">{record.amount ? `฿${record.amount}` : "-"}</TableCell>
+                            <TableCell className="text-sm">{(() => {
+                              const n = Number(record.amount);
+                              return record.amount
+                                ? Number.isFinite(n)
+                                  ? `฿${new Intl.NumberFormat("th-TH").format(n)}`
+                                  : `฿${record.amount}`
+                                : "-";
+                            })()}</TableCell>
                             <TableCell>
                               {record.picked_up === true ? (
                                 <Badge variant="secondary" className="bg-success/10 text-success text-xs">ใช่</Badge>
@@ -566,6 +762,71 @@ const CallDashboard = () => {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Hidden container used only for PDF export. Always mounted so charts size correctly. */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: "-100000px",
+          top: 0,
+          width: "1100px",
+          background: "#ffffff",
+          pointerEvents: "none",
+        }}
+      >
+        <div ref={exportRef} className="pdf-export bg-background text-foreground p-6 space-y-6" style={{ width: "1100px" }}>
+          <div className="flex items-start justify-between border-b pb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Analytics Report</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                ช่วงเวลา: {dateRangeLabel || "-"}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              สร้างเมื่อ {format(new Date(), "d MMM yyyy HH:mm", { locale: th })}
+            </p>
+          </div>
+
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[80px]">
+            <AnalyticsStats callListItems={callListItems || []} />
+          </div>
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[120px]">
+            <MainStatusOverview callListItems={callListItems || []} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <SubStatusOverview callListItems={callListItems || []} />
+            </div>
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <OutcomeDistributionChart callListItems={callListItems || []} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <TemplatePerformanceChart callListItems={callListItems || []} templates={templates || []} />
+            </div>
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <BestTimeInsights callListItems={callListItems || []} />
+            </div>
+          </div>
+
+          <div data-pdf-section className="page-break-avoid pb-6 min-h-[300px]">
+            <TrendChart callListItems={callListItems || []} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pb-6">
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <HourlyPickupChart callListItems={callListItems || []} />
+            </div>
+            <div data-pdf-section className="page-break-avoid min-h-[280px]">
+              <DayOfWeekChart callListItems={callListItems || []} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

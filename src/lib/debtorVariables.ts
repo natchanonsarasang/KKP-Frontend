@@ -1,14 +1,15 @@
 /** Template / customer fields stored in `debtors.variables`. */
 export const DEBTOR_CUSTOMER_VARIABLE_KEYS = [
-  "policy_number",
+  "policy_no",
   "name",
   "due_date",
   "due_month",
   "due_year",
-  "price",
+  "outstanding_amount",
   "paid_date",
   "paid_month",
   "paid_year",
+  "overdue_installments",
 ] as const;
 
 export type DebtorCustomerVariableKey =
@@ -18,15 +19,16 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   DebtorCustomerVariableKey,
   string
 > = {
-  policy_number: "Policy number",
+  policy_no: "Policy number",
   name: "Name",
   due_date: "Due date",
   due_month: "Due month",
   due_year: "Due year",
-  price: "Price",
+  outstanding_amount: "Outstanding amount",
   paid_date: "Paid date",
   paid_month: "Paid month",
   paid_year: "Paid year",
+  overdue_installments: "Overdue Installments",
 };
 
 /** Text fields in `variables`. */
@@ -127,4 +129,36 @@ export function splitThaiDate(isoDate: string | null | undefined): {
   const year = (d.getFullYear() + 543).toString();
 
   return { day, month, year };
+}
+
+
+/** Format ISO date (YYYY-MM-DD) as Thai Buddhist date, e.g. "วันจันทร์ที่ 13 เมษายน 2568". */
+export function formatThaiBuddhistDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(`${iso}T00:00:00+07:00`);
+  if (isNaN(d.getTime())) return "-";
+  return new Intl.DateTimeFormat("th-TH-u-ca-buddhist", {
+    timeZone: "Asia/Bangkok",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+    .format(d)
+    .replace(/(\S+)\s/, "$1ที่ ");
+}
+
+/** Format date as DD/MM/YYYY in Buddhist Era, e.g. "22/05/2569". */
+export function formatThaiBuddhistDateShort(value: string | null | undefined): string {
+  if (!value) return "-";
+  const iso = String(value).slice(0, 10);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(`${iso}T00:00:00+07:00`)
+    : new Date(value);
+  if (isNaN(d.getTime())) return "-";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear() + 543;
+  return `${day}/${month}/${year}`;
 }
