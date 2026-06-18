@@ -1,6 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { listDebtorsByWorkspace, updateDebtor } from "@/test/api/debtors";
+import {
+  listCallListItemsByWorkspace,
+  createCallListItem,
+  createCallListItems,
+  updateCallListItem,
+  deleteCallListItem,
+} from "@/test/api/callListItems";
+import { listCallRecords, createCallRecord, getCallRecord, updateCallRecord } from "@/test/api/callRecords";
+import {
+  listCallSessions,
+  createCallSession,
+  updateCallSession,
+} from "@/test/api/callSessions";
+import { makeCall as apiMakeCall, processCallSession } from "@/test/api/voicebot";
+import type { CallSessionSettings } from "@/test/api/types";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import { Button } from "@/components/ui/button";
@@ -65,6 +80,7 @@ interface Debtor {
   other_count: number;
   last_contact_at: string | null;
   variables: Record<string, string> | null;
+  user_id?: string;
 }
 
 interface CallListItem {
@@ -233,32 +249,7 @@ const CallList = () => {
     localStorage.setItem("autoDialSettingsVersion", "2");
   }, [settings]);
 
-  // Realtime subscription for call_list_items updates
-  useEffect(() => {
-    if (!currentWorkspace?.id) return;
-
-    const channel = supabase
-      .channel("call-list-realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "call_list_items",
-          filter: `workspace_id=eq.${currentWorkspace.id}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
-          queryClient.invalidateQueries({ queryKey: ["active-call-session"] });
-          queryClient.invalidateQueries({ queryKey: ["call-tokens"] });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentWorkspace?.id, queryClient]);
+  // Live updates come from query refetch intervals (no Supabase realtime).
 
   // Helper to parse notes field (could be JSON with audio_url/conversation_log or legacy plain URL)
   const parseNotesData = useCallback(
@@ -325,86 +316,28 @@ const CallList = () => {
     queryFn: async () => {
       if (!currentWorkspace?.id) return [] as CallListItem[];
 
-      // Paginate to fetch all call list items
-      let allItems: CallListItem[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      let allItems = (await listCallListItemsByWorkspace(currentWorkspace.id)) as unknown as CallListItem[];
+      if (effectiveUserId) allItems = allItems.filter((it) => it.user_id === effectiveUserId);
+      // Exclude "incomplete" entirely (hanged_up rows ARE included)
+      allItems = allItems.filter((it) => it.status !== "incomplete");
+      allItems = [...allItems].sort((a, b) =>
+        (b.created_at || "").localeCompare(a.created_at || ""),
+      );
 
-      while (hasMore) {
-        let query = supabase
-          .from("call_list_items")
-          .select("*")
-          .eq("workspace_id", currentWorkspace.id)
-          // Exclude "incomplete" entirely from the system (hanged_up rows ARE included)
-          .not("status", "in", '("incomplete")')
-          .order("created_at", { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
+      if (allItems.length === 0) return [] as CallListItem[];
 
-        // Filter by effective user if admin is impersonating
-        if (effectiveUserId) {
-          query = query.eq("user_id", effectiveUserId);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          // Defensive client-side filter in case any leak through
-          const filtered = data.filter((it: any) => it.status !== "incomplete");
-          allItems = [...allItems, ...filtered];
-          page++;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      console.log(`Total call list items fetched: ${allItems.length}`);
-
-      // Fetch debtor info for each item (in chunks to avoid 1000-row and payload limits)
-      const debtorIds = [...new Set(allItems.map((item) => item.debtor_id))];
-      if (debtorIds.length === 0) return [] as CallListItem[];
-
-      const chunkSize = 500;
-      let allDebtors: Debtor[] = [];
-
-      for (let i = 0; i < debtorIds.length; i += chunkSize) {
-        const chunk = debtorIds.slice(i, i + chunkSize);
-        const { data: debtorsChunk, error: debtorsError } = await supabase
-          .from("debtors")
-          .select(
-            "id, phone_number, name, last_name, total_debt, due_date, status, contact_attempts, picked_up_count, not_picked_up_count, accept_count, reject_count, other_count, last_contact_at, variables",
-          )
-          .in("id", chunk);
-
-        if (debtorsError) {
-          console.error("Error fetching debtors chunk:", debtorsError);
-          throw debtorsError;
-        }
-        if (debtorsChunk?.length) {
-          console.log(`Fetched ${debtorsChunk.length} debtors for chunk ${i / chunkSize + 1}`);
-          allDebtors = allDebtors.concat(debtorsChunk as Debtor[]);
-        }
-      }
-
-      console.log(`Total debtors fetched: ${allDebtors.length} for ${debtorIds.length} unique IDs`);
+      // Join debtor info from a single workspace fetch.
+      const allDebtors = (await listDebtorsByWorkspace(currentWorkspace.id)) as unknown as Debtor[];
       const debtorMap = new Map(allDebtors.map((d) => [d.id, d]));
 
-      const result = allItems.map((item) => ({
+      return allItems.map((item) => ({
         ...item,
         debtor: debtorMap.get(item.debtor_id),
       })) as CallListItem[];
-
-      // Log a sample to debug
-      if (result.length > 0) {
-        console.log("Sample call list item with debtor:", JSON.stringify(result[0], null, 2));
-      }
-
-      return result;
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 0,
+    refetchInterval: 10000, // replaces Supabase realtime
   });
 
   // Fetch all active debtors for bulk queue (with pagination to bypass 1000 row limit)
@@ -413,36 +346,12 @@ const CallList = () => {
     queryFn: async () => {
       if (!currentWorkspace?.id) return [] as Debtor[];
 
-      let allDebtors: Debtor[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        let query = supabase
-          .from("debtors")
-          .select("*")
-          .eq("workspace_id", currentWorkspace.id)
-          .in("status", ["active", "pending", "negotiating"])
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (effectiveUserId) {
-          query = query.eq("user_id", effectiveUserId);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allDebtors = [...allDebtors, ...(data as Debtor[])];
-          page++;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      return allDebtors;
+      const all = (await listDebtorsByWorkspace(currentWorkspace.id)) as unknown as Debtor[];
+      return all.filter(
+        (d) =>
+          ["active", "pending", "negotiating"].includes(d.status) &&
+          (!effectiveUserId || d.user_id === effectiveUserId),
+      );
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
@@ -454,13 +363,8 @@ const CallList = () => {
       if (!currentWorkspace?.id)
         return {} as Record<string, { picked_up: number; not_picked_up: number; confirmed: number; declined: number }>;
 
-      const { data, error } = await supabase
-        .from("call_records")
-        .select("phone_number, status")
-        .eq("workspace_id", currentWorkspace.id)
-        .not("status", "in", '("hanged_up","incomplete")');
-
-      if (error) throw error;
+      const records = await listCallRecords({ workspace_id: currentWorkspace.id });
+      const data = records.filter((r) => !["hanged_up", "incomplete"].includes(r.status as string));
 
       const stats: Record<
         string,
@@ -507,21 +411,12 @@ const CallList = () => {
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const todayIso = today.toISOString();
 
-      let query = supabase
-        .from("call_list_items")
-        .select("id", { count: "exact" })
-        .eq("workspace_id", currentWorkspace.id)
-        .not("called_at", "is", null)
-        .gte("called_at", today.toISOString());
-
-      if (effectiveUserId) {
-        query = query.eq("user_id", effectiveUserId);
-      }
-
-      const { count, error } = await query;
-      if (error) throw error;
-      return count || 0;
+      let items = await listCallListItemsByWorkspace(currentWorkspace.id);
+      if (effectiveUserId) items = items.filter((i) => i.user_id === effectiveUserId);
+      // called_at is a Go time.Time; unset rows carry the zero date "0001-...".
+      return items.filter((i) => i.called_at && i.called_at >= todayIso).length;
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
@@ -532,65 +427,27 @@ const CallList = () => {
     queryFn: async () => {
       if (!currentWorkspace?.id) return [] as Debtor[];
 
-      let pendingQuery = supabase
-        .from("call_list_items")
-        .select("debtor_id")
-        .in("status", ["pending", "retry_pending", "calling"])
-        .eq("workspace_id", currentWorkspace.id);
+      let pendingItems = await listCallListItemsByWorkspace(currentWorkspace.id);
+      pendingItems = pendingItems.filter(
+        (i) =>
+          ["pending", "retry_pending", "calling"].includes(i.status) &&
+          (!effectiveUserId || i.user_id === effectiveUserId),
+      );
+      const pendingDebtorIds = new Set(pendingItems.map((item) => item.debtor_id));
 
-      if (effectiveUserId) {
-        pendingQuery = pendingQuery.eq("user_id", effectiveUserId);
-      }
-
-      const { data: pendingItems } = await pendingQuery;
-      const pendingDebtorIds = pendingItems?.map((item) => item.debtor_id) || [];
-
-      let query = supabase
-        .from("debtors")
-        .select("*")
-        .eq("workspace_id", currentWorkspace.id)
-        .in("status", ["active", "pending", "negotiating"]);
-
-      if (effectiveUserId) {
-        query = query.eq("user_id", effectiveUserId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Filter out debtors already in pending list
-      return (data as Debtor[]).filter((d) => !pendingDebtorIds.includes(d.id));
+      const all = (await listDebtorsByWorkspace(currentWorkspace.id)) as unknown as Debtor[];
+      return all.filter(
+        (d) =>
+          ["active", "pending", "negotiating"].includes(d.status) &&
+          (!effectiveUserId || d.user_id === effectiveUserId) &&
+          !pendingDebtorIds.has(d.id),
+      );
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
   });
 
-  // Fetch templates
-  const { data: templates } = useQuery({
-    queryKey: ["templates-for-call-list", effectiveUserId, currentWorkspace?.id],
-    queryFn: async () => {
-      let query = supabase
-        .from("call_templates")
-        .select("*")
-        .not("template_id", "is", null)
-        .order("created_at", { ascending: false });
-
-      // For templates, also show system defaults
-      if (effectiveUserId) {
-        query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
-      }
-
-      // Filter by workspace if available
-      if (currentWorkspace?.id) {
-        query = query.or(`workspace_id.eq.${currentWorkspace.id},is_system_default.eq.true`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as Template[];
-    },
-    enabled: !!effectiveUserId,
-  });
+  // call_templates is not served by the Go API; no templates available here.
+  const templates: Template[] = [];
 
   // Fetch active call session for this workspace
   const { data: activeSession, refetch: refetchSession } = useQuery({
@@ -598,18 +455,14 @@ const CallList = () => {
     queryFn: async () => {
       if (!effectiveUserId || !currentWorkspace?.id) return null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from("call_sessions") as any)
-        .select("*")
-        .eq("user_id", effectiveUserId)
-        .eq("workspace_id", currentWorkspace.id)
-        .in("status", ["running", "stopping", "paused"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as CallSession | null;
+      const sessions = await listCallSessions({
+        workspace_id: currentWorkspace.id,
+        user_id: effectiveUserId,
+      });
+      const active = sessions
+        .filter((s) => ["running", "stopping", "paused"].includes(s.status))
+        .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+      return (active[0] ?? null) as unknown as CallSession | null;
     },
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
     refetchInterval: 2000, // Poll every 2 seconds for updates
@@ -632,23 +485,8 @@ const CallList = () => {
     };
   }, [activeSession?.status, settings.delayBetweenCalls]);
 
-  // Fetch user tokens for the effective user
-  const { data: userTokens, refetch: refetchTokens } = useQuery({
-    queryKey: ["call-tokens", effectiveUserId],
-    queryFn: async () => {
-      if (!effectiveUserId) return null;
-
-      const { data, error } = await supabase
-        .from("call_tokens")
-        .select("tokens")
-        .eq("user_id", effectiveUserId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.tokens ?? 0;
-    },
-    enabled: !!effectiveUserId,
-  });
+  // Call tokens are not served by the Go API; default to 0 (token gating is disabled).
+  const userTokens = 0;
 
   // Queue all active debtors mutation
   // NOTE: Daily limit applies to CALLING, not QUEUEING. We allow queueing all, then startCalling will respect daily limit.
@@ -694,8 +532,7 @@ const CallList = () => {
           phone_number: debtor.phone_number,
         }));
 
-        const { error } = await supabase.from("call_list_items").insert(items);
-        if (error) throw error;
+        await createCallListItems(items);
         inserted += items.length;
       }
 
@@ -760,8 +597,7 @@ const CallList = () => {
           phone_number: debtor.phone_number,
         }));
 
-        const { error } = await supabase.from("call_list_items").insert(items);
-        if (error) throw error;
+        await createCallListItems(items);
         inserted += items.length;
       }
 
@@ -792,8 +628,7 @@ const CallList = () => {
         status: "pending",
       }));
 
-      const { error } = await supabase.from("call_list_items").insert(items);
-      if (error) throw error;
+      await createCallListItems(items);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -811,8 +646,7 @@ const CallList = () => {
   // Remove from call list
   const removeFromListMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("call_list_items").delete().eq("id", id);
-      if (error) throw error;
+      await deleteCallListItem(id, currentWorkspace?.id ?? "");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -833,13 +667,8 @@ const CallList = () => {
   const clearPendingMutation = useMutation({
     mutationFn: async () => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-      const { error } = await supabase
-        .from("call_list_items")
-        .delete()
-        .eq("status", "pending")
-        .eq("workspace_id", currentWorkspace.id)
-        .eq("user_id", effectiveUserId);
-      if (error) throw error;
+      const ids = (callListItems || []).filter((i) => i.status === "pending").map((i) => i.id);
+      await Promise.all(ids.map((id) => deleteCallListItem(id, currentWorkspace.id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -853,13 +682,9 @@ const CallList = () => {
   const clearCompletedMutation = useMutation({
     mutationFn: async () => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-      const { error } = await supabase
-        .from("call_list_items")
-        .delete()
-        .in("status", ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"])
-        .eq("workspace_id", currentWorkspace.id)
-        .eq("user_id", effectiveUserId);
-      if (error) throw error;
+      const done = ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"];
+      const ids = (callListItems || []).filter((i) => done.includes(i.status)).map((i) => i.id);
+      await Promise.all(ids.map((id) => deleteCallListItem(id, currentWorkspace.id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -875,13 +700,9 @@ const CallList = () => {
     mutationFn: async () => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
 
-      const { error } = await supabase
-        .from("call_list_items")
-        .delete()
-        .in("status", QUEUE_STATUSES as unknown as string[])
-        .eq("workspace_id", currentWorkspace.id)
-        .eq("user_id", effectiveUserId);
-      if (error) throw error;
+      const queue = QUEUE_STATUSES as unknown as string[];
+      const ids = (callListItems || []).filter((i) => queue.includes(i.status)).map((i) => i.id);
+      await Promise.all(ids.map((id) => deleteCallListItem(id, currentWorkspace.id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -911,9 +732,9 @@ const CallList = () => {
         notes: `Retry of failed call`,
       }));
 
-      const { error } = await supabase.from("call_list_items").insert(newItems);
-
-      if (error) throw error;
+      await createCallListItems(
+        newItems.map((it) => ({ ...it, workspace_id: currentWorkspace?.id ?? "" })),
+      );
       return failedItems.length;
     },
     onSuccess: (count) => {
@@ -1009,8 +830,7 @@ const CallList = () => {
           phone_number: debtor.phone_number,
         }));
 
-        const { error } = await supabase.from("call_list_items").insert(items);
-        if (error) throw error;
+        await createCallListItems(items);
         inserted += items.length;
       }
 
@@ -1194,95 +1014,57 @@ const CallList = () => {
       const selectedTemplate = templates?.find((t) => t.id === item.template_id) || templates?.[0];
       if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
 
+      const wsId = currentWorkspace?.id ?? "";
       try {
         const debtor = item.debtor;
         const debtorVars = {
           ...((debtor.variables || {}) as Record<string, string>),
         };
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not authenticated");
-
         // Update call list item to calling
-        await supabase
-          .from("call_list_items")
-          .update({ status: "calling", called_at: new Date().toISOString() })
-          .eq("id", item.id);
-
-        // Create call record
-        const { data: callRecord, error: dbError } = await supabase
-          .from("call_records")
-          .insert({
-            phone_number: debtor.phone_number,
-            amount: debtor.total_debt?.toString() || "",
-            due_date: debtor.due_date || "",
-            status: "calling",
-            template_id: selectedTemplate.id,
-            user_id: user.id,
-          })
-          .select()
-          .single();
-
-        if (dbError) throw dbError;
-
-        // Link call record to call list item
-        await supabase.from("call_list_items").update({ call_record_id: callRecord.id }).eq("id", item.id);
-
-        // Make call via voicebot edge function - send variables directly
-        console.log("Sending to voicebot-make-call with variables:", debtorVars);
-        const { data: callResponse, error: callError } = await supabase.functions.invoke("voicebot-make-call", {
-          body: {
-            phone_number: debtor.phone_number,
-            variables: debtorVars,
-            interruptible: settings.interruptible ? "True" : "False",
-          },
+        await updateCallListItem(item.id, wsId, {
+          status: "calling",
+          called_at: new Date().toISOString(),
         });
 
-        if (callError) {
-          await supabase
-            .from("call_records")
-            .update({ status: "failed", result_data: { error: callError.message } })
-            .eq("id", callRecord.id);
-          await supabase.from("call_list_items").update({ status: "failed" }).eq("id", item.id);
+        // Create call record (client-generated id so we can link + poll it).
+        const callRecordId = crypto.randomUUID();
+        await createCallRecord({
+          id: callRecordId,
+          phone_number: debtor.phone_number,
+          amount: debtor.total_debt ?? 0,
+          status: "calling",
+          template_id: selectedTemplate.id,
+          workspace_id: wsId,
+        });
+
+        // Link call record to call list item
+        await updateCallListItem(item.id, wsId, { call_record_id: callRecordId });
+
+        // Make call via the Go voicebot endpoint
+        try {
+          await apiMakeCall({
+            phone_number: debtor.phone_number,
+            variables: debtorVars,
+            interruptible: !!settings.interruptible,
+          });
+        } catch (callError) {
+          await updateCallRecord(callRecordId, {
+            status: "failed",
+            result_data: { error: (callError as Error)?.message },
+          });
+          await updateCallListItem(item.id, wsId, { status: "failed" });
           return { success: false, shouldRetry: true };
         }
 
-        // Update call record with Botnoi ID
-        await supabase
-          .from("call_records")
-          .update({
-            botnoi_call_id: callResponse?.outbound_id || null,
-            status: "pending",
-          })
-          .eq("id", callRecord.id);
-
-        // Token deduction disabled for testing
-        /*
-      const { data: tokenData } = await supabase
-        .from("call_tokens")
-        .select("tokens")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (tokenData && tokenData.tokens > 0) {
-        await supabase
-          .from("call_tokens")
-          .update({ tokens: tokenData.tokens - 1, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id);
-        refetchTokens();
-      }
-      */
+        // The Go make-call endpoint does not return a botnoi id; mark pending.
+        await updateCallRecord(callRecordId, { status: "pending" });
 
         // Update debtor contact attempts
-        await supabase
-          .from("debtors")
-          .update({
-            contact_attempts: (debtor.contact_attempts || 0) + 1,
-            last_contact_at: new Date().toISOString(),
-          })
-          .eq("id", debtor.id);
+        await updateDebtor(debtor.id, wsId, {
+          contact_attempts: (debtor.contact_attempts || 0) + 1,
+          last_contact_at: new Date().toISOString(),
+        });
 
         // Wait for call to complete
         const maxWaitTime = 5 * 60 * 1000;
@@ -1294,40 +1076,33 @@ const CallList = () => {
 
           await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
-          const { data: updatedRecord } = await supabase
-            .from("call_records")
-            .select("status")
-            .eq("id", callRecord.id)
-            .single();
+          const updatedRecord = await getCallRecord(callRecordId);
 
           if (updatedRecord) {
             const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
             if (finalStatuses.includes(updatedRecord.status || "")) {
               const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
               // Update call list item with final status
-              await supabase
-                .from("call_list_items")
-                .update({
-                  status: updatedRecord.status,
-                  call_outcome: updatedRecord.status,
-                  picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
-                })
-                .eq("id", item.id);
+              await updateCallListItem(item.id, wsId, {
+                status: updatedRecord.status,
+                call_outcome: updatedRecord.status,
+                picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
+              });
               return { success: true, shouldRetry };
             }
           }
         }
 
         // Timeout
-        await supabase.from("call_list_items").update({ status: "completed" }).eq("id", item.id);
+        await updateCallListItem(item.id, wsId, { status: "completed" });
         return { success: true, shouldRetry: false };
       } catch (error) {
         console.error("Error making call:", error);
-        await supabase.from("call_list_items").update({ status: "failed" }).eq("id", item.id);
+        await updateCallListItem(item.id, wsId, { status: "failed" });
         return { success: false, shouldRetry: true };
       }
     },
-    [templates],
+    [templates, currentWorkspace?.id, settings.interruptible],
   );
 
   // Start calling using backend session (persists even if page closed)
@@ -1362,27 +1137,18 @@ const CallList = () => {
     */
 
     try {
-      // Create a call session in the database
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: session, error: sessionError } = await (supabase.from("call_sessions") as any)
-        .insert({
-          user_id: effectiveUserId,
-          workspace_id: currentWorkspace.id,
-          status: "running",
-          total_calls: pendingItems.length,
-          settings: settings,
-        })
-        .select()
-        .single();
-
-      if (sessionError) throw sessionError;
-
-      // Start processing in the background via edge function
-      const { error: invokeError } = await supabase.functions.invoke("process-call-session", {
-        body: { session_id: session.id, action: "start" },
+      // Create a call session (client-generated id; the Go create returns only a message).
+      const sessionId = crypto.randomUUID();
+      await createCallSession({
+        id: sessionId,
+        workspace_id: currentWorkspace.id,
+        status: "running",
+        total_calls: pendingItems.length,
+        settings: settings as unknown as CallSessionSettings,
       });
 
-      if (invokeError) throw invokeError;
+      // Start processing in the background via the Go call-process endpoint
+      await processCallSession({ session_id: sessionId, action: "start" });
 
       toast.success(
         `Started calling ${pendingItems.length} debtors. You can close this page - calls will continue in the background.`,
@@ -1407,11 +1173,7 @@ const CallList = () => {
     if (!activeSession) return;
 
     try {
-      const { error } = await supabase.functions.invoke("process-call-session", {
-        body: { session_id: activeSession.id, action: "pause" },
-      });
-
-      if (error) throw error;
+      await processCallSession({ session_id: activeSession.id, action: "pause" });
 
       toast.info("Pausing calls...");
       refetchSession();
@@ -1427,17 +1189,10 @@ const CallList = () => {
 
     try {
       // Update status to running
-      await supabase
-        .from("call_sessions")
-        .update({ status: "running", error_message: null })
-        .eq("id", activeSession.id);
+      await updateCallSession(activeSession.id, { status: "running", error_message: null });
 
       // Start processing again
-      const { error } = await supabase.functions.invoke("process-call-session", {
-        body: { session_id: activeSession.id, action: "start" },
-      });
-
-      if (error) throw error;
+      await processCallSession({ session_id: activeSession.id, action: "start" });
 
       toast.success("Resumed calling");
       refetchSession();
@@ -1452,11 +1207,7 @@ const CallList = () => {
     if (!activeSession) return;
 
     try {
-      const { error } = await supabase.functions.invoke("process-call-session", {
-        body: { session_id: activeSession.id, action: "stop" },
-      });
-
-      if (error) throw error;
+      await processCallSession({ session_id: activeSession.id, action: "stop" });
 
       toast.info("Stopping session...");
       refetchSession();

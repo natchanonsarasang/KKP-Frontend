@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -126,22 +125,8 @@ const TestDashboard = () => {
   // Get workspace context
   const { currentWorkspace, workspaces, isLoading: workspacesLoading, createWorkspace } = useWorkspace();
 
-  // Fetch user tokens for the header
-  const { data: userTokens } = useQuery({
-    queryKey: ["call-tokens", effectiveUserId],
-    queryFn: async () => {
-      if (!effectiveUserId) return null;
-      const { data, error } = await supabase
-        .from("call_tokens")
-        .select("tokens")
-        .eq("user_id", effectiveUserId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.tokens ?? 0;
-    },
-    enabled: !!effectiveUserId,
-  });
+  // Call tokens are not served by the Go API; default to 0 (token UI is hidden anyway).
+  const userTokens = 0;
 
   // Show/hide create workspace dialog based on whether workspaces exist
   useEffect(() => {

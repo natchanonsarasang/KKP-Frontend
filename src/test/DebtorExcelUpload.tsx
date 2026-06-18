@@ -9,7 +9,7 @@ import { Upload, FileSpreadsheet, Loader2, Trash2, X, AlertTriangle, Download } 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { listDebtorsByWorkspace, createDebtor } from "@/test/api/debtors";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
@@ -52,19 +52,13 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
       if (!currentWorkspace?.id) return null;
 
       // Get one sample debtor to extract the schema
-      const { data, error } = await supabase
-        .from("debtors")
-        .select("variables")
-        .eq("workspace_id", currentWorkspace.id)
-        .limit(1)
-        .maybeSingle();
+      const debtors = await listDebtorsByWorkspace(currentWorkspace.id);
+      const sample = debtors[0];
 
-      if (error) throw error;
-
-      if (!data || !data.variables) return null;
+      if (!sample || !sample.variables) return null;
 
       // Extract column keys (excluding message_template)
-      const variables = data.variables as Record<string, string>;
+      const variables = sample.variables;
       const columns = Object.keys(variables).filter((k) => k !== "message_template");
 
       return columns.length > 0 ? columns : [...DEBTOR_CUSTOMER_VARIABLE_KEYS];
@@ -239,38 +233,37 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
       for (let i = 0; i < debtorRows.length; i += batchSize) {
         const batch = debtorRows.slice(i, i + batchSize);
 
-        const insertData = batch.map((row) => {
-          let dueDate = parseDueDateForColumn(row.variables.due_date);
+        // The Go API creates debtors one at a time (POST /debtors); send the batch
+        // concurrently. The owner (user_id) is bound server-side from the JWT.
+        await Promise.all(
+          batch.map((row) => {
+            let dueDate = parseDueDateForColumn(row.variables.due_date);
 
-          // If the date column only had a day number (like "10"),
-          // try to construct a full ISO date from day, month, and year parts if they exist.
-          if (!dueDate && row.variables.due_date && row.variables.due_month && row.variables.due_year) {
-            dueDate = constructIsoDateFromThaiParts(
-              row.variables.due_date,
-              row.variables.due_month,
-              row.variables.due_year,
-            );
-          }
+            // If the date column only had a day number (like "10"),
+            // try to construct a full ISO date from day, month, and year parts if they exist.
+            if (!dueDate && row.variables.due_date && row.variables.due_month && row.variables.due_year) {
+              dueDate = constructIsoDateFromThaiParts(
+                row.variables.due_date,
+                row.variables.due_month,
+                row.variables.due_year,
+              );
+            }
 
-          const variables = {
-            ...row.variables,
-            ...(dueDate ? { due_date_iso: dueDate } : {}),
-          };
-          return {
-            phone_number: row.phone_number,
-            variables,
-            user_id: effectiveUserId,
-            workspace_id: currentWorkspace.id,
-            status: "active",
-            total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
-            due_date: dueDate,
-          };
-        });
+            const variables = {
+              ...row.variables,
+              ...(dueDate ? { due_date_iso: dueDate } : {}),
+            };
 
-        const { error } = await supabase.from("debtors").insert(insertData);
-        if (error) {
-          throw error;
-        }
+            return createDebtor({
+              phone_number: row.phone_number,
+              variables,
+              workspace_id: currentWorkspace.id,
+              status: "active",
+              total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
+              ...(dueDate ? { due_date: dueDate } : {}),
+            });
+          }),
+        );
 
         uploaded += batch.length;
         setProgress(Math.round((uploaded / total) * 100));

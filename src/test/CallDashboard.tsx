@@ -1,8 +1,10 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { listCallRecords } from "@/test/api/callRecords";
+import { listCallListItemsByWorkspace } from "@/test/api/callListItems";
+import { listDebtorsByWorkspace } from "@/test/api/debtors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +106,6 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 };
 
 const CallDashboard = () => {
-  const queryClient = useQueryClient();
   const { effectiveUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
 
@@ -286,20 +287,20 @@ const CallDashboard = () => {
     queryKey: ["call-records", effectiveUserId, currentWorkspace?.id, dateRange, customRange],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
-      let query = supabase
-        .from("call_records")
-        .select("*")
-        .eq("workspace_id", currentWorkspace.id)
-        .order("created_at", { ascending: false });
+      const records = await listCallRecords({
+        workspace_id: currentWorkspace.id,
+        ...(effectiveUserId ? { user_id: effectiveUserId } : {}),
+      });
 
-      if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
+      // Date filtering happens client-side (the Go list endpoint has no date range).
       const { start, end } = getDateFilter();
-      if (start) query = query.gte("created_at", start);
-      if (end) query = query.lte("created_at", end);
+      let filtered = records;
+      if (start) filtered = filtered.filter((r) => r.created_at >= start);
+      if (end) filtered = filtered.filter((r) => r.created_at <= end);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as CallRecord[];
+      return [...filtered].sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      ) as unknown as CallRecord[];
     },
     refetchInterval: 10000,
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
@@ -309,20 +310,16 @@ const CallDashboard = () => {
     queryKey: ["call-list-items-analytics", effectiveUserId, currentWorkspace?.id, dateRange, customRange],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
-      let query = supabase
-        .from("call_list_items")
-        .select("*")
-        .eq("workspace_id", currentWorkspace.id)
-        .order("created_at", { ascending: false });
+      let items = await listCallListItemsByWorkspace(currentWorkspace.id);
 
-      if (effectiveUserId) query = query.eq("user_id", effectiveUserId);
+      if (effectiveUserId) items = items.filter((i) => i.user_id === effectiveUserId);
       const { start, end } = getDateFilter();
-      if (start) query = query.gte("created_at", start);
-      if (end) query = query.lte("created_at", end);
+      if (start) items = items.filter((i) => i.created_at >= start);
+      if (end) items = items.filter((i) => i.created_at <= end);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as CallListItem[];
+      return [...items].sort((a, b) =>
+        b.created_at.localeCompare(a.created_at),
+      ) as unknown as CallListItem[];
     },
     refetchInterval: 10000,
     enabled: !!effectiveUserId && !!currentWorkspace?.id,
@@ -332,27 +329,14 @@ const CallDashboard = () => {
     queryKey: ["analytics-debtors", currentWorkspace?.id],
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
-      const { data, error } = await supabase
-        .from("debtors")
-        .select("id, name, last_name, phone_number, total_debt, due_date, variables")
-        .eq("workspace_id", currentWorkspace.id);
-      if (error) throw error;
-      return data as Debtor[];
+      const data = await listDebtorsByWorkspace(currentWorkspace.id);
+      return data as unknown as Debtor[];
     },
     enabled: !!currentWorkspace?.id,
   });
 
-  const { data: templates } = useQuery({
-    queryKey: ["templates-analytics", effectiveUserId],
-    queryFn: async () => {
-      let query = supabase.from("call_templates").select("id, message, org_name");
-      if (effectiveUserId) query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Template[];
-    },
-    enabled: !!effectiveUserId,
-  });
+  // call_templates is not served by the Go API; template analytics are unavailable.
+  const templates: Template[] = [];
 
   // Debtor lookup maps
   const debtorMap = useMemo(() => new Map((debtors || []).map((d) => [d.id, d])), [debtors]);
@@ -408,16 +392,7 @@ const CallDashboard = () => {
     );
   }, [enrichedRecords, searchQuery]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("analytics-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "call_records" },
-        () => queryClient.invalidateQueries({ queryKey: ["call-records"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "call_list_items" },
-        () => queryClient.invalidateQueries({ queryKey: ["call-list-items-analytics"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  // Live updates come from the queries' 10s refetchInterval (no Supabase realtime).
 
   const handleRefresh = () => {
     refetchRecords();

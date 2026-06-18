@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Filter, Sparkles, Loader2, Users } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export interface FilterConditions {
@@ -47,7 +46,7 @@ export function DebtorFilterPanel({
   const [activeTab, setActiveTab] = useState<string>("quick");
   const [filters, setFilters] = useState<FilterConditions>({});
   const [nlQuery, setNlQuery] = useState("");
-  const [isParsingQuery, setIsParsingQuery] = useState(false);
+  const isParsingQuery = false;
   const [maxDebtors, setMaxDebtors] = useState<number | undefined>(undefined);
   const [hasCalculated, setHasCalculated] = useState(false);
 
@@ -72,28 +71,9 @@ export function DebtorFilterPanel({
       return;
     }
 
-    setIsParsingQuery(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("parse-debtor-query", {
-        body: { query: nlQuery }
-      });
-
-      if (error) throw error;
-
-      if (data?.conditions) {
-        setFilters(data.conditions);
-        setHasCalculated(true);
-        onCalculateCount(data.conditions);
-        toast.success("Query parsed successfully");
-      } else {
-        toast.error("Could not parse the query. Try being more specific.");
-      }
-    } catch (error) {
-      console.error("Error parsing query:", error);
-      toast.error("Failed to parse query. Please try again.");
-    } finally {
-      setIsParsingQuery(false);
-    }
+    // Natural-language parsing (parse-debtor-query) is not available on the Go API.
+    // Use the manual filter fields instead.
+    toast.info("Natural-language filtering is not available — please use the manual filters");
   };
 
   const clearFilters = () => {

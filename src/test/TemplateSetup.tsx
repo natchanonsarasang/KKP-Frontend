@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { listDebtorsByWorkspace } from "@/test/api/debtors";
+import { makeCall } from "@/test/api/voicebot";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,7 +55,6 @@ interface Template {
 }
 
 const TemplateSetup = () => {
-  const queryClient = useQueryClient();
   const { effectiveUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -80,19 +80,12 @@ const TemplateSetup = () => {
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
 
-      // Fetch debtors to extract unique variable keys
-      const { data, error } = await supabase
-        .from("debtors")
-        .select("variables")
-        .eq("workspace_id", currentWorkspace.id)
-        .limit(100);
+      const debtors = await listDebtorsByWorkspace(currentWorkspace.id);
 
-      if (error) throw error;
-      
       // Extract all unique variable keys (excluding message_template)
       const allKeys = new Set<string>();
-      data?.forEach((d) => {
-        const vars = d.variables as Record<string, unknown> | null;
+      debtors.slice(0, 100).forEach((d) => {
+        const vars = d.variables;
         if (vars) {
           Object.keys(vars).forEach((key) => {
             if (key !== "message_template") {
@@ -101,65 +94,24 @@ const TemplateSetup = () => {
           });
         }
       });
-      
+
       return Array.from(allKeys).sort();
     },
     enabled: !!currentWorkspace?.id,
   });
 
-  const { data: templates, isLoading } = useQuery({
-    queryKey: ["templates", effectiveUserId, currentWorkspace?.id],
-    queryFn: async () => {
-      let query = supabase
-        .from("call_templates")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // Filter by workspace OR system defaults
-      if (currentWorkspace?.id) {
-        query = query.or(`workspace_id.eq.${currentWorkspace.id},is_system_default.eq.true`);
-      } else if (effectiveUserId) {
-        query = query.or(`user_id.eq.${effectiveUserId},is_system_default.eq.true`);
-      }
-
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data as Template[];
-    },
-    enabled: !!effectiveUserId,
-  });
+  // call_templates is not served by the Go API; no templates are persisted for now.
+  const templates: Template[] = [];
+  const isLoading = false;
 
   const createTemplateMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const targetUserId = effectiveUserId;
-      if (!targetUserId) throw new Error("Not authenticated");
+    // Template persistence is not part of the Go API yet (call_templates stubbed to null).
+    mutationFn: async (_data: typeof formData) => {
+      if (!effectiveUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-
-      const { data: apiResponse, error: apiError } = await supabase.functions.invoke(
-        "botnoi-create-template",
-        { body: data }
-      );
-
-      if (apiError) throw apiError;
-
-      const { data: savedTemplate, error: dbError } = await supabase
-        .from("call_templates")
-        .insert({
-          ...data,
-          template_id: apiResponse?.template_id || null,
-          user_id: targetUserId,
-          workspace_id: currentWorkspace.id,
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-      return savedTemplate;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
-      toast.success("Template created successfully");
+      toast.info("Template saving is not available — no template API is configured yet");
       setShowCreateForm(false);
     },
     onError: (error) => {
@@ -169,17 +121,11 @@ const TemplateSetup = () => {
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: async (templateId: string) => {
-      const { error } = await supabase
-        .from("call_templates")
-        .delete()
-        .eq("id", templateId);
-      
-      if (error) throw error;
+    mutationFn: async (_templateId: string) => {
+      // No-op: templates are not persisted via the Go API yet.
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
-      toast.success("Template deleted");
+      toast.info("Template deletion is not available yet");
     },
     onError: (error) => {
       console.error("Error deleting template:", error);
@@ -539,13 +485,7 @@ const TemplateSetup = () => {
                     return;
                   }
                   try {
-                    const { error } = await supabase.functions.invoke("voicebot-make-call", {
-                      body: {
-                        phone_number: testCallPhone,
-                        variables: {},
-                      },
-                    });
-                    if (error) throw error;
+                    await makeCall({ phone_number: testCallPhone, variables: {} });
                     toast.success(`ทดสอบโทรไปยัง ${testCallPhone} ด้วย "${template.org_name}" สำเร็จ`);
                   } catch (err) {
                     toast.error("ทดสอบโทรล้มเหลว");

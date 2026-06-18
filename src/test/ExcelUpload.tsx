@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMutation } from "@tanstack/react-query";
+import { makeCall } from "@/test/api/voicebot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,6 @@ interface ContactRow {
 }
 
 const ExcelUpload = () => {
-  const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [contactData, setContactData] = useState<ContactRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,18 +45,8 @@ const ExcelUpload = () => {
     amount: "",
   });
 
-  const { data: templates } = useQuery({
-    queryKey: ["templates"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("call_templates")
-        .select("id, template_id, org_name, message")
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data as Template[];
-    },
-  });
+  // call_templates is not served by the Go API; no templates are available here.
+  const templates: Template[] = [];
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,18 +110,17 @@ const ExcelUpload = () => {
         throw new Error("Please select a template and add contacts");
       }
 
-      const template = templates?.find((t) => t.id === selectedTemplate);
+      const template = templates.find((t) => t.id === selectedTemplate);
       if (!template?.template_id) {
         throw new Error("Selected template has no Botnoi ID");
       }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
 
       setIsProcessing(true);
       setProgress(0);
       setCurrentCall(0);
 
+      // The Go API places calls via /voicebot/make-call. Call-record persistence is
+      // not done here (this legacy campaign flow has no workspace context).
       const results = [];
       for (let i = 0; i < contactData.length; i++) {
         const row = contactData[i];
@@ -140,72 +128,8 @@ const ExcelUpload = () => {
         setProgress(((i + 1) / contactData.length) * 100);
 
         try {
-          const { data: callRecord, error: dbError } = await supabase
-            .from("call_records")
-            .insert({
-              template_id: selectedTemplate,
-              phone_number: row.phone_number,
-              due_date: row.due_date,
-              amount: row.amount,
-              status: "calling",
-              user_id: user.id,
-            })
-            .select()
-            .single();
-
-          if (dbError) throw dbError;
-          // Build constructed message by replacing placeholders
-          let constructedMessage = template.message;
-          
-          // Replace due_date placeholder
-          if (row.due_date) {
-            const formattedDueDate = new Date(row.due_date).toLocaleDateString("th-TH", { 
-              day: "numeric", 
-              month: "long", 
-              year: "numeric" 
-            });
-            constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
-          }
-          
-          // Replace amount placeholder with Thai text
-          if (row.amount) {
-            const amountNum = parseFloat(row.amount.replace(/[^0-9.-]/g, ''));
-            if (!isNaN(amountNum)) {
-              constructedMessage = constructedMessage.replace(/\{amount\}/gi, amountNum.toLocaleString('th-TH') + " บาท");
-              constructedMessage = constructedMessage.replace(/\{debt\}/gi, amountNum.toLocaleString('th-TH') + " บาท");
-            }
-          }
-          
-          console.log("Constructed message:", constructedMessage);
-
-          const { data: callResponse, error: callError } = await supabase.functions.invoke(
-            "voicebot-make-call",
-            {
-              body: {
-                phone_number: row.phone_number,
-                variables: { ...row },
-              },
-            }
-          );
-
-          if (callError) {
-            await supabase
-              .from("call_records")
-              .update({ status: "failed", result_data: { error: callError.message } })
-              .eq("id", callRecord.id);
-            throw callError;
-          }
-
-          await supabase
-            .from("call_records")
-            .update({
-              botnoi_call_id: callResponse?.outbound_id || null,
-              status: "pending",
-            })
-            .eq("id", callRecord.id);
-
+          await makeCall({ phone_number: row.phone_number, variables: { ...row } });
           results.push({ success: true, phone: row.phone_number });
-
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error) {
           console.error(`Error calling ${row.phone_number}:`, error);
@@ -218,7 +142,6 @@ const ExcelUpload = () => {
     onSuccess: (results) => {
       const successful = results.filter((r) => r.success).length;
       toast.success(`Completed: ${successful}/${results.length} calls initiated`);
-      queryClient.invalidateQueries({ queryKey: ["call-records"] });
       setContactData([]);
       setIsProcessing(false);
       setProgress(0);

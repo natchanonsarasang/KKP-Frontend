@@ -6,7 +6,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  listDebtorsByWorkspace,
+  createDebtor,
+  updateDebtor,
+  deleteDebtor,
+} from "@/test/api/debtors";
+import { listCallListItemsByWorkspace, createCallListItem } from "@/test/api/callListItems";
+import { listCallRecords, createCallRecord } from "@/test/api/callRecords";
+import { makeCall } from "@/test/api/voicebot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,6 +162,8 @@ interface Debtor {
   other_count: number;
   variables: Record<string, string> | null;
   date_con: string | null;
+  user_id?: string;
+  is_blocked?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -207,16 +217,16 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     queryFn: async () => {
       const map = new Map<string, string | null>();
       if (!currentWorkspace?.id) return map;
-      let q = supabase
-        .from("call_list_items")
-        .select("debtor_id, ai_category, called_at, created_at")
-        .eq("workspace_id", currentWorkspace.id)
-        .order("called_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false });
-      if (effectiveUserId) q = q.eq("user_id", effectiveUserId);
-      const { data, error } = await q.limit(5000);
-      if (error) throw error;
-      (data ?? []).forEach((row: { debtor_id: string; ai_category: string | null }) => {
+      let rows = await listCallListItemsByWorkspace(currentWorkspace.id);
+      if (effectiveUserId) rows = rows.filter((r) => r.user_id === effectiveUserId);
+      // Order by called_at desc (Go zero-time "0001-..." naturally sorts last), then created_at desc.
+      rows = [...rows].sort((a, b) => {
+        const ca = a.called_at || "";
+        const cb = b.called_at || "";
+        if (ca !== cb) return cb.localeCompare(ca);
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
+      rows.forEach((row) => {
         if (!map.has(row.debtor_id)) map.set(row.debtor_id, row.ai_category ?? null);
       });
       return map;
@@ -245,7 +255,61 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     return ids;
   }, [callStatusFilter, latestStatusByDebtor]);
 
-  // Server-side paginated query with sorting and filtering
+  // The Go API returns all debtors for a workspace; filtering/sorting/pagination
+  // that used to run in SQL now runs client-side here (and is reused by export).
+  const applyDebtorFilters = (all: Debtor[]): Debtor[] => {
+    let rows = all;
+
+    if (effectiveUserId) rows = rows.filter((d) => d.user_id === effectiveUserId);
+    if (statusFilter !== "all") rows = rows.filter((d) => d.status === statusFilter);
+
+    if (callStatusFilter === "never") {
+      const calledIds = new Set(latestStatusByDebtor?.keys() ?? []);
+      rows = rows.filter((d) => !calledIds.has(d.id));
+    } else if (callStatusFilter !== "all") {
+      const ids = new Set(filteredDebtorIds ?? []);
+      rows = rows.filter((d) => ids.has(d.id));
+    }
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      rows = rows.filter(
+        (d) =>
+          (d.phone_number || "").toLowerCase().includes(q) ||
+          (d.name || "").toLowerCase().includes(q),
+      );
+    }
+
+    if (dateRange?.from) {
+      const fromStr = format(startOfDay(dateRange.from), "yyyy-MM-dd");
+      rows = rows.filter((d) => d.date_con && d.date_con >= fromStr);
+    }
+    if (dateRange?.to || dateRange?.from) {
+      const toStr = format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd");
+      rows = rows.filter((d) => d.date_con && d.date_con <= toStr);
+    }
+
+    const dir = sortDirection === "asc" ? 1 : -1;
+    const getVal = (d: Debtor): unknown => {
+      if (sortField.startsWith("var:")) return d.variables?.[sortField.slice(4)];
+      return (d as unknown as Record<string, unknown>)[sortField];
+    };
+    rows = [...rows].sort((a, b) => {
+      const va = getVal(a);
+      const vb = getVal(b);
+      const aNull = va === null || va === undefined || va === "";
+      const bNull = vb === null || vb === undefined || vb === "";
+      if (aNull && bNull) return 0;
+      if (aNull) return 1; // nulls last regardless of direction
+      if (bNull) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+
+    return rows;
+  };
+
+  // Paginated query (fetch-all + client-side filter/sort/slice)
   const {
     data: debtorsData,
     isLoading,
@@ -266,67 +330,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       dateRange?.to?.toISOString() ?? null,
     ],
     queryFn: async () => {
-      let query = supabase.from("debtors").select("*", { count: "exact" });
-
-      // Filter by workspace
-      if (currentWorkspace?.id) {
-        query = query.eq("workspace_id", currentWorkspace.id);
-      }
-
-      // Filter by effective user if admin is impersonating
-      if (effectiveUserId) {
-        query = query.eq("user_id", effectiveUserId);
-      }
-
-      // Apply status filter
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
-      }
-
-      // Apply call-status filter
-      if (callStatusFilter === "never") {
-        const calledIds = Array.from(latestStatusByDebtor?.keys() ?? []);
-        if (calledIds.length > 0) {
-          query = query.not("id", "in", `(${calledIds.map((i) => `"${i}"`).join(",")})`);
-        }
-      } else if (callStatusFilter !== "all") {
-        const ids = filteredDebtorIds ?? [];
-        if (ids.length === 0) {
-          return { debtors: [] as Debtor[], totalCount: 0 };
-        }
-        query = query.in("id", ids);
-      }
-
-      // Apply search filter (server-side)
-      if (searchQuery) {
-        query = query.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
-      }
-
-      // Apply date range filter on callback date (date_con)
-      if (dateRange?.from) {
-        query = query.gte("date_con", format(startOfDay(dateRange.from), "yyyy-MM-dd"));
-      }
-      if (dateRange?.to || dateRange?.from) {
-        query = query.lte("date_con", format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd"));
-      }
-
-      // Apply sorting - handle variable column sorting with JSONB
-      if (sortField.startsWith("var:")) {
-        const varKey = sortField.replace("var:", "");
-        query = query.order(`variables->${varKey}`, { ascending: sortDirection === "asc", nullsFirst: false });
-      } else {
-        query = query.order(sortField, { ascending: sortDirection === "asc", nullsFirst: false });
-      }
-
-      // Apply pagination
+      if (!currentWorkspace?.id) return { debtors: [] as Debtor[], totalCount: 0 };
+      const all = (await listDebtorsByWorkspace(currentWorkspace.id)) as unknown as Debtor[];
+      const filtered = applyDebtorFilters(all);
       const from = page * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-      return { debtors: data as Debtor[], totalCount: count || 0 };
+      return { debtors: filtered.slice(from, from + pageSize), totalCount: filtered.length };
     },
     placeholderData: (prev) => prev,
     enabled: !!effectiveUserId,
@@ -370,19 +378,16 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     return display;
   };
 
-  const { data: templates } = useQuery({
-    queryKey: ["templates-full"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("call_templates")
-        .select("*")
-        .not("template_id", "is", null)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-  });
+  // call_templates is not served by the Go API; no templates available here.
+  type FullTemplate = {
+    id: string;
+    is_system_default?: boolean;
+    message?: string;
+    confirm_message?: string;
+    decline_message?: string;
+    fallback_message?: string;
+  };
+  const templates: FullTemplate[] = [];
 
   // Extract placeholders from template messages
   const extractPlaceholdersFromTemplate = (template: NonNullable<typeof templates>[number] | undefined) => {
@@ -407,9 +412,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const { data: callStats } = useQuery({
     queryKey: ["call-stats-by-phone"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("call_records").select("phone_number, status");
-
-      if (error) throw error;
+      const data = await listCallRecords({});
 
       // Calculate stats per phone number from raw data
       const stats: Record<
@@ -468,17 +471,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       const variablesData = buildVariablesToSave(data.variables, null, data.formData.due_date, data.formData.paid_date);
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
-      const { error } = await supabase.from("debtors").insert({
+      await createDebtor({
         phone_number: data.formData.phone_number,
         status: data.formData.status,
-        notes: data.formData.notes || null,
+        notes: data.formData.notes || "",
         total_debt: totalDebt,
-        due_date: data.formData.due_date,
+        ...(data.formData.due_date ? { due_date: data.formData.due_date } : {}),
         variables: variablesData,
-        user_id: targetUserId,
         workspace_id: currentWorkspace.id,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
@@ -513,18 +514,14 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       );
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
-      const { error } = await supabase
-        .from("debtors")
-        .update({
-          phone_number: data.formData.phone_number,
-          status: data.formData.status,
-          notes: data.formData.notes || null,
-          total_debt: totalDebt,
-          due_date: data.formData.due_date,
-          variables: variablesData,
-        })
-        .eq("id", id);
-      if (error) throw error;
+      await updateDebtor(id, currentWorkspace?.id ?? "", {
+        phone_number: data.formData.phone_number,
+        status: data.formData.status,
+        notes: data.formData.notes || "",
+        total_debt: totalDebt,
+        ...(data.formData.due_date ? { due_date: data.formData.due_date } : {}),
+        variables: variablesData,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
@@ -539,8 +536,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
 
   const deleteDebtorMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("debtors").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDebtor(id, currentWorkspace?.id ?? "");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
@@ -556,13 +552,10 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
       if (!effectiveUserId) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("debtors")
-        .delete()
-        .eq("workspace_id", currentWorkspace.id)
-        .eq("user_id", effectiveUserId);
-
-      if (error) throw error;
+      // No bulk-delete endpoint; remove this user's debtors one at a time.
+      const all = await listDebtorsByWorkspace(currentWorkspace.id);
+      const mine = all.filter((d) => d.user_id === effectiveUserId);
+      await Promise.all(mine.map((d) => deleteDebtor(d.id, currentWorkspace.id)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
@@ -576,26 +569,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     },
   });
 
-  // Fetch workspace template for calls
-  const { data: workspaceTemplate } = useQuery({
-    queryKey: ["workspace-template", currentWorkspace?.id],
-    queryFn: async () => {
-      if (!currentWorkspace?.id) return null;
-
-      const { data, error } = await supabase
-        .from("call_templates")
-        .select("*")
-        .eq("workspace_id", currentWorkspace.id)
-        .not("template_id", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!currentWorkspace?.id,
-  });
+  // call_templates is not served by the Go API; no workspace template available.
+  const workspaceTemplate: { id: string } | null = null;
 
   // Make call mutation - directly call the debtor
   const makeCallMutation = useMutation({
@@ -604,28 +579,15 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         ...((debtor.variables || {}) as Record<string, string>),
       };
 
-      console.log("Calling via voicebot-make-call with variables:", debtorVars);
+      await makeCall({ phone_number: debtor.phone_number, variables: debtorVars });
 
-      const { data, error } = await supabase.functions.invoke("voicebot-make-call", {
-        body: {
-          phone_number: debtor.phone_number,
-          variables: debtorVars,
-        },
-      });
-
-      if (error) throw error;
-
-      // Create call record
-      await supabase.from("call_records").insert({
+      // Create call record (botnoi_call_id is not returned by the Go make-call endpoint)
+      await createCallRecord({
         phone_number: debtor.phone_number,
-        template_id: workspaceTemplate.id,
-        user_id: effectiveUserId,
+        template_id: workspaceTemplate?.id ?? null,
         workspace_id: currentWorkspace?.id,
         status: "pending",
-        botnoi_call_id: data?.outbound_id || null,
       });
-
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-records"] });
@@ -655,19 +617,19 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       if (debtorsToAdd.length === 0) throw new Error("No debtors selected");
 
       // Get default template
-      const defaultTemplate = templates?.find((t) => !t.is_system_default) || templates?.[0];
+      const defaultTemplate = templates.find((t) => !t.is_system_default) || templates[0];
 
-      const items = debtorsToAdd.map((debtor) => ({
-        debtor_id: debtor.id,
-        user_id: targetUserId,
-        workspace_id: currentWorkspace.id,
-        template_id: defaultTemplate?.id || null,
-        status: "pending",
-        phone_number: debtor.phone_number,
-      }));
-
-      const { error } = await supabase.from("call_list_items").insert(items);
-      if (error) throw error;
+      // No bulk-create endpoint; create call-list items one at a time (user bound server-side).
+      await Promise.all(
+        debtorsToAdd.map((debtor) =>
+          createCallListItem({
+            debtor_id: debtor.id,
+            workspace_id: currentWorkspace.id,
+            template_id: defaultTemplate?.id || "",
+            status: "pending",
+          }),
+        ),
+      );
 
       return debtorsToAdd.length;
     },
@@ -818,84 +780,22 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
   const { data: statsData } = useQuery({
     queryKey: ["debtors-stats", effectiveUserId, currentWorkspace?.id],
     queryFn: async () => {
-      // Get total count
-      let totalQuery = supabase.from("debtors").select("*", { count: "exact", head: true });
-      if (currentWorkspace?.id) {
-        totalQuery = totalQuery.eq("workspace_id", currentWorkspace.id);
-      }
-      if (effectiveUserId) {
-        totalQuery = totalQuery.eq("user_id", effectiveUserId);
-      }
-      const { count: totalCount, error: totalError } = await totalQuery;
-      if (totalError) throw totalError;
+      if (!currentWorkspace?.id) return { total: 0, totalDebt: 0, active: 0, paid: 0 };
 
-      // Get active count
-      let activeQuery = supabase.from("debtors").select("*", { count: "exact", head: true }).eq("status", "active");
-      if (currentWorkspace?.id) {
-        activeQuery = activeQuery.eq("workspace_id", currentWorkspace.id);
-      }
-      if (effectiveUserId) {
-        activeQuery = activeQuery.eq("user_id", effectiveUserId);
-      }
-      const { count: activeCount, error: activeError } = await activeQuery;
-      if (activeError) throw activeError;
+      const all = await listDebtorsByWorkspace(currentWorkspace.id);
+      const scoped = effectiveUserId ? all.filter((d) => d.user_id === effectiveUserId) : all;
 
-      // Get paid count
-      let paidQuery = supabase.from("debtors").select("*", { count: "exact", head: true }).eq("status", "paid");
-      if (currentWorkspace?.id) {
-        paidQuery = paidQuery.eq("workspace_id", currentWorkspace.id);
-      }
-      if (effectiveUserId) {
-        paidQuery = paidQuery.eq("user_id", effectiveUserId);
-      }
-      const { count: paidCount, error: paidError } = await paidQuery;
-      if (paidError) throw paidError;
+      const active = scoped.filter((d) => d.status === "active").length;
+      const paid = scoped.filter((d) => d.status === "paid").length;
 
-      // Get total debt sum - use pagination to fetch ALL rows (avoid 1000 row limit)
-      let allDebtData: { variables: unknown }[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      const totalDebt = scoped.reduce((sum, d) => {
+        const vars = (d.variables ?? {}) as Record<string, unknown>;
+        const debtValue = vars.Debt || vars.debt || vars.total_debt || 0;
+        const numericValue = Number(String(debtValue).replace(/,/g, "")) || 0;
+        return sum + numericValue;
+      }, 0);
 
-      while (hasMore) {
-        let debtQuery = supabase.from("debtors").select("variables");
-        if (currentWorkspace?.id) {
-          debtQuery = debtQuery.eq("workspace_id", currentWorkspace.id);
-        }
-        if (effectiveUserId) {
-          debtQuery = debtQuery.eq("user_id", effectiveUserId);
-        }
-        const { data: debtData, error: debtError } = await debtQuery.range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (debtError) {
-          console.error("Error fetching debt sum:", debtError);
-          break;
-        }
-
-        if (debtData && debtData.length > 0) {
-          allDebtData = [...allDebtData, ...debtData];
-          page++;
-          hasMore = debtData.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      // Sum Debt values from variables
-      const totalDebt =
-        allDebtData.reduce((sum, d) => {
-          const vars = d.variables as Record<string, unknown> | null;
-          const debtValue = vars?.Debt || vars?.debt || vars?.total_debt || 0;
-          const numericValue = Number(String(debtValue).replace(/,/g, "")) || 0;
-          return sum + numericValue;
-        }, 0) || 0;
-
-      return {
-        total: totalCount || 0,
-        totalDebt,
-        active: activeCount || 0,
-        paid: paidCount || 0,
-      };
+      return { total: scoped.length, totalDebt, active, paid };
     },
     enabled: !!effectiveUserId,
   });
@@ -914,102 +814,41 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     if (isExporting) return;
     setIsExporting(true);
     try {
-      // Fetch ALL filtered rows across pages (mirrors debtorsData query, no .range)
-      const buildBaseQuery = () => {
-        let q = supabase.from("debtors").select("*");
-        if (currentWorkspace?.id) q = q.eq("workspace_id", currentWorkspace.id);
-        if (effectiveUserId) q = q.eq("user_id", effectiveUserId);
-        if (statusFilter !== "all") q = q.eq("status", statusFilter);
-        if (callStatusFilter === "never") {
-          const calledIds = Array.from(latestStatusByDebtor?.keys() ?? []);
-          if (calledIds.length > 0) {
-            q = q.not("id", "in", `(${calledIds.map((i) => `"${i}"`).join(",")})`);
-          }
-        } else if (callStatusFilter !== "all") {
-          const ids = filteredDebtorIds ?? [];
-          if (ids.length === 0) return null;
-          q = q.in("id", ids);
-        }
-        if (searchQuery) {
-          q = q.or(`phone_number.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
-        }
-        if (dateRange?.from) {
-          q = q.gte("date_con", format(startOfDay(dateRange.from), "yyyy-MM-dd"));
-        }
-        if (dateRange?.to || dateRange?.from) {
-          q = q.lte("date_con", format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd"));
-        }
-        if (sortField.startsWith("var:")) {
-          const varKey = sortField.replace("var:", "");
-          q = q.order(`variables->${varKey}`, { ascending: sortDirection === "asc", nullsFirst: false });
-        } else {
-          q = q.order(sortField, { ascending: sortDirection === "asc", nullsFirst: false });
-        }
-        return q;
-      };
-
-      const all: any[] = [];
-      const batchSize = 1000;
-      let from = 0;
-      while (true) {
-        const base = buildBaseQuery();
-        if (!base) break;
-        const { data, error } = await base.range(from, from + batchSize - 1);
-        if (error) throw error;
-        const chunk = data ?? [];
-        all.push(...chunk);
-        if (chunk.length < batchSize) break;
-        from += batchSize;
+      if (!currentWorkspace?.id) {
+        toast.info("No workspace selected");
+        return;
       }
+
+      // Fetch all workspace debtors, then apply the same filters/sort as the table.
+      const allRaw = (await listDebtorsByWorkspace(currentWorkspace.id)) as unknown as Debtor[];
+      const all = applyDebtorFilters(allRaw);
 
       if (all.length === 0) {
         toast.info("No debtors to export");
         return;
       }
 
-      // Compute call stats directly from call_records for the exported set,
-      // independent of the cached callStats query (which can be empty/stale).
-      const phones = Array.from(
-        new Set(all.map((d: any) => d.phone_number).filter(Boolean))
-      ) as string[];
+      // Compute call stats from the user's call_records (scoped server-side by JWT).
       const exportStats: Record<
         string,
         { total: number; picked_up: number; not_picked_up: number }
       > = {};
-      const phoneBatch = 500;
-      for (let i = 0; i < phones.length; i += phoneBatch) {
-        const slice = phones.slice(i, i + phoneBatch);
-        let recFrom = 0;
-        while (true) {
-          const { data: recs, error: recErr } = await supabase
-            .from("call_records")
-            .select("phone_number, status")
-            .in("phone_number", slice)
-            .range(recFrom, recFrom + 999);
-          if (recErr) throw recErr;
-          const chunk = recs ?? [];
-          chunk.forEach((r: any) => {
-            const s = (exportStats[r.phone_number] ||= {
-              total: 0,
-              picked_up: 0,
-              not_picked_up: 0,
-            });
-            s.total++;
-            if (
-              r.status === "confirmed" ||
-              r.status === "declined" ||
-              r.status === "no_response" ||
-              r.status === "completed"
-            ) {
-              s.picked_up++;
-            } else if (r.status === "no_answer" || r.status === "failed") {
-              s.not_picked_up++;
-            }
-          });
-          if (chunk.length < 1000) break;
-          recFrom += 1000;
+      const recs = await listCallRecords({});
+      recs.forEach((r) => {
+        if (!r.phone_number) return;
+        const s = (exportStats[r.phone_number] ||= { total: 0, picked_up: 0, not_picked_up: 0 });
+        s.total++;
+        if (
+          r.status === "confirmed" ||
+          r.status === "declined" ||
+          r.status === "no_response" ||
+          r.status === "completed"
+        ) {
+          s.picked_up++;
+        } else if (r.status === "no_answer" || r.status === "failed") {
+          s.not_picked_up++;
         }
-      }
+      });
 
       const fmtLastContact = (iso: string | null | undefined) =>
         iso
@@ -1713,11 +1552,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
                                     <DropdownMenuItem
                                       onClick={async () => {
                                         const newBlocked = !(debtor as any).is_blocked;
-                                        const { error } = await supabase
-                                          .from("debtors")
-                                          .update({ is_blocked: newBlocked } as any)
-                                          .eq("id", debtor.id);
-                                        if (error) {
+                                        try {
+                                          await updateDebtor(debtor.id, currentWorkspace?.id ?? "", {
+                                            is_blocked: newBlocked,
+                                          });
+                                        } catch {
                                           toast.error("Failed to update block status");
                                           return;
                                         }

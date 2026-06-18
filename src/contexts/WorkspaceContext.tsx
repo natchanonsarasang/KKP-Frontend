@@ -1,15 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  listWorkspaces,
+  createWorkspace as apiCreateWorkspace,
+  updateWorkspace as apiUpdateWorkspace,
+  deleteWorkspace as apiDeleteWorkspace,
+} from "@/test/api/workspaces";
+import type { Workspace } from "@/test/api/types";
 import { toast } from "sonner";
-
-interface Workspace {
-  id: string;
-  name: string;
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-}
 
 interface WorkspaceContextType {
   workspaces: Workspace[];
@@ -75,26 +74,24 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Fetch user's workspaces
+  // Fetch user's workspaces (scoped to the JWT user by the Go API)
   const workspacesQuery = useQuery({
     queryKey: ["workspaces", userId],
     queryFn: async () => {
       if (!userId) return [];
 
-      const { data, error } = await supabase
-        .from("workspaces")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-      return data as Workspace[];
+      const data = await listWorkspaces();
+      // Preserve the previous `.order("created_at", { ascending: true })` behavior.
+      return [...data].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
     },
     enabled: authReady && !!userId,
     retry: 1,
   });
 
   const workspaces = workspacesQuery.data ?? [];
-  const isLoading = !authReady ? true : !!userId ? workspacesQuery.isLoading : false;
+  const isLoading = !authReady ? true : userId ? workspacesQuery.isLoading : false;
 
   // Set default workspace when workspaces load
   useEffect(() => {
@@ -117,30 +114,18 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const createWorkspaceMutation = useMutation({
     mutationFn: async (name: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Create workspace
-      const { data: workspace, error: workspaceError } = await supabase
-        .from("workspaces")
-        .insert({ name, owner_id: user.id })
-        .select()
-        .single();
-
-      if (workspaceError) throw workspaceError;
-
-      // Add user as owner member
-      const { error: memberError } = await supabase
-        .from("workspace_members")
-        .insert({ workspace_id: workspace.id, user_id: user.id, role: "owner" });
-
-      if (memberError) throw memberError;
-
-      return workspace;
+      // The Go API binds the owner from the JWT and adds the owner membership
+      // server-side. Create returns only `{ message }`, so re-fetch to get the row.
+      await apiCreateWorkspace({ name });
+      const list = await listWorkspaces();
+      const newest = [...list].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+      return newest ?? null;
     },
     onSuccess: (workspace) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      setCurrentWorkspace(workspace);
+      if (workspace) setCurrentWorkspace(workspace);
       toast.success("Workspace created");
     },
     onError: (error: Error) => {
@@ -150,12 +135,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const updateWorkspaceMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase
-        .from("workspaces")
-        .update({ name })
-        .eq("id", id);
-
-      if (error) throw error;
+      await apiUpdateWorkspace(id, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
@@ -168,12 +148,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteWorkspaceMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("workspaces")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await apiDeleteWorkspace(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { listDebtorsByWorkspace } from "@/test/api/debtors";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,6 @@ interface Template {
 }
 
 const InlineTemplateEditor = () => {
-  const queryClient = useQueryClient();
   const { effectiveUserId } = useAdmin();
   const { currentWorkspace } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
@@ -53,17 +52,11 @@ const InlineTemplateEditor = () => {
     queryFn: async () => {
       if (!currentWorkspace?.id) return [];
 
-      const { data, error } = await supabase
-        .from("debtors")
-        .select("variables")
-        .eq("workspace_id", currentWorkspace.id)
-        .limit(100);
+      const debtors = await listDebtorsByWorkspace(currentWorkspace.id);
 
-      if (error) throw error;
-      
       const allKeys = new Set<string>();
-      data?.forEach((d) => {
-        const vars = d.variables as Record<string, unknown> | null;
+      debtors.slice(0, 100).forEach((d) => {
+        const vars = d.variables;
         if (vars) {
           Object.keys(vars).forEach((key) => {
             if (key !== "message_template") {
@@ -72,31 +65,15 @@ const InlineTemplateEditor = () => {
           });
         }
       });
-      
+
       return Array.from(allKeys).sort();
     },
     enabled: !!currentWorkspace?.id,
   });
 
-  // Fetch existing template for current workspace
-  const { data: existingTemplate, isLoading } = useQuery({
-    queryKey: ["workspace-template", currentWorkspace?.id],
-    queryFn: async () => {
-      if (!currentWorkspace?.id) return null;
-
-      const { data, error } = await supabase
-        .from("call_templates")
-        .select("*")
-        .eq("workspace_id", currentWorkspace.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as Template | null;
-    },
-    enabled: !!currentWorkspace?.id,
-  });
+  // call_templates is not served by the Go API; treat the stored template as null.
+  const existingTemplate: Template | null = null;
+  const isLoading = false;
 
   // Populate form when template loads
   useEffect(() => {
@@ -123,47 +100,14 @@ const InlineTemplateEditor = () => {
   }, [existingTemplate]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    // Template persistence (call_templates + the botnoi-create-template edge function)
+    // is not part of the Go API yet. Keep edits local-only until an endpoint exists.
+    mutationFn: async (_data: typeof formData) => {
       if (!effectiveUserId) throw new Error("Not authenticated");
       if (!currentWorkspace?.id) throw new Error("No workspace selected");
-
-      // Call Botnoi API to create/update template
-      const { data: apiResponse, error: apiError } = await supabase.functions.invoke(
-        "botnoi-create-template",
-        { body: data }
-      );
-
-      if (apiError) throw apiError;
-
-      if (existingTemplate) {
-        // Update existing template
-        const { error: dbError } = await supabase
-          .from("call_templates")
-          .update({
-            ...data,
-            template_id: apiResponse?.template_id || existingTemplate.template_id,
-          })
-          .eq("id", existingTemplate.id);
-
-        if (dbError) throw dbError;
-      } else {
-        // Create new template
-        const { error: dbError } = await supabase
-          .from("call_templates")
-          .insert({
-            ...data,
-            template_id: apiResponse?.template_id || null,
-            user_id: effectiveUserId,
-            workspace_id: currentWorkspace.id,
-          });
-
-        if (dbError) throw dbError;
-      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspace-template"] });
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
-      toast.success("Template saved successfully");
+      toast.info("Template editing is local only — no template API is configured yet");
     },
     onError: (error) => {
       console.error("Error saving template:", error);
