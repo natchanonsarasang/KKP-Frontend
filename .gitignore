@@ -7,16 +7,39 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Env files (keep .env.example tracked for reference)
+.env
+.env.*
+!.env.example
+
+# Test / coverage output
+coverage
+
+# Lovable
+.lovable
+
+# Python / notebooks (Classifire_RuleBase.ipynb)
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
