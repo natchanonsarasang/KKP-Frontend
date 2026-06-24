@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   listWorkspaces,
   createWorkspace as apiCreateWorkspace,
@@ -25,54 +25,12 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
   const [currentWorkspace, setCurrentWorkspaceState] = useState<Workspace | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [authReady, setAuthReady] = useState(false);
 
-  // Listen for auth state changes
-  useEffect(() => {
-    let cancelled = false;
-
-    const init = async () => {
-      try {
-        // Read session from local storage (fast) and avoid blocking the UI forever
-        const { data, error } = await supabase.auth.getSession();
-        if (error) console.warn("getSession error", error);
-        if (!cancelled) {
-          const id = data.session?.user?.id ?? null;
-          setUserId(id);
-          setAuthReady(true);
-        }
-      } catch (e) {
-        console.warn("getSession threw", e);
-        if (!cancelled) {
-          setUserId(null);
-          setAuthReady(true);
-        }
-      }
-    };
-
-    init();
-
-    // Failsafe: never let the app be stuck in a perpetual auth loading state
-    const failSafe = window.setTimeout(() => {
-      if (!cancelled) setAuthReady(true);
-    }, 3000);
-
-    // Subscribe to auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      const newUserId = session?.user?.id ?? null;
-      setUserId(newUserId);
-      setAuthReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(failSafe);
-      subscription.unsubscribe();
-    };
-  }, []);
+  // The Callecto session (token + user) is read synchronously from localStorage,
+  // so auth is always "ready" — no async bootstrap or failsafe timeout needed.
+  const { user, isLoading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
+  const authReady = !authLoading;
 
   // Fetch user's workspaces (scoped to the JWT user by the Go API)
   const workspacesQuery = useQuery({

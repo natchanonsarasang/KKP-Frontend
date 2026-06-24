@@ -66,6 +66,18 @@ export function parseDueDateForColumn(
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Widen a date-only string ("2026-06-24") to RFC3339 ("2026-06-24T00:00:00Z").
+ * The Go API's date fields are `time.Time`, which only unmarshals RFC3339; a bare
+ * date makes the whole request body fail to parse (HTTP 422). Full timestamps and
+ * empty values are passed through unchanged.
+ */
+export function toApiDate(dateStr?: string | null): string | null {
+  if (!dateStr) return null;
+  if (dateStr.includes("T")) return dateStr;
+  return `${dateStr}T00:00:00Z`;
+}
+
 /** Construct ISO date from Thai day, month name, and Buddhist year. */
 export function constructIsoDateFromThaiParts(
   day: string | undefined | null,

@@ -19,6 +19,7 @@ import {
   parseDebtAmountForColumn,
   parseDueDateForColumn,
   constructIsoDateFromThaiParts,
+  toApiDate,
 } from "@/lib/debtorVariables";
 
 interface DebtorRow {
@@ -260,7 +261,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
               workspace_id: currentWorkspace.id,
               status: "active",
               total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
-              ...(dueDate ? { due_date: dueDate } : {}),
+              ...(dueDate ? { due_date: toApiDate(dueDate) } : {}),
             });
           }),
         );

@@ -1,50 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
-import { User } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { BotnoiGroupFooter } from "@/components/BotnoiGroupFooter";
+import { BotnoiGroupFooter } from "@/test/BotnoiGroupFooter";
 import { Phone, BarChart3, Users, Zap, Shield, Clock, LayoutDashboard } from "lucide-react";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const { isAuthenticated } = useAuth();
 
+  // Already signed in? Skip the marketing page.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        navigate("/dashboard");
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (event === "SIGNED_IN" && session?.user) {
-        navigate("/dashboard");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleGoogleLogin = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-
-    if (result.error) {
-      console.error("Login error:", result.error);
-      return;
+    if (isAuthenticated) {
+      navigate("/dashboard");
     }
+  }, [isAuthenticated, navigate]);
 
-    if (result.redirected) {
-      return;
-    }
-
-    navigate("/dashboard");
-  };
+  const handleSignIn = () => navigate("/login");
 
   const features = [
     {
@@ -93,14 +65,14 @@ const Landing = () => {
             <span className="text-xl font-semibold tracking-tight">Callecto</span>
           </Link>
 
-          {user ? (
+          {isAuthenticated ? (
             <Button onClick={() => navigate("/dashboard")} size="sm">
               <LayoutDashboard className="w-4 h-4 mr-2" />
               Go to Dashboard
             </Button>
           ) : (
-            <Button onClick={handleGoogleLogin} variant="outline" size="sm">
-              Google Sign In
+            <Button onClick={handleSignIn} variant="outline" size="sm">
+              Sign In
             </Button>
           )}
         </header>
@@ -117,7 +89,7 @@ const Landing = () => {
             </p>
 
             <Button
-              onClick={handleGoogleLogin}
+              onClick={handleSignIn}
               size="lg"
               className="h-14 px-8 text-base gap-3"
             >

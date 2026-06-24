@@ -80,6 +80,7 @@ import {
   splitThaiDate,
   formatThaiBuddhistDate,
   formatThaiBuddhistDateShort,
+  toApiDate,
 } from "@/lib/debtorVariables";
 import {
   MAIN_STATUSES,
@@ -476,7 +477,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         status: data.formData.status,
         notes: data.formData.notes || "",
         total_debt: totalDebt,
-        ...(data.formData.due_date ? { due_date: data.formData.due_date } : {}),
+        ...(data.formData.due_date ? { due_date: toApiDate(data.formData.due_date) } : {}),
         variables: variablesData,
         workspace_id: currentWorkspace.id,
       });
@@ -519,7 +520,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         status: data.formData.status,
         notes: data.formData.notes || "",
         total_debt: totalDebt,
-        ...(data.formData.due_date ? { due_date: data.formData.due_date } : {}),
+        ...(data.formData.due_date ? { due_date: toApiDate(data.formData.due_date) } : {}),
         variables: variablesData,
       });
     },
