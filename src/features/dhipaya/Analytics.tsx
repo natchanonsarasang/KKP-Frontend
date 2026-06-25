@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AudioProxyPlayer } from "@/components/AudioProxyPlayer";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -867,13 +868,7 @@ const DhipayaAnalytics = () => {
                       )}
 
                       {/* Audio player */}
-                      {log.audioUrl && (
-                        <audio
-                          controls
-                          src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?url=${encodeURIComponent(log.audioUrl)}`}
-                          className="w-full h-9"
-                        />
-                      )}
+                      {log.audioUrl && <AudioProxyPlayer audioUrl={log.audioUrl} className="w-full h-9" />}
 
                       {/* Conversation log */}
                       {log.conversationLogs && (

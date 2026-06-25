@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { listDebtorsByWorkspace } from "@/test/api/debtors";
-import { makeCall } from "@/test/api/voicebot";
+import { listDebtorsByWorkspace } from "@/api/debtors";
+import { makeCall } from "@/api/voicebot";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

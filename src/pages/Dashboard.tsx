@@ -18,13 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Phone, Users, FileText, BarChart3, LogOut, LucideIcon, Shield, UserCog, ListChecks, ClipboardList, Coins } from "lucide-react";
-import DebtorsList from "@/test/DebtorsList";
-import CallReportDashboard from "@/test/reports/CallReportDashboard";
-import TemplateSetup from "@/test/TemplateSetup";
-import CallDashboard from "@/test/CallDashboard";
-import CallList from "@/test/CallList";
-import WorkspaceSelector from "@/test/WorkspaceSelector";
-import CreateWorkspaceDialog from "@/test/CreateWorkspaceDialog";
+import DebtorsList from "@/components/DebtorsList";
+import CallReportDashboard from "@/components/reports/CallReportDashboard";
+import TemplateSetup from "@/components/TemplateSetup";
+import CallDashboard from "@/components/CallDashboard";
+import CallList from "@/components/CallList";
+import WorkspaceSelector from "@/components/WorkspaceSelector";
+import CreateWorkspaceDialog from "@/components/CreateWorkspaceDialog";
 import { cn } from "@/lib/utils";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -110,7 +110,7 @@ const StepIndicator = ({ activeTab, onTabClick }: { activeTab: TabType, onTabCli
   );
 };
 
-const TestDashboard = () => {
+const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("debtors");
@@ -306,4 +306,4 @@ const TestDashboard = () => {
   );
 };
 
-export default TestDashboard;
+export default Dashboard;

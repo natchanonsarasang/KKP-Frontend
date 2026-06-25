@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listCallRecords } from "@/test/api/callRecords";
-import { listCallListItemsByWorkspace } from "@/test/api/callListItems";
-import { listDebtorsByWorkspace } from "@/test/api/debtors";
+import { listCallRecords } from "@/api/callRecords";
+import { listCallListItemsByWorkspace } from "@/api/callListItems";
+import { listDebtorsByWorkspace } from "@/api/debtors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { downloadAudioViaProxy } from "@/api/audioProxy";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -842,18 +843,7 @@ const CallReportDashboard = () => {
                                     className="h-7 px-2 text-xs"
                                     onClick={async () => {
                                       try {
-                                        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?download=1&filename=call_audio.mp3&url=${encodeURIComponent(audioUrl)}`;
-                                        const res = await fetch(proxyUrl);
-                                        if (!res.ok) throw new Error("Download failed");
-                                        const blob = await res.blob();
-                                        const blobUrl = URL.createObjectURL(blob);
-                                        const a = document.createElement('a');
-                                        a.href = blobUrl;
-                                        a.download = 'call_audio.mp3';
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                        URL.revokeObjectURL(blobUrl);
+                                        await downloadAudioViaProxy(audioUrl, "call_audio.mp3");
                                       } catch (err) {
                                         console.error("Audio download error:", err);
                                       }

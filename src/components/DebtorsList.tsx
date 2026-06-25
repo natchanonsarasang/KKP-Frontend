@@ -11,10 +11,10 @@ import {
   createDebtor,
   updateDebtor,
   deleteDebtor,
-} from "@/test/api/debtors";
-import { listCallListItemsByWorkspace, createCallListItem } from "@/test/api/callListItems";
-import { listCallRecords, createCallRecord } from "@/test/api/callRecords";
-import { makeCall } from "@/test/api/voicebot";
+} from "@/api/debtors";
+import { listCallListItemsByWorkspace, createCallListItem } from "@/api/callListItems";
+import { listCallRecords, createCallRecord } from "@/api/callRecords";
+import { makeCall } from "@/api/voicebot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

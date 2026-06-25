@@ -6,8 +6,8 @@ import {
   loginWithGoogle,
   loginWithMicrosoft,
   logout as clearAuth,
-} from "@/test/api/auth";
-import { getStoredUser, subscribeAuth, type AuthUser } from "@/test/api/authToken";
+} from "@/api/auth";
+import { getStoredUser, subscribeAuth, type AuthUser } from "@/api/authToken";
 
 interface AuthContextType {
   user: AuthUser | null;
