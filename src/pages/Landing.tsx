@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { BotnoiGroupFooter } from "@/test/BotnoiGroupFooter";
+import { BotnoiGroupFooter } from "@/components/BotnoiGroupFooter";
 import { Phone, BarChart3, Users, Zap, Shield, Clock, LayoutDashboard } from "lucide-react";
 
 const Landing = () => {

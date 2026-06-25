@@ -6,8 +6,8 @@ import {
   createWorkspace as apiCreateWorkspace,
   updateWorkspace as apiUpdateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
-} from "@/test/api/workspaces";
-import type { Workspace } from "@/test/api/types";
+} from "@/api/workspaces";
+import type { Workspace } from "@/api/types";
 import { toast } from "sonner";
 
 interface WorkspaceContextType {

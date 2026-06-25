@@ -1,21 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listDebtorsByWorkspace, updateDebtor } from "@/test/api/debtors";
+import { listDebtorsByWorkspace, updateDebtor } from "@/api/debtors";
 import {
   listCallListItemsByWorkspace,
   createCallListItem,
   createCallListItems,
   updateCallListItem,
   deleteCallListItem,
-} from "@/test/api/callListItems";
-import { listCallRecords, createCallRecord, getCallRecord, updateCallRecord } from "@/test/api/callRecords";
+} from "@/api/callListItems";
+import { listCallRecords, createCallRecord, getCallRecord, updateCallRecord } from "@/api/callRecords";
 import {
   listCallSessions,
   createCallSession,
   updateCallSession,
-} from "@/test/api/callSessions";
-import { makeCall as apiMakeCall, processCallSession } from "@/test/api/voicebot";
-import type { CallSessionSettings } from "@/test/api/types";
+} from "@/api/callSessions";
+import { makeCall as apiMakeCall, processCallSession } from "@/api/voicebot";
+import type { CallSessionSettings } from "@/api/types";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,7 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { DebtorFilterPanel, FilterConditions } from "@/test/DebtorFilterPanel";
+import { DebtorFilterPanel, FilterConditions } from "@/components/DebtorFilterPanel";
 
 interface Debtor {
   id: string;

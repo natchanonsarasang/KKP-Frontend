@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listCallRecords } from "@/test/api/callRecords";
-import { listCallListItemsByWorkspace } from "@/test/api/callListItems";
-import { listDebtorsByWorkspace } from "@/test/api/debtors";
+import { listCallRecords } from "@/api/callRecords";
+import { listCallListItemsByWorkspace } from "@/api/callListItems";
+import { listDebtorsByWorkspace } from "@/api/debtors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

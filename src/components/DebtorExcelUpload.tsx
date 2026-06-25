@@ -9,7 +9,7 @@ import { Upload, FileSpreadsheet, Loader2, Trash2, X, AlertTriangle, Download } 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listDebtorsByWorkspace, createDebtor } from "@/test/api/debtors";
+import { listDebtorsByWorkspace, createDebtor } from "@/api/debtors";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
