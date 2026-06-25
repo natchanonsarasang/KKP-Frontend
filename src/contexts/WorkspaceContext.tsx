@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -50,6 +50,16 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const workspaces = workspacesQuery.data ?? [];
   const isLoading = !authReady ? true : userId ? workspacesQuery.isLoading : false;
+
+  // Clear the selected workspace on any auth boundary (login/logout/switch
+  // account) so a stale selection from a previous user never lingers in the UI.
+  const prevUserId = useRef(userId);
+  useEffect(() => {
+    if (userId !== prevUserId.current) {
+      prevUserId.current = userId;
+      setCurrentWorkspaceState(null);
+    }
+  }, [userId]);
 
   // Set default workspace when workspaces load
   useEffect(() => {

@@ -118,6 +118,7 @@ export async function getMicrosoftIdToken(): Promise<string> {
     response_mode: "fragment",
     nonce,
     state,
+    prompt: "select_account",
   });
   const authUrl = `https://login.microsoftonline.com/${MS_TENANT}/oauth2/v2.0/authorize?${params.toString()}`;
   return popupIdToken(authUrl, state);
