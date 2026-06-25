@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getToken } from "./authToken";
 
 // Base URL for the Callecto Go API (Fiber + MongoDB), e.g. http://localhost:1818/api/v1
 const BASE_URL = import.meta.env.VITE_CALLECTO_API_URL;
@@ -17,12 +17,12 @@ interface RequestOptions {
 }
 
 /**
- * The Go API validates the *Supabase* access token, so every request carries the
- * current session's bearer token. Auth itself stays on Supabase — see CLAUDE.md.
+ * The Go API issues and validates its own JWT (see api/auth.ts). Every request
+ * carries the stored token as the bearer credential; public endpoints (the
+ * `/auth/*` routes) simply receive no Authorization header when none is stored.
  */
-async function authHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+function authHeader(): Record<string, string> {
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -44,7 +44,7 @@ export async function apiRequest<T = unknown>(
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(await authHeader()),
+      ...authHeader(),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

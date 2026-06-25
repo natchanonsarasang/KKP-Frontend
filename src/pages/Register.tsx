@@ -3,8 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { useAuth } from "@/contexts/AuthContext";
+import { getGoogleIdToken, getMicrosoftIdToken } from "@/test/api/oauth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -27,11 +27,13 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
   const navigate = useNavigate();
-  // Flow state
+  const { signUp, signInWithGoogle, signInWithMicrosoft } = useAuth();
+  // The "otp" step is retained for layout compatibility, but the Go API has no
+  // email-verification step, so registration logs the user straight in.
   const [step, setStep] = useState<"register" | "otp">("register");
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [otp, setOtp] = useState("");
-  
+
   // Loading states
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -50,32 +52,15 @@ const Register = () => {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
     try {
-      const { data: authData, error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            first_name: data.firstName,
-            last_name: data.lastName,
-            full_name: `${data.firstName} ${data.lastName}`,
-          },
-        },
-      });
+      const fullName = `${data.firstName} ${data.lastName}`.trim();
+      await signUp(data.email, data.password, fullName);
 
-      if (error) throw error;
-      
-      // If session is null, it means email confirmation is required by Supabase settings
-      if (!authData.session) {
-        setRegisteredEmail(data.email);
-        setStep("otp");
-        toast.success("Verification code sent!", {
-          description: "Please check your email for the 6-digit verification code.",
-        });
-      } else {
-        // Fallback if email confirmation is disabled in Supabase
-        toast.success("Registration successful!");
-        navigate("/dashboard");
-      }
+      // The Go register endpoint returns a session token, so the user is now
+      // signed in — no email confirmation step.
+      toast.success("Registration successful!", {
+        description: "Welcome to Callecto.",
+      });
+      navigate("/dashboard");
     } catch (error: any) {
       toast.error("Registration failed", {
         description: error.message || "Something went wrong. Please try again.",
@@ -86,49 +71,35 @@ const Register = () => {
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
+    // No email-verification step in the Go API; kept only so the unused OTP
+    // layout below still has a handler. Sends the user to the dashboard.
     e.preventDefault();
-    if (otp.length !== 6) {
-      toast.error("Invalid Code", { description: "Please enter the full 6-digit code." });
-      return;
-    }
-    
     setIsVerifying(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: registeredEmail,
-        token: otp,
-        type: "signup",
-      });
-
-      if (error) throw error;
-
-      toast.success("Email verified successfully!", {
-        description: "Welcome to Callecto.",
-      });
-      navigate("/dashboard");
-    } catch (error: any) {
-      toast.error("Verification failed", {
-        description: error.message || "Invalid or expired code. Please try again.",
-      });
-    } finally {
-      setIsVerifying(false);
-    }
+    navigate("/dashboard");
+    setIsVerifying(false);
   };
 
   const handleGoogleSignup = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-
-    if (result.error) {
-      toast.error("Google signup failed", {
-        description: result.error.message,
-      });
-      return;
-    }
-
-    if (!result.redirected) {
+    try {
+      const idToken = await getGoogleIdToken();
+      await signInWithGoogle(idToken);
       navigate("/dashboard");
+    } catch (error: any) {
+      toast.error("Google signup failed", {
+        description: error.message || "Could not sign up with Google.",
+      });
+    }
+  };
+
+  const handleMicrosoftSignup = async () => {
+    try {
+      const idToken = await getMicrosoftIdToken();
+      await signInWithMicrosoft(idToken);
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast.error("Microsoft signup failed", {
+        description: error.message || "Could not sign up with Microsoft.",
+      });
     }
   };
 
@@ -224,6 +195,21 @@ const Register = () => {
                       <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                     </svg>
                     Continue with Google
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 relative bg-white/60 dark:bg-background/60 backdrop-blur-md border-border/60 hover:bg-white/90 dark:hover:bg-background/90 hover:shadow-sm font-medium transition-all duration-200"
+                    onClick={handleMicrosoftSignup}
+                  >
+                    <svg className="w-5 h-5 mr-3" viewBox="0 0 23 23">
+                      <path fill="#f25022" d="M1 1h10v10H1z" />
+                      <path fill="#7fba00" d="M12 1h10v10H12z" />
+                      <path fill="#00a4ef" d="M1 12h10v10H1z" />
+                      <path fill="#ffb900" d="M12 12h10v10H12z" />
+                    </svg>
+                    Continue with Microsoft
                   </Button>
                 </div>
 

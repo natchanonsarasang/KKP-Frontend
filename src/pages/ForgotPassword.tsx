@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -44,78 +43,28 @@ const ForgotPassword = () => {
     defaultValues: { password: "", confirmPassword: "" },
   });
 
+  // The Callecto Go API does not yet expose a password-reset/OTP flow, so this
+  // page informs the user and routes them back to sign-in. The OTP/new-password
+  // steps below are retained for when a reset endpoint is added.
   const onEmailSubmit = async (data: EmailFormValues) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email);
-      if (error) throw error;
-      
-      setEmail(data.email);
-      setStep("otp");
-      toast.success("Reset code sent!", {
-        description: "Please check your email for the 6-digit recovery code.",
-      });
-    } catch (error: any) {
-      toast.error("Failed to send code", {
-        description: error.message || "Something went wrong. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    setEmail(data.email);
+    toast.info("Password reset isn't available yet", {
+      description: "Please contact your administrator to reset your password.",
+    });
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length !== 6) {
-      toast.error("Invalid Code", { description: "Please enter the full 6-digit code." });
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: "recovery",
-      });
-
-      if (error) throw error;
-
-      setStep("password");
-      toast.success("Code verified!", {
-        description: "You can now securely choose a new password.",
-      });
-    } catch (error: any) {
-      toast.error("Verification failed", {
-        description: error.message || "Invalid or expired code. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    toast.info("Password reset isn't available yet", {
+      description: "Please contact your administrator to reset your password.",
+    });
   };
 
-  const onPasswordSubmit = async (data: PasswordFormValues) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: data.password,
-      });
-
-      if (error) throw error;
-      
-      toast.success("Password updated successfully!", {
-        description: "You can now log in with your new password.",
-      });
-      // Optionally sign out the user if you want them to log back in
-      await supabase.auth.signOut();
-      navigate("/login");
-    } catch (error: any) {
-      toast.error("Update failed", {
-        description: error.message || "Could not update password. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const onPasswordSubmit = async (_data: PasswordFormValues) => {
+    toast.info("Password reset isn't available yet", {
+      description: "Please contact your administrator to reset your password.",
+    });
+    navigate("/login");
   };
 
   return (

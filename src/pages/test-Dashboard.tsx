@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { User, Session } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -113,9 +112,7 @@ const StepIndicator = ({ activeTab, onTabClick }: { activeTab: TabType, onTabCli
 
 const TestDashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isAuthenticated, isLoading: loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("debtors");
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
 
@@ -130,68 +127,28 @@ const TestDashboard = () => {
 
   // Show/hide create workspace dialog based on whether workspaces exist
   useEffect(() => {
-    if (!workspacesLoading && session) {
+    if (!workspacesLoading && isAuthenticated) {
       if (workspaces.length === 0) {
         setShowCreateWorkspace(true);
       } else {
         setShowCreateWorkspace(false);
       }
     }
-  }, [workspaces, workspacesLoading, session]);
+  }, [workspaces, workspacesLoading, isAuthenticated]);
 
   // Get selected user info for display
   const selectedUserInfo = allUsers.find(u => u.id === selectedUserId);
 
+  // Redirect to login whenever there is no active Callecto session.
   useEffect(() => {
-    let cancelled = false;
+    if (!loading && !isAuthenticated) {
+      navigate("/login");
+    }
+  }, [loading, isAuthenticated, navigate]);
 
-    const finish = (nextSession: Session | null) => {
-      if (cancelled) return;
-
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setLoading(false);
-
-      if (!nextSession) {
-        navigate("/");
-      }
-    };
-
-    const init = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) console.warn("dashboard getSession error", error);
-        finish(data.session);
-      } catch (e) {
-        console.warn("dashboard getSession threw", e);
-        finish(null);
-      }
-    };
-
-    init();
-
-    // Failsafe: never hang on a loading screen in production
-    const failSafe = window.setTimeout(() => {
-      finish(null);
-    }, 3000);
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      window.clearTimeout(failSafe);
-      finish(nextSession);
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(failSafe);
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
+  const handleLogout = () => {
+    signOut();
+    navigate("/login");
   };
 
 
@@ -203,7 +160,7 @@ const TestDashboard = () => {
     );
   }
 
-  const userInitials = user?.user_metadata?.full_name
+  const userInitials = user?.name
     ?.split(" ")
     .map((n: string) => n[0])
     .join("")
@@ -283,7 +240,7 @@ const TestDashboard = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || ""} />
+                    <AvatarImage src={user?.picture} alt={user?.email || ""} />
                     <AvatarFallback className="bg-primary/10 text-primary text-sm">
                       {userInitials}
                     </AvatarFallback>
@@ -292,7 +249,7 @@ const TestDashboard = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium">{user?.user_metadata?.full_name || "User"}</p>
+                  <p className="text-sm font-medium">{user?.name || "User"}</p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />

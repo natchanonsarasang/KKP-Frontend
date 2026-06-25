@@ -3,8 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { useAuth } from "@/contexts/AuthContext";
+import { getGoogleIdToken, getMicrosoftIdToken } from "@/test/api/oauth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -20,6 +20,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signInWithPassword, signInWithGoogle, signInWithMicrosoft } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
@@ -33,13 +34,8 @@ const Login = () => {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      await signInWithPassword(data.email, data.password);
 
-      if (error) throw error;
-      
       toast.success("Welcome back!", {
         description: "You have successfully logged in.",
       });
@@ -54,19 +50,26 @@ const Login = () => {
   };
 
   const handleGoogleLogin = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-
-    if (result.error) {
-      toast.error("Google login failed", {
-        description: result.error.message,
-      });
-      return;
-    }
-
-    if (!result.redirected) {
+    try {
+      const idToken = await getGoogleIdToken();
+      await signInWithGoogle(idToken);
       navigate("/dashboard");
+    } catch (error: any) {
+      toast.error("Google login failed", {
+        description: error.message || "Could not sign in with Google.",
+      });
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    try {
+      const idToken = await getMicrosoftIdToken();
+      await signInWithMicrosoft(idToken);
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast.error("Microsoft login failed", {
+        description: error.message || "Could not sign in with Microsoft.",
+      });
     }
   };
 
@@ -111,6 +114,21 @@ const Login = () => {
                   <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
                 Continue with Google
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 relative bg-white/60 dark:bg-background/60 backdrop-blur-md border-border/60 hover:bg-white/90 dark:hover:bg-background/90 hover:shadow-sm font-medium transition-all duration-200"
+                onClick={handleMicrosoftLogin}
+              >
+                <svg className="w-5 h-5 mr-3" viewBox="0 0 23 23">
+                  <path fill="#f25022" d="M1 1h10v10H1z" />
+                  <path fill="#7fba00" d="M12 1h10v10H12z" />
+                  <path fill="#00a4ef" d="M1 12h10v10H1z" />
+                  <path fill="#ffb900" d="M12 12h10v10H12z" />
+                </svg>
+                Continue with Microsoft
               </Button>
             </div>
 
