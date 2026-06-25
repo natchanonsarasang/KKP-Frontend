@@ -6,3 +6,4 @@ export * as callListItemsApi from "./callListItems";
 export * as callAttemptsApi from "./callAttempts";
 export * as callRecordsApi from "./callRecords";
 export * as callSessionsApi from "./callSessions";
+export * from "./audioProxy";

@@ -15,6 +15,7 @@ import {
   updateCallSession,
 } from "@/api/callSessions";
 import { makeCall as apiMakeCall, processCallSession } from "@/api/voicebot";
+import { downloadAudioViaProxy } from "@/api/audioProxy";
 import type { CallSessionSettings } from "@/api/types";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber } from "@/lib/formatPhone";
@@ -2604,18 +2605,7 @@ const CallList = () => {
                     className="w-full"
                     onClick={async () => {
                       try {
-                        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?download=1&filename=call_audio.mp3&url=${encodeURIComponent(transcriptData.audioUrl!)}`;
-                        const res = await fetch(proxyUrl);
-                        if (!res.ok) throw new Error("Download failed");
-                        const blob = await res.blob();
-                        const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = blobUrl;
-                        a.download = "call_audio.mp3";
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(blobUrl);
+                        await downloadAudioViaProxy(transcriptData.audioUrl!, "call_audio.mp3");
                       } catch (err) {
                         console.error("Audio download error:", err);
                         toast.error("Failed to download audio");
