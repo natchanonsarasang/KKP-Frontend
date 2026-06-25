@@ -1,21 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listDebtorsByWorkspace, updateDebtor } from "@/test/api/debtors";
+import { listDebtorsByWorkspace, updateDebtor } from "@/api/debtors";
 import {
   listCallListItemsByWorkspace,
   createCallListItem,
   createCallListItems,
   updateCallListItem,
   deleteCallListItem,
-} from "@/test/api/callListItems";
-import { listCallRecords, createCallRecord, getCallRecord, updateCallRecord } from "@/test/api/callRecords";
+} from "@/api/callListItems";
+import { listCallRecords, createCallRecord, getCallRecord, updateCallRecord } from "@/api/callRecords";
 import {
   listCallSessions,
   createCallSession,
   updateCallSession,
-} from "@/test/api/callSessions";
-import { makeCall as apiMakeCall, processCallSession } from "@/test/api/voicebot";
-import type { CallSessionSettings } from "@/test/api/types";
+} from "@/api/callSessions";
+import { makeCall as apiMakeCall, processCallSession } from "@/api/voicebot";
+import { downloadAudioViaProxy } from "@/api/audioProxy";
+import type { CallSessionSettings } from "@/api/types";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { DebtorFilterPanel, FilterConditions } from "@/test/DebtorFilterPanel";
+import { DebtorFilterPanel, FilterConditions } from "@/components/DebtorFilterPanel";
 
 interface Debtor {
   id: string;
@@ -2604,18 +2605,7 @@ const CallList = () => {
                     className="w-full"
                     onClick={async () => {
                       try {
-                        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/audio-proxy?download=1&filename=call_audio.mp3&url=${encodeURIComponent(transcriptData.audioUrl!)}`;
-                        const res = await fetch(proxyUrl);
-                        if (!res.ok) throw new Error("Download failed");
-                        const blob = await res.blob();
-                        const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = blobUrl;
-                        a.download = "call_audio.mp3";
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(blobUrl);
+                        await downloadAudioViaProxy(transcriptData.audioUrl!, "call_audio.mp3");
                       } catch (err) {
                         console.error("Audio download error:", err);
                         toast.error("Failed to download audio");

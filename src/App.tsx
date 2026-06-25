@@ -8,7 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminProvider } from "@/contexts/AdminContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import Landing from "./pages/Landing";
-import TestDashboard from "./pages/test-Dashboard";
+import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -39,9 +39,7 @@ const App = () => (
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/auth/callback" element={<OAuthCallback />} />
-                {/* /dashboard and /test render the same (current) dashboard surface */}
-                <Route path="/dashboard" element={<TestDashboard />} />
-                <Route path="/test" element={<TestDashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/dhipaya" element={<Dhipaya />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
