@@ -195,6 +195,7 @@ const CallList = () => {
   } | null>(null);
   const [nextBatchCountdown, setNextBatchCountdown] = useState<number>(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [transcriptData, setTranscriptData] = useState<{
@@ -485,6 +486,33 @@ const CallList = () => {
       }
     };
   }, [activeSession?.status, settings.delayBetweenCalls]);
+
+  // Heartbeat: nudge the backend to re-check for stale "calling" items even when
+  // no result webhook arrives to re-trigger ProcessSession (vendor webhooks can
+  // go silent, which otherwise leaves a session stuck "in progress" forever).
+  useEffect(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+
+    if (activeSession?.status === "running") {
+      const sessionId = activeSession.id;
+      heartbeatIntervalRef.current = setInterval(() => {
+        processCallSession({ session_id: sessionId, action: "continue" }).catch(() => {
+          // Fire-and-forget safety net; a failed nudge just means we try again next tick.
+        });
+      }, 25000);
+    }
+
+    // Cleanup heartbeat interval on unmount or when the session stops running
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, [activeSession?.id, activeSession?.status]);
 
   // Call tokens are not served by the Go API; default to 0 (token gating is disabled).
   const userTokens = 0;
