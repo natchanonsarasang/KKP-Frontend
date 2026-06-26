@@ -26,9 +26,6 @@ dist-ssr
 # Test / coverage output
 coverage
 
-# Lovable
-.lovable
-
 # Python / notebooks (Classifire_RuleBase.ipynb)
 .ipynb_checkpoints/
 __pycache__/
