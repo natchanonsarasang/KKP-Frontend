@@ -3,6 +3,8 @@ import { listDebtorsByWorkspace } from "@/api/debtors";
 import { listCallListItemsByWorkspace } from "@/api/callListItems";
 import { listCallRecords } from "@/api/callRecords";
 import { listCallSessions } from "@/api/callSessions";
+import { listCallAttemptsByWorkspace } from "@/api/callAttempts";
+import type { CallAttempt } from "@/api/types";
 import type { CallListItem, CallSession, Debtor } from "./types";
 
 interface UseCallListQueriesArgs {
@@ -163,6 +165,32 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     enabled: !!effectiveUserId && !!workspaceId,
   });
 
+  // Fetch call attempts for this workspace and index by call_list_item_id so the
+  // queue table can look up conversation_log/audio_url — the Go API stores those
+  // on CallAttempt, not on CallListItem.notes. Keep only the latest attempt per
+  // item (highest attempt_number) in case of retries.
+  const { data: callAttemptsByItemId } = useQuery({
+    queryKey: ["call-attempts-by-item", workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return new Map<string, CallAttempt>();
+
+      const attempts = await listCallAttemptsByWorkspace(workspaceId);
+      const map = new Map<string, CallAttempt>();
+      for (const attempt of attempts) {
+        const existing = map.get(attempt.call_list_item_id);
+        if (!existing || attempt.attempt_number >= existing.attempt_number) {
+          map.set(attempt.call_list_item_id, attempt);
+        }
+      }
+      return map;
+    },
+    enabled: !!workspaceId,
+    refetchInterval: () => {
+      const session = queryClient.getQueryData<CallSession | null>(["active-call-session", effectiveUserId, workspaceId]);
+      return session && ["running", "stopping"].includes(session.status) ? 30000 : false;
+    },
+  });
+
   // Fetch available debtors (not already in pending call list)
   const { data: availableDebtors } = useQuery({
     queryKey: ["available-debtors-for-call", effectiveUserId, workspaceId],
@@ -199,5 +227,6 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     availableDebtors,
     activeSession,
     refetchSession,
+    callAttemptsByItemId,
   };
 }
