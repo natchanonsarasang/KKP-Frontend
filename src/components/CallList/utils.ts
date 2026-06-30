@@ -3,26 +3,21 @@ import { toast } from "sonner";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
 import { BOTNOI_TEMPLATE_ID } from "./constants";
-import type { CallListItem, PreviewPayload, Template, TranscriptData } from "./types";
+import type { CallAttempt } from "@/api/types";
+import type { CallListItem, PreviewPayload, Template } from "./types";
 
-// Parse notes field (could be JSON with audio_url/conversation_log or legacy plain URL)
-export function parseNotesData(notes: string | null): TranscriptData {
-  if (!notes) return { audioUrl: null, conversationLog: null };
-
-  // Try to parse as JSON first (new format)
-  try {
-    const parsed = JSON.parse(notes);
-    return {
-      audioUrl: parsed.audio_url || null,
-      conversationLog: parsed.conversation_log || parsed.transcription || null,
-    };
-  } catch {
-    // Legacy format: notes is just the audio URL
-    if (notes.startsWith("http")) {
-      return { audioUrl: notes, conversationLog: null };
-    }
-    return { audioUrl: null, conversationLog: null };
-  }
+// Trigger a browser download of the conversation log as a plain-text file.
+// No network round-trip needed — the log is already in memory from the call record.
+export function downloadConversationAsText(conversationLog: string, filename = "conversation.txt"): void {
+  const blob = new Blob([conversationLog], { type: "text/plain;charset=utf-8" });
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
 }
 
 // Convert number to Thai text
@@ -103,7 +98,10 @@ export function buildCallPayload(item: CallListItem, templates: Template[]): Pre
 }
 
 // Export completed calls to Excel
-export function exportCompletedCallsToExcel(callListItems: CallListItem[]): void {
+export function exportCompletedCallsToExcel(
+  callListItems: CallListItem[],
+  callAttemptsByItemId?: Map<string, CallAttempt>,
+): void {
   const completedStatuses = new Set([
     "completed",
     "success",
@@ -177,7 +175,9 @@ export function exportCompletedCallsToExcel(callListItems: CallListItem[]): void
       aiStatus = def ? def.label : resolveLatestStatusLabel(cat);
     }
 
-    const { audioUrl, conversationLog } = parseNotesData(item.notes ?? null);
+    const attempt = callAttemptsByItemId?.get(item.id);
+    const audioUrl = attempt?.audio_url || null;
+    const conversationLog = attempt?.conversation_log || null;
 
     return {
       เบอร์โทร: debtor?.phone_number || "-",
