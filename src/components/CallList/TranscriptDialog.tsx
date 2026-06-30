@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Download, Volume2 } from "lucide-react";
+import { Download, FileText, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadAudioViaProxy } from "@/api/audioProxy";
+import { downloadConversationAsText } from "./utils";
 import type { TranscriptData } from "./types";
 
 interface TranscriptDialogProps {
@@ -63,6 +64,17 @@ export function TranscriptDialog({ open, onOpenChange, transcriptData }: Transcr
                   </p>
                 )}
               </div>
+              {transcriptData.conversationLog && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => downloadConversationAsText(transcriptData.conversationLog!, "conversation.txt")}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download Text
+                </Button>
+              )}
             </div>
 
             {transcriptData.audioUrl && (

@@ -7,7 +7,8 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
 import { DEFAULT_SETTINGS, statusConfig } from "./constants";
-import { exportCompletedCallsToExcel, parseNotesData } from "./utils";
+import { exportCompletedCallsToExcel } from "./utils";
+import type { CallAttempt } from "@/api/types";
 import { useCallListQueries } from "./useCallListQueries";
 import { useCallListMutations } from "./useCallListMutations";
 import { useCallSession } from "./useCallSession";
@@ -102,6 +103,7 @@ const CallList = () => {
     availableDebtors,
     activeSession,
     refetchSession,
+    callAttemptsByItemId,
   } = useCallListQueries({ effectiveUserId, workspaceId });
 
   const {
@@ -158,9 +160,11 @@ const CallList = () => {
   });
 
   // Handle viewing transcript
-  const handleViewTranscript = (notes: string | null) => {
-    const data = parseNotesData(notes);
-    setTranscriptData({ conversationLog: data.conversationLog, audioUrl: data.audioUrl });
+  const handleViewTranscript = (attempt: CallAttempt | null) => {
+    setTranscriptData({
+      conversationLog: attempt?.conversation_log || null,
+      audioUrl: attempt?.audio_url || null,
+    });
     setShowTranscriptDialog(true);
   };
 
@@ -482,11 +486,12 @@ const CallList = () => {
         processedCount={processedCount}
         isLoading={isLoading}
         filteredCallListItems={filteredCallListItems}
+        callAttemptsByItemId={callAttemptsByItemId}
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}
         getStatusBadge={getStatusBadge}
-        onExportCompletedCalls={() => exportCompletedCallsToExcel(callListItems || [])}
+        onExportCompletedCalls={() => exportCompletedCallsToExcel(callListItems || [], callAttemptsByItemId)}
         onPreviewCall={handlePreviewCall}
         onViewTranscript={handleViewTranscript}
         onRemoveFromList={(id) => removeFromListMutation.mutate(id)}

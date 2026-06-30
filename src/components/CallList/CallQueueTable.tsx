@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
-import { parseNotesData } from "./utils";
+import type { CallAttempt } from "@/api/types";
 import type { CallListItem, SortDirection, SortField } from "./types";
 
 interface CallQueueTableProps {
@@ -27,13 +27,14 @@ interface CallQueueTableProps {
   processedCount: number;
   isLoading: boolean;
   filteredCallListItems: CallListItem[];
+  callAttemptsByItemId: Map<string, CallAttempt> | undefined;
   sortField: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
   getStatusBadge: (status: string) => JSX.Element;
   onExportCompletedCalls: () => void;
   onPreviewCall: (item: CallListItem) => void;
-  onViewTranscript: (notes: string | null) => void;
+  onViewTranscript: (attempt: CallAttempt | null) => void;
   onRemoveFromList: (id: string) => void;
   isRemovingFromList: boolean;
 }
@@ -46,6 +47,7 @@ export function CallQueueTable({
   processedCount,
   isLoading,
   filteredCallListItems,
+  callAttemptsByItemId,
   sortField,
   sortDirection,
   onSort,
@@ -286,20 +288,15 @@ export function CallQueueTable({
                         item.status === "no_response" ||
                         item.status === "no_answer" ||
                         item.status === "failed" ? (
-                          (() => {
-                            const { conversationLog } = parseNotesData(item.notes);
-                            return conversationLog ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                                onClick={() => onViewTranscript(item.notes)}
-                                title="View conversation"
-                              >
-                                <FileText className="w-3.5 h-3.5" />
-                              </Button>
-                            ) : null;
-                          })()
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                            title="View conversation"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </Button>
                         ) : (
                           <Button
                             variant="ghost"
