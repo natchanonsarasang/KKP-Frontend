@@ -340,7 +340,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         sortDirection={sortDirection}
         onSort={handleSort}
         callStats={callStats}
-        latestStatusByDebtor={latestStatusByDebtor}
         onEdit={handleEdit}
         onToggleBlock={handleToggleBlock}
         onDelete={(id) => deleteDebtorMutation.mutate(id)}

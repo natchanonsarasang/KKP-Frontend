@@ -42,9 +42,9 @@ import {
   X,
 } from "lucide-react";
 import { maskLicensePlate, maskPhoneNumber, isLicensePlateField } from "@/lib/formatPhone";
-import { formatThaiBuddhistDateShort } from "@/lib/debtorVariables";
-import { resolveLatestStatusLabel, resolveLatestStatusTone, MAIN_STATUSES, SUB_STATUSES } from "@/lib/callStatuses";
-import { statusConfig, STATUS_TONE_CLASS } from "./constants";
+// import { formatThaiBuddhistDateShort } from "@/lib/debtorVariables"; // Callback Date column hidden
+import { MAIN_STATUSES, SUB_STATUSES } from "@/lib/callStatuses";
+import { statusConfig } from "./constants";
 import { formatVariableValue } from "./utils";
 import type { Debtor, PhoneCallStats, SortDirection } from "./types";
 
@@ -65,7 +65,6 @@ interface DebtorsTableProps {
   sortDirection: SortDirection;
   onSort: (field: string) => void;
   callStats: Record<string, PhoneCallStats> | undefined;
-  latestStatusByDebtor: Map<string, string | null> | undefined;
   onEdit: (debtor: Debtor) => void;
   onToggleBlock: (debtor: Debtor) => void;
   onDelete: (id: string) => void;
@@ -92,7 +91,6 @@ export function DebtorsTable({
   sortDirection,
   onSort,
   callStats,
-  latestStatusByDebtor,
   onEdit,
   onToggleBlock,
   onDelete,
@@ -228,12 +226,14 @@ export function DebtorsTable({
                     <TableHead className="text-xs">Contact</TableHead>
                     <TableHead className="text-xs">Name</TableHead>
                     <TableHead className="text-xs">Latest Call Status</TableHead>
+                    {/* Callback Date column hidden — not used for now
                     <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("date_con")}>
                       <div className="flex items-center whitespace-nowrap">
                         Callback Date
                         {getSortIcon("date_con")}
                       </div>
                     </TableHead>
+                    */}
                     <TableHead className="text-xs whitespace-nowrap">Policy Number</TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Outstanding Amount</TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Overdue Installment</TableHead>
@@ -319,26 +319,26 @@ export function DebtorsTable({
                           <TableCell className="text-sm">{formatVariableValue("name", debtor.variables?.name)}</TableCell>
                           <TableCell className="whitespace-nowrap">
                             {(() => {
-                              const raw = latestStatusByDebtor?.get(debtor.id) ?? null;
-                              const label = resolveLatestStatusLabel(raw);
-                              const tone = resolveLatestStatusTone(raw);
-                              if (tone === "none") {
+                              // Latest Call Status now reads the debtor's own `call_outcome`
+                              // (e.g. "hanged_up") straight from the debtors table.
+                              const outcome = debtor.call_outcome?.trim();
+                              if (!outcome) {
                                 return <span className="text-sm text-muted-foreground">–</span>;
                               }
-                              const isHighPriority = tone === "callback" || tone === "transfer";
                               return (
-                                <Badge variant="outline" className={`gap-1.5 font-medium ${STATUS_TONE_CLASS[tone]}`}>
-                                  {isHighPriority && <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />}
-                                  {label}
+                                <Badge variant="outline" className="gap-1.5 font-medium">
+                                  {outcome}
                                 </Badge>
                               );
                             })()}
                           </TableCell>
+                          {/* Callback Date column hidden — not used for now
                           <TableCell>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               {formatThaiBuddhistDateShort(debtor.date_con)}
                             </span>
                           </TableCell>
+                          */}
                           <TableCell className="text-sm">{formatVariableValue("policy_no", debtor.variables?.policy_no)}</TableCell>
                           <TableCell className="text-sm">
                             {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
