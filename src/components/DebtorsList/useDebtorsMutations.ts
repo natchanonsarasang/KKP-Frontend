@@ -147,21 +147,73 @@ export function useDebtorsMutations({
         ...((debtor.variables || {}) as Record<string, string>),
       };
 
+      // Create a unique client-side ID for the call record
+      const callRecordId = crypto.randomUUID();
+
       await makeCall({ phone_number: debtor.phone_number, variables: debtorVars });
 
-      // Create call record (botnoi_call_id is not returned by the Go make-call endpoint)
+      // Create call record
       await createCallRecord({
+        id: callRecordId,
         phone_number: debtor.phone_number,
         template_id: workspaceTemplate?.id ?? null,
         workspace_id: workspaceId,
         status: "pending",
       });
+
+      return { debtor, callRecordId };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["call-records"] });
-      queryClient.invalidateQueries({ queryKey: ["call-stats-by-phone"] });
-      toast.success("Call initiated successfully");
-      onMakeCallSettled();
+    onSuccess: ({ debtor, callRecordId }) => {
+      // Start polling for the call result in the background
+      const maxWaitTime = 5 * 60 * 1000;
+      const pollInterval = 3000;
+      const startTime = Date.now();
+
+      const pollPromise = new Promise<string>(async (resolve, reject) => {
+        try {
+          // Dynamic import of getCallRecord to avoid circular deps if any, or just use the API
+          const { getCallRecord } = await import("@/api/callRecords");
+          
+          while (Date.now() - startTime < maxWaitTime) {
+            await new Promise((r) => setTimeout(r, pollInterval));
+            const updatedRecord = await getCallRecord(callRecordId);
+            
+            if (updatedRecord) {
+              const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
+              if (finalStatuses.includes(updatedRecord.status || "")) {
+                resolve(updatedRecord.status || "completed");
+                return;
+              }
+            }
+          }
+          resolve("completed");
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      toast.promise(pollPromise, {
+        loading: `📞 Calling ${debtor.phone_number}...`,
+        success: (status) => {
+          queryClient.invalidateQueries({ queryKey: ["call-records"] });
+          queryClient.invalidateQueries({ queryKey: ["call-stats-by-phone"] });
+          onMakeCallSettled();
+          
+          const statusMap: Record<string, string> = {
+            confirmed: "✅ Confirmed",
+            declined: "❌ Declined",
+            no_response: "🤐 No Response",
+            no_answer: "📵 No Answer",
+            failed: "⚠️ Call Failed",
+            completed: "✅ Call Completed",
+          };
+          return statusMap[status] ?? `Call ended — ${status}`;
+        },
+        error: () => {
+          onMakeCallSettled();
+          return "⚠️ Call failed unexpectedly";
+        }
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to make call");

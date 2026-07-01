@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { exportCompletedCallsToExcel, parseNotesData } from "./utils";
 import { useCallListQueries } from "./useCallListQueries";
 import { useCallListMutations } from "./useCallListMutations";
 import { useCallSession } from "./useCallSession";
+import { useRealtimeCallList } from "./useRealtimeCallList";
 import { StatsCards } from "./StatsCards";
 import { ActiveSessionBanner } from "./ActiveSessionBanner";
 import { ActionsBar } from "./ActionsBar";
@@ -71,6 +72,8 @@ const CallList = () => {
     }
   });
 
+  const prevCallingCountRef = useRef(0);
+
   useEffect(() => {
     try {
       const savedVersion = Number(localStorage.getItem("autoDialSettingsVersion") ?? "0");
@@ -103,6 +106,15 @@ const CallList = () => {
     activeSession,
     refetchSession,
   } = useCallListQueries({ effectiveUserId, workspaceId });
+
+  // Realtime: invalidate caches AND force immediate refetch the moment the
+  // webhook writes a status update to call_list_items or call_sessions.
+  useRealtimeCallList({
+    workspaceId,
+    effectiveUserId,
+    onCallListChange: refetch,
+    onSessionChange: refetchSession,
+  });
 
   const {
     queuedDebtorIds,
@@ -184,6 +196,14 @@ const CallList = () => {
     callListItems?.filter(
       (item) => item.status === "completed" || item.status === "failed" || item.status === "success",
     ).length || 0;
+
+  // Auto-switch to "calling" tab when a call starts
+  useEffect(() => {
+    if (callingCount > 0 && prevCallingCountRef.current === 0 && activeTab === "pending") {
+      setActiveTab("calling");
+    }
+    prevCallingCountRef.current = callingCount;
+  }, [callingCount, activeTab]);
 
   // Unified Analytics-style Stats (Matching AnalyticsStats.tsx)
   // GLOBAL EXCLUSION: drop "incomplete" rows before any computation (hanged_up IS counted)
@@ -526,12 +546,47 @@ const CallList = () => {
         open={showPreviewDialog}
         onOpenChange={setShowPreviewDialog}
         previewPayload={previewPayload}
-        onMakeCallNow={() => {
+        onMakeCallNow={async () => {
           setShowPreviewDialog(false);
-          if (previewPayload?.item) {
-            makeCall(previewPayload.item);
-            toast.info("Call initiated - check logs for result");
-          }
+          if (!previewPayload?.item) return;
+
+          const item = previewPayload.item;
+
+          // Status → human-readable label
+          const statusLabel: Record<string, string> = {
+            confirmed:   "✅ Confirmed — customer agreed",
+            declined:    "❌ Declined — customer refused",
+            no_response: "🤐 No Response — customer stayed silent",
+            no_answer:   "📵 No Answer — call not picked up",
+            failed:      "⚠️ Call Failed",
+            completed:   "✅ Call Completed",
+          };
+
+          // 1. Start the call promise
+          const callPromise = makeCall(item);
+
+          // Switch tab to 'calling' automatically so the user sees the active call
+          setActiveTab("calling");
+
+          // 2. Immediately call refetch so the row shows 'calling' right away in the UI.
+          // We also do a tiny 800ms fallback refresh to verify the DB state has completed transitioning.
+          refetch();
+          setTimeout(() => refetch(), 800);
+
+          // 3. Keep a "Calling…" spinner toast, resolving to final outcome when finished.
+          toast.promise(
+            callPromise.then((result) => {
+              refetch(); // final update
+              return result;
+            }),
+            {
+              loading: "📞 Calling…",
+              success: (result) =>
+                statusLabel[result.finalStatus] ??
+                `Call ended — ${result.finalStatus}`,
+              error: "⚠️ Call failed unexpectedly",
+            },
+          );
         }}
       />
 
