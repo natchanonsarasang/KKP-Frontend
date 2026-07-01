@@ -49,8 +49,9 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     // the new state immediately.
     refetchInterval: (query) => {
       const data = query.state.data as CallSession | null | undefined;
-      return data && ["running", "stopping"].includes(data.status) ? 10000 : false;
+      return data && ["running", "stopping"].includes(data.status) ? 2000 : false;
     },
+    refetchIntervalInBackground: true,
   });
 
   // Fetch call list items with debtor info (with pagination to bypass 1000 row limit)
@@ -84,13 +85,23 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     },
     enabled: !!effectiveUserId && !!workspaceId,
     staleTime: 0,
-    // Only poll while a call session is actually running — otherwise this would
-    // hit the backend forever just from having the page open. Kept slow (30s)
-    // since this is a coarse "did anything change" check, not live progress.
-    refetchInterval: () => {
+    // Enable fast 2-second polling when a batch session is actively running
+    // OR when any single call list item is in "calling" status. Goes completely
+    // quiet (no background requests) when the app is idle.
+    refetchInterval: (query) => {
+      const items = query.state.data as CallListItem[] | undefined;
+      // Poll if there are any active items (calling, pending, or retry_pending)
+      // since the Go/MongoDB backend doesn't trigger Supabase Realtime WebSockets.
+      const hasActiveItem = items?.some((it) => 
+        ["calling", "pending", "retry_pending"].includes(it.status)
+      );
+
       const session = queryClient.getQueryData<CallSession | null>(["active-call-session", effectiveUserId, workspaceId]);
-      return session && ["running", "stopping"].includes(session.status) ? 30000 : false;
+      const isSessionRunning = session && ["running", "stopping"].includes(session.status);
+
+      return isSessionRunning || hasActiveItem ? 2000 : false;
     },
+    refetchIntervalInBackground: true,
   });
 
   // Fetch all active debtors for bulk queue (with pagination to bypass 1000 row limit)
