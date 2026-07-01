@@ -178,18 +178,27 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
 
   // Fetch call attempts for this workspace and index by call_list_item_id so the
   // queue table can look up conversation_log/audio_url — the Go API stores those
-  // on CallAttempt, not on CallListItem.notes. Keep only the latest attempt per
-  // item (highest attempt_number) in case of retries.
-  const { data: callAttemptsByItemId } = useQuery({
+  // on CallAttempt, not on CallListItem.notes.
+  // Priority rule: an attempt that actually has conversation_log/audio_url always
+  // wins over one that doesn't, regardless of attempt_number. Among attempts that
+  // both have (or both lack) data we keep the one with the highest attempt_number.
+  const { data: callAttemptsByItemId, refetch: refetchAttempts } = useQuery({
     queryKey: ["call-attempts-by-item", workspaceId],
     queryFn: async () => {
       if (!workspaceId) return new Map<string, CallAttempt>();
 
       const attempts = await listCallAttemptsByWorkspace(workspaceId);
+      const hasData = (a: CallAttempt) => !!(a.conversation_log || a.audio_url);
       const map = new Map<string, CallAttempt>();
       for (const attempt of attempts) {
         const existing = map.get(attempt.call_list_item_id);
-        if (!existing || attempt.attempt_number >= existing.attempt_number) {
+        if (!existing) {
+          map.set(attempt.call_list_item_id, attempt);
+        } else if (hasData(attempt) && !hasData(existing)) {
+          map.set(attempt.call_list_item_id, attempt);
+        } else if (!hasData(attempt) && hasData(existing)) {
+          // keep existing — it has real data, incoming doesn't
+        } else if (attempt.attempt_number >= existing.attempt_number) {
           map.set(attempt.call_list_item_id, attempt);
         }
       }
@@ -239,5 +248,6 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     activeSession,
     refetchSession,
     callAttemptsByItemId,
+    refetchAttempts,
   };
 }
