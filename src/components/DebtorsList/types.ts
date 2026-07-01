@@ -21,6 +21,7 @@ export interface Debtor {
   date_con: string | null;
   user_id?: string;
   is_blocked?: boolean;
+  call_outcome?: string | null;
 }
 
 export interface DebtorFormData {
