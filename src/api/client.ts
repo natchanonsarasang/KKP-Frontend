@@ -1,9 +1,9 @@
 import { getToken } from "./authToken";
 
 // Base URL for the Callecto Go API (Fiber + MongoDB), e.g. http://localhost:1818/api/v1
-const BASE_URL = import.meta.env.VITE_CALLECTO_API_URL;
+const BASE_URL = import.meta.env.VITE_CALLECTO_API_URL || "http://localhost:1818/api/v1";
 
-if (!BASE_URL) {
+if (!import.meta.env.VITE_CALLECTO_API_URL) {
   // Surface misconfiguration early rather than firing requests at `undefined/...`.
   console.warn("VITE_CALLECTO_API_URL is not set; Callecto API calls will fail.");
 }

@@ -101,9 +101,9 @@ export function useCallSession({
 
   // Make a single call
   const makeCall = useCallback(
-    async (item: CallListItem): Promise<{ success: boolean; shouldRetry: boolean }> => {
+    async (item: CallListItem): Promise<{ success: boolean; shouldRetry: boolean; finalStatus: string }> => {
       const selectedTemplate = templates?.find((t) => t.id === item.template_id) || templates?.[0];
-      if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false };
+      if (!selectedTemplate?.template_id || !item.debtor) return { success: false, shouldRetry: false, finalStatus: "failed" };
 
       const wsId = workspaceId ?? "";
       try {
@@ -145,7 +145,7 @@ export function useCallSession({
             result_data: { error: (callError as Error)?.message },
           });
           await updateCallListItem(item.id, wsId, { status: "failed" });
-          return { success: false, shouldRetry: true };
+          return { success: false, shouldRetry: true, finalStatus: "failed" };
         }
 
         // The Go make-call endpoint does not return a botnoi id; mark pending.
@@ -163,7 +163,7 @@ export function useCallSession({
         const startTime = Date.now();
 
         while (Date.now() - startTime < maxWaitTime) {
-          if (stopAutoDialRef.current) return { success: false, shouldRetry: false };
+          if (stopAutoDialRef.current) return { success: false, shouldRetry: false, finalStatus: "failed" };
 
           await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
@@ -173,24 +173,25 @@ export function useCallSession({
             const finalStatuses = ["confirmed", "declined", "no_response", "failed", "no_answer", "completed"];
             if (finalStatuses.includes(updatedRecord.status || "")) {
               const shouldRetry = ["failed", "no_answer", "no_response"].includes(updatedRecord.status || "");
+              const finalStatus = updatedRecord.status || "completed";
               // Update call list item with final status
               await updateCallListItem(item.id, wsId, {
-                status: updatedRecord.status,
-                call_outcome: updatedRecord.status,
-                picked_up: ["confirmed", "declined", "no_response", "completed"].includes(updatedRecord.status || ""),
+                status: finalStatus,
+                call_outcome: finalStatus,
+                picked_up: ["confirmed", "declined", "no_response", "completed"].includes(finalStatus),
               });
-              return { success: true, shouldRetry };
+              return { success: true, shouldRetry, finalStatus };
             }
           }
         }
 
-        // Timeout
+        // Timeout — 5 min elapsed with no final webhook status.
         await updateCallListItem(item.id, wsId, { status: "completed" });
-        return { success: true, shouldRetry: false };
+        return { success: true, shouldRetry: false, finalStatus: "completed" };
       } catch (error) {
         console.error("Error making call:", error);
         await updateCallListItem(item.id, wsId, { status: "failed" });
-        return { success: false, shouldRetry: true };
+        return { success: false, shouldRetry: true, finalStatus: "failed" };
       }
     },
     [templates, workspaceId, settings.interruptible],
