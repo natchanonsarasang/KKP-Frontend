@@ -104,6 +104,7 @@ const CallList = () => {
     activeSession,
     refetchSession,
     callAttemptsByItemId,
+    refetchAttempts,
   } = useCallListQueries({ effectiveUserId, workspaceId });
 
   const {
@@ -402,7 +403,7 @@ const CallList = () => {
             <Settings className="w-4 h-4 mr-2" />
             Settings
           </Button>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchAttempts(); }}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
