@@ -105,7 +105,11 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
   });
 
   // Fetch all active debtors for bulk queue (with pagination to bypass 1000 row limit)
-  const { data: allActiveDebtors, isLoading: isLoadingAllActiveDebtors } = useQuery({
+  const {
+    data: allActiveDebtors,
+    isLoading: isLoadingAllActiveDebtors,
+    refetch: refetchAllActiveDebtors,
+  } = useQuery({
     queryKey: ["all-active-debtors", effectiveUserId, workspaceId],
     queryFn: async () => {
       if (!workspaceId) return [] as Debtor[];
@@ -242,6 +246,7 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
     refetch,
     allActiveDebtors,
     isLoadingAllActiveDebtors,
+    refetchAllActiveDebtors,
     phoneStats,
     todayCallCount,
     availableDebtors,

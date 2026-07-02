@@ -4,7 +4,47 @@ import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
 import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
 import { BOTNOI_TEMPLATE_ID } from "./constants";
 import type { CallAttempt } from "@/api/types";
-import type { CallListItem, PreviewPayload, Template } from "./types";
+import type { CallListItem, Debtor, PreviewPayload, Template } from "./types";
+
+// The debtor's debt amount for Smart Queue Min/Max Debt filtering. Reads the
+// `outstanding_amount` variable shown in the Debtor List "Outstanding Amount"
+// column (stripping thousands separators), falling back to legacy Debt vars
+// and finally the `total_debt` field.
+export function getDebtorDebt(d: Debtor): number {
+  const vars = d.variables || {};
+  const raw = vars.outstanding_amount ?? vars.Debt ?? vars.debt;
+  if (raw != null && String(raw).trim() !== "") {
+    const parsed = parseFloat(String(raw).replace(/,/g, ""));
+    if (!isNaN(parsed)) return parsed;
+  }
+  return d.total_debt ?? 0;
+}
+
+// Whether a debtor satisfies the Smart Queue "Status" filter. Most values map
+// straight to the debtor's own `status`, with two derived cases:
+//   - "overdue"   → due date is before today (compared by calendar day)
+//   - "hanged_up" → latest call outcome was a hang-up (the `call_outcome` value
+//                   shown in the Debtor List "Latest Call Status" column)
+export function debtorMatchesStatusFilter(d: Debtor, status: string): boolean {
+  if (status === "overdue") {
+    const dueRaw = d.due_date || d.variables?.due_date_iso;
+    const due = dueRaw ? new Date(dueRaw) : null;
+    if (!due || isNaN(due.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
+  }
+  if (status === "hanged_up") {
+    // Loose match covers "hanged_up"/"hangup" spelling variants.
+    return (d.call_outcome || "").trim().toLowerCase().includes("hang");
+  }
+  if (status === "rejected") {
+    // Same `call_outcome` column as "hanged_up" — match the rejected outcome.
+    return (d.call_outcome || "").trim().toLowerCase().includes("reject");
+  }
+  return d.status === status;
+}
 
 // Trigger a browser download of the conversation log as a plain-text file.
 // No network round-trip needed — the log is already in memory from the call record.
