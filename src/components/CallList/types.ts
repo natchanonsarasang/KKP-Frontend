@@ -13,6 +13,7 @@ export interface Debtor {
   reject_count: number;
   other_count: number;
   last_contact_at: string | null;
+  call_outcome?: string | null;
   variables: Record<string, string> | null;
   user_id?: string;
 }

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createCallListItems, deleteCallListItem } from "@/api/callListItems";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
+import { debtorMatchesStatusFilter, getDebtorDebt } from "./utils";
 import type { CallListItem, Debtor, Template } from "./types";
 import type { PhoneStats } from "./useCallListQueries";
 
@@ -294,11 +295,8 @@ export function useCallListMutations({
       let filteredDebtors = (allActiveDebtors || []).filter((d) => {
         if (queuedDebtorIds.has(d.id)) return false;
 
-        // Get debt from variables.Debt (with capital D) or fall back to total_debt
-        const vars = d.variables || {};
-        const debtValue = parseFloat(vars.Debt || vars.debt || "0") || (d.total_debt ?? 0);
-
         // Apply debt filters
+        const debtValue = getDebtorDebt(d);
         if (conditions.minDebt !== undefined && debtValue < conditions.minDebt) return false;
         if (conditions.maxDebt !== undefined && debtValue > conditions.maxDebt) return false;
 
@@ -317,7 +315,7 @@ export function useCallListMutations({
         if (conditions.maxAccepted !== undefined && accepted > conditions.maxAccepted) return false;
         if (conditions.minRejected !== undefined && rejected < conditions.minRejected) return false;
         if (conditions.maxRejected !== undefined && rejected > conditions.maxRejected) return false;
-        if (conditions.status && d.status !== conditions.status) return false;
+        if (conditions.status && !debtorMatchesStatusFilter(d, conditions.status)) return false;
 
         return true;
       });
