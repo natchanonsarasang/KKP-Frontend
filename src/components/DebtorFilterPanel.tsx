@@ -232,7 +232,8 @@ export function DebtorFilterPanel({
                 <SelectContent>
                   <SelectItem value="all">Any status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="hanged_up">Hang-up</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
                 </SelectContent>
               </Select>

@@ -7,7 +7,7 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
 import { DEFAULT_SETTINGS, statusConfig } from "./constants";
-import { exportCompletedCallsToExcel } from "./utils";
+import { exportCompletedCallsToExcel, debtorMatchesStatusFilter, getDebtorDebt } from "./utils";
 import type { CallAttempt } from "@/api/types";
 import { useCallListQueries } from "./useCallListQueries";
 import { useCallListMutations } from "./useCallListMutations";
@@ -101,6 +101,7 @@ const CallList = () => {
     refetch,
     allActiveDebtors,
     isLoadingAllActiveDebtors,
+    refetchAllActiveDebtors,
     phoneStats,
     todayCallCount,
     availableDebtors,
@@ -366,10 +367,7 @@ const CallList = () => {
       const filteredDebtors = (allActiveDebtors || []).filter((d) => {
         if (queuedDebtorIds.has(d.id)) return false;
 
-        // Get debt from variables.Debt (with capital D) or fall back to total_debt
-        const vars = d.variables || {};
-        const debtValue = parseFloat(vars.Debt || vars.debt || "0") || (d.total_debt ?? 0);
-
+        const debtValue = getDebtorDebt(d);
         if (conditions.minDebt !== undefined && debtValue < conditions.minDebt) return false;
         if (conditions.maxDebt !== undefined && debtValue > conditions.maxDebt) return false;
 
@@ -388,7 +386,7 @@ const CallList = () => {
         if (conditions.maxAccepted !== undefined && accepted > conditions.maxAccepted) return false;
         if (conditions.minRejected !== undefined && rejected < conditions.minRejected) return false;
         if (conditions.maxRejected !== undefined && rejected > conditions.maxRejected) return false;
-        if (conditions.status && d.status !== conditions.status) return false;
+        if (conditions.status && !debtorMatchesStatusFilter(d, conditions.status)) return false;
 
         return true;
       });
@@ -486,7 +484,12 @@ const CallList = () => {
         onStartCalling={startCalling}
         onQueueAll={() => queueAllDebtorsMutation.mutate()}
         onQueueUncalled={() => queueUncalledDebtorsMutation.mutate()}
-        onOpenFilterDialog={() => setShowFilterDialog(true)}
+        onOpenFilterDialog={() => {
+          // Refresh so the Hang-up filter sees the latest call_outcome rather
+          // than stale copies cached before the calls ran.
+          refetchAllActiveDebtors();
+          setShowFilterDialog(true);
+        }}
         onRetryFailed={() => retryFailedMutation.mutate()}
         isQueueAllPending={queueAllDebtorsMutation.isPending}
         isQueueUncalledPending={queueUncalledDebtorsMutation.isPending}
