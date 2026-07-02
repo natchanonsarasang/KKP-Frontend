@@ -183,8 +183,12 @@ const CallReportDashboard = () => {
         start.setFullYear(start.getFullYear() - 1);
         return start.toISOString();
       }
-      case "custom":
-        return customStart ? new Date(customStart).toISOString() : undefined;
+      case "custom": {
+        if (!customStart) return undefined;
+        const [y, m, d] = customStart.split("-").map(Number);
+        const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+        return start.toISOString();
+      }
       default:
         return undefined;
     }
@@ -203,8 +207,10 @@ const CallReportDashboard = () => {
       const dateFilter = getDateFilter();
       if (dateFilter) items = items.filter((i) => i.created_at >= dateFilter);
       if (dateRange === "custom" && customEnd) {
-        const end = new Date(customEnd).toISOString();
-        items = items.filter((i) => i.created_at <= end);
+        const [y, m, d] = customEnd.split("-").map(Number);
+        const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+        const endStr = end.toISOString();
+        items = items.filter((i) => i.created_at <= endStr);
       }
 
       return [...items].sort((a, b) =>
@@ -227,8 +233,10 @@ const CallReportDashboard = () => {
       const dateFilter = getDateFilter();
       if (dateFilter) records = records.filter((r) => r.created_at >= dateFilter);
       if (dateRange === "custom" && customEnd) {
-        const end = new Date(customEnd).toISOString();
-        records = records.filter((r) => r.created_at <= end);
+        const [y, m, d] = customEnd.split("-").map(Number);
+        const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+        const endStr = end.toISOString();
+        records = records.filter((r) => r.created_at <= endStr);
       }
 
       return [...records].sort((a, b) =>

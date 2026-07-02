@@ -516,7 +516,6 @@ serve(async (req) => {
         }).catch(err => console.error(`[AutoCall] Error calling ${debtor.id}:`, err));
         }
     }
-    }
     // ──────────────────────────────────────────────────────────────────────────
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
