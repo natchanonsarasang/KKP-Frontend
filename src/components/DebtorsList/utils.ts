@@ -71,6 +71,95 @@ export interface DebtorFilterArgs {
   sortDirection: "asc" | "desc";
 }
 
+// Helper to normalize day/month/year components to YYYY-MM-DD
+function normalizeDateParts(dayRaw: string, monthRaw: string, yearRaw: string): string | null {
+  const dd = /^\d{1,2}$/.test(dayRaw) ? dayRaw.padStart(2, "0") : null;
+  if (!dd) return null;
+
+  // Normalize Month
+  const thaiMonths: Record<string, string> = {
+    "มกราคม": "01", "กุมภาพันธ์": "02", "มีนาคม": "03", "เมษายน": "04",
+    "พฤษภาคม": "05", "มิถุนายน": "06", "กรกฎาคม": "07", "สิงหาคม": "08",
+    "กันยายน": "09", "ตุลาคม": "10", "พฤศจิกายน": "11", "ธันวาคม": "12",
+    "ม.ค.": "01", "ก.พ.": "02", "มี.ค.": "03", "เม.ย.": "04", "พ.ค.": "05", "มิ.ย.": "06",
+    "ก.ค.": "07", "ส.ค.": "08", "ก.ย.": "09", "ต.ค.": "10", "พ.ย.": "11", "ธ.ค.": "12"
+  };
+  const engMonths: Record<string, string> = {
+    january: "01", february: "02", march: "03", april: "04", may: "05",
+    june: "06", july: "07", august: "08", september: "09", october: "10",
+    november: "11", december: "12",
+    jan: "01", feb: "02", mar: "03", apr: "04", jun: "06", jul: "07",
+    aug: "08", sep: "09", sept: "09", oct: "10", nov: "11", dec: "12",
+  };
+  
+  let mm = "";
+  if (/^\d{1,2}$/.test(monthRaw)) {
+    mm = monthRaw.padStart(2, "0");
+  } else if (thaiMonths[monthRaw]) {
+    mm = thaiMonths[monthRaw];
+  } else {
+    mm = engMonths[monthRaw.toLowerCase()] || "";
+  }
+  if (!mm) return null;
+
+  // Normalize Year
+  let y = parseInt(yearRaw, 10);
+  if (isNaN(y)) return null;
+  if (y > 2400) {
+    y -= 543; // Convert Buddhist year to Gregorian
+  }
+  const yyyy = String(y).padStart(4, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Helper to parse debtor due date to YYYY-MM-DD
+export function parseDebtorDueDate(d: Debtor): string | null {
+  if (d.due_date) {
+    const match = d.due_date.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  const v = d.variables || {};
+
+  if (v.due_date_iso) {
+    const match = v.due_date_iso.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  const dayRaw = String(v.due_date || "").trim();
+  const monthRaw = String(v.due_month || "").trim();
+  const yearRaw = String(v.due_year || "").trim();
+
+  if (dayRaw && monthRaw && yearRaw) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dayRaw)) return dayRaw;
+    return normalizeDateParts(dayRaw, monthRaw, yearRaw);
+  }
+
+  return null;
+}
+
+// Helper to parse debtor paid date to YYYY-MM-DD
+export function parseDebtorPaidDate(d: Debtor): string | null {
+  const v = d.variables || {};
+
+  if (v.paid_date_iso) {
+    const match = v.paid_date_iso.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  const dayRaw = String(v.paid_date || "").trim();
+  const monthRaw = String(v.paid_month || "").trim();
+  const yearRaw = String(v.paid_year || "").trim();
+
+  if (dayRaw && monthRaw && yearRaw) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dayRaw)) return dayRaw;
+    return normalizeDateParts(dayRaw, monthRaw, yearRaw);
+  }
+
+  return null;
+}
+
 // The Go API returns all debtors for a workspace; filtering/sorting/pagination
 // that used to run in SQL now runs client-side here (and is reused by export).
 export function applyDebtorFilters(all: Debtor[], args: DebtorFilterArgs): Debtor[] {
@@ -90,18 +179,30 @@ export function applyDebtorFilters(all: Debtor[], args: DebtorFilterArgs): Debto
 
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
-    rows = rows.filter(
-      (d) => (d.phone_number || "").toLowerCase().includes(q) || (d.name || "").toLowerCase().includes(q),
-    );
+    rows = rows.filter((d) => {
+      const dbName = (d.name || "").toLowerCase();
+      const dbLastName = (d.last_name || "").toLowerCase();
+      const varName = (d.variables?.name || "").toLowerCase();
+      const phone = (d.phone_number || "").toLowerCase();
+      return dbName.includes(q) || dbLastName.includes(q) || varName.includes(q) || phone.includes(q);
+    });
   }
 
   if (dateRange?.from) {
-    const fromStr = format(startOfDay(dateRange.from), "yyyy-MM-dd");
-    rows = rows.filter((d) => d.date_con && d.date_con >= fromStr);
-  }
-  if (dateRange?.to || dateRange?.from) {
-    const toStr = format(endOfDay(dateRange.to ?? dateRange.from!), "yyyy-MM-dd");
-    rows = rows.filter((d) => d.date_con && d.date_con <= toStr);
+    const fromStr = format(dateRange.from, "yyyy-MM-dd");
+    const toStr = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : fromStr;
+    const isSingleDay = fromStr === toStr;
+
+    rows = rows.filter((d) => {
+      const dueDate = parseDebtorDueDate(d);
+      const paidDate = parseDebtorPaidDate(d);
+
+      if (isSingleDay) {
+        return dueDate === fromStr;
+      } else {
+        return dueDate === fromStr && paidDate === toStr;
+      }
+    });
   }
 
   const dir = sortDirection === "asc" ? 1 : -1;

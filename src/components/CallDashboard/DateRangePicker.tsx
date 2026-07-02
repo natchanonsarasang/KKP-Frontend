@@ -46,8 +46,8 @@ export function DateRangePicker({ dateRange, customRange, onPresetChange, onCust
             initialFocus
             mode="range"
             defaultMonth={customRange?.from || new Date()}
-            selected={customRange}
-            onSelect={onCustomRangeChange}
+            selected={customRange ?? undefined}
+            onSelect={(range) => onCustomRangeChange(range)}
             numberOfMonths={2}
             locale={th}
           />
