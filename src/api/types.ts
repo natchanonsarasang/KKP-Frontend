@@ -56,6 +56,11 @@ export interface CallListItem {
   next_retry_at: string | null;
   retry_count: number;
   notes: string;
+  // Debtor snapshot captured at creation (backend), so completed history stays
+  // readable after the debtor is deleted. Used as a fallback in the debtor join.
+  debtor_phone?: string;
+  debtor_name?: string;
+  debtor_amount?: number;
   created_at: string;
   updated_at: string;
 }

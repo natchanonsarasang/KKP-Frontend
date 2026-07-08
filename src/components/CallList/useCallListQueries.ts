@@ -78,10 +78,24 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
       const allDebtors = (await listDebtorsByWorkspace(workspaceId)) as unknown as Debtor[];
       const debtorMap = new Map(allDebtors.map((d) => [d.id, d]));
 
-      return allItems.map((item) => ({
-        ...item,
-        debtor: debtorMap.get(item.debtor_id),
-      })) as CallListItem[];
+      return allItems.map((item) => {
+        const liveDebtor = debtorMap.get(item.debtor_id);
+        // Fall back to the snapshot captured on the item so completed rows stay
+        // readable after the debtor was deleted (pending items are deleted with
+        // the debtor, so this only surfaces on already-called history).
+        const debtor =
+          liveDebtor ??
+          (item.debtor_phone || item.debtor_name || item.debtor_amount != null
+            ? ({
+                id: item.debtor_id,
+                phone_number: item.debtor_phone ?? "",
+                name: item.debtor_name ?? "",
+                total_debt: item.debtor_amount ?? 0,
+                variables: null,
+              } as unknown as Debtor)
+            : undefined);
+        return { ...item, debtor };
+      }) as CallListItem[];
     },
     enabled: !!effectiveUserId && !!workspaceId,
     staleTime: 0,
