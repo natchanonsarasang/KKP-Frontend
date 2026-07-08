@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createDebtor, deleteDebtor, listDebtorsByWorkspace, updateDebtor } from "@/api/debtors";
-import { createCallListItem } from "@/api/callListItems";
+import { createCallListItem, deleteCallListItem, listCallListItemsByWorkspace } from "@/api/callListItems";
 import { createCallRecord } from "@/api/callRecords";
 import { makeCall } from "@/api/voicebot";
 import { parseDebtAmountForColumn, toApiDate } from "@/lib/debtorVariables";
@@ -104,10 +104,19 @@ export function useDebtorsMutations({
 
   const deleteDebtorMutation = useMutation({
     mutationFn: async (id: string) => {
-      await deleteDebtor(id, workspaceId ?? "");
+      const ws = workspaceId ?? "";
+      // Delete only this debtor's PENDING call-list items; completed items are kept
+      // as history (they carry a debtor snapshot, so they stay readable after delete).
+      const items = await listCallListItemsByWorkspace(ws);
+      const pendingForDebtor = items.filter(
+        (it) => it.debtor_id === id && (it.status === "pending" || it.status === "retry_pending"),
+      );
+      await Promise.all(pendingForDebtor.map((it) => deleteCallListItem(it.id, ws)));
+      await deleteDebtor(id, ws);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
+      queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       toast.success("Debtor removed");
     },
     onError: () => {
@@ -123,11 +132,22 @@ export function useDebtorsMutations({
       // No bulk-delete endpoint; remove this user's debtors one at a time.
       const all = await listDebtorsByWorkspace(workspaceId);
       const mine = all.filter((d) => d.user_id === effectiveUserId);
+      const mineIds = new Set(mine.map((d) => d.id));
+
+      // Delete PENDING call-list items for those debtors; keep completed history
+      // (it carries a debtor snapshot, so it stays readable after delete).
+      const items = await listCallListItemsByWorkspace(workspaceId);
+      const pendingForMine = items.filter(
+        (it) => mineIds.has(it.debtor_id) && (it.status === "pending" || it.status === "retry_pending"),
+      );
+      await Promise.all(pendingForMine.map((it) => deleteCallListItem(it.id, workspaceId)));
+
       await Promise.all(mine.map((d) => deleteDebtor(d.id, workspaceId)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["debtors"] });
       queryClient.invalidateQueries({ queryKey: ["debtors-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       queryClient.invalidateQueries({ queryKey: ["workspace-schema"] });
       toast.success("All debtors cleared");
       onClearAllSuccess();
