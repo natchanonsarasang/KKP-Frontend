@@ -7,6 +7,7 @@ export interface MakeCallRequest {
   next_intent?: string;
   outbound_id?: string;
   event_id?: string;
+  bot_type?: string;
 }
 
 // POST /api/v1/voicebot/make-call -> { message }
