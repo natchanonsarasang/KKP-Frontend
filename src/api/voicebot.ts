@@ -11,6 +11,7 @@ export interface MakeCallRequest {
 
 // POST /api/v1/voicebot/make-call -> { message }
 export async function makeCall(body: MakeCallRequest): Promise<void> {
+  console.log("[makeCall] → POST /voicebot/make-call", JSON.stringify(body, null, 2));
   await api.post("/voicebot/make-call", body);
 }
 
