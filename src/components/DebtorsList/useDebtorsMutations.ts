@@ -216,7 +216,7 @@ export function useDebtorsMutations({
         loading: `📞 Calling ${debtor.phone_number}...`,
         success: (status) => {
           queryClient.invalidateQueries({ queryKey: ["call-records"] });
-          queryClient.invalidateQueries({ queryKey: ["call-stats-by-phone"] });
+          queryClient.invalidateQueries({ queryKey: ["call-stats-by-debtor"] });
           onMakeCallSettled();
           
           const statusMap: Record<string, string> = {

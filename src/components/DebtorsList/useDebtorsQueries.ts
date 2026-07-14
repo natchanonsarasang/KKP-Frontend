@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
 import { listDebtorsByWorkspace } from "@/api/debtors";
 import { listCallListItemsByWorkspace } from "@/api/callListItems";
+import { listCallAttemptsByWorkspace } from "@/api/callAttempts";
 import { listCallRecords } from "@/api/callRecords";
 import { resolveLatestStatusLabel, resolveMainStatus, resolveSubStatus } from "@/lib/callStatuses";
 import { PAGE_SIZE } from "./constants";
@@ -132,18 +133,41 @@ export function useDebtorsQueries({
   const totalCount = debtorsData?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Fetch call stats from raw call_records (like a CDP)
+  // Fetch call stats from raw call_records, keyed by DEBTOR ID (not phone number).
+  // Phone numbers aren't unique per debtor — two debtors can share one — so keying
+  // by phone made a newly-created debtor inherit another debtor's call history.
+  // call_records has no debtor_id, so we resolve record -> debtor via call_list_items
+  // (has both debtor_id and call_record_id) and call_attempts (covers retry records).
   const { data: callStats } = useQuery({
-    queryKey: ["call-stats-by-phone"],
+    queryKey: ["call-stats-by-debtor", effectiveUserId, workspaceId],
     queryFn: async () => {
-      const data = await listCallRecords({});
-
-      // Calculate stats per phone number from raw data
       const stats: Record<string, PhoneCallStats> = {};
+      if (!workspaceId) return stats;
 
-      data.forEach((record) => {
-        if (!stats[record.phone_number]) {
-          stats[record.phone_number] = {
+      const [records, listItems, attempts] = await Promise.all([
+        listCallRecords({}),
+        listCallListItemsByWorkspace(workspaceId),
+        listCallAttemptsByWorkspace(workspaceId),
+      ]);
+
+      // Map each call_record_id to the debtor it belongs to.
+      const itemToDebtor = new Map(listItems.map((it) => [it.id, it.debtor_id]));
+      const recordToDebtor = new Map<string, string>();
+      listItems.forEach((it) => {
+        if (it.call_record_id) recordToDebtor.set(it.call_record_id, it.debtor_id);
+      });
+      // Attempts carry each retry's own record id; resolve via its list item.
+      attempts.forEach((att) => {
+        const debtorId = itemToDebtor.get(att.call_list_item_id);
+        if (att.call_record_id && debtorId) recordToDebtor.set(att.call_record_id, debtorId);
+      });
+
+      records.forEach((record) => {
+        const debtorId = recordToDebtor.get(record.id);
+        if (!debtorId) return; // record not linked to a debtor in this workspace
+
+        if (!stats[debtorId]) {
+          stats[debtorId] = {
             total: 0,
             confirmed: 0,
             declined: 0,
@@ -152,22 +176,22 @@ export function useDebtorsQueries({
             not_picked_up: 0,
           };
         }
-        stats[record.phone_number].total++;
+        stats[debtorId].total++;
 
         // Count by status from call_records
         if (record.status === "confirmed") {
-          stats[record.phone_number].confirmed++;
-          stats[record.phone_number].picked_up++;
+          stats[debtorId].confirmed++;
+          stats[debtorId].picked_up++;
         } else if (record.status === "declined") {
-          stats[record.phone_number].declined++;
-          stats[record.phone_number].picked_up++;
+          stats[debtorId].declined++;
+          stats[debtorId].picked_up++;
         } else if (record.status === "no_response") {
-          stats[record.phone_number].no_response++;
-          stats[record.phone_number].picked_up++;
+          stats[debtorId].no_response++;
+          stats[debtorId].picked_up++;
         } else if (record.status === "completed") {
-          stats[record.phone_number].picked_up++;
+          stats[debtorId].picked_up++;
         } else if (record.status === "no_answer" || record.status === "failed") {
-          stats[record.phone_number].not_picked_up++;
+          stats[debtorId].not_picked_up++;
         }
       });
       return stats;
