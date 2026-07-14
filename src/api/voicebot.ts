@@ -12,6 +12,13 @@ export interface MakeCallRequest {
 // POST /api/v1/voicebot/make-call -> { message }
 export async function makeCall(body: MakeCallRequest): Promise<void> {
   console.log("[makeCall] → POST /voicebot/make-call", JSON.stringify(body, null, 2));
+  // Fire-and-forget copy to the Vercel serverless function so the payload also
+  // shows up in the Vercel dashboard logs (client console.log never reaches Vercel).
+  void fetch("/api/log-call", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
   await api.post("/voicebot/make-call", body);
 }
 
