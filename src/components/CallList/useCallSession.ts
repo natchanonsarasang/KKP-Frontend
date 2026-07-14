@@ -138,6 +138,7 @@ export function useCallSession({
             phone_number: debtor.phone_number,
             variables: debtorVars,
             interruptible: !!settings.interruptible,
+            bot_type: "in_init_conversation",
           });
         } catch (callError) {
           await updateCallRecord(callRecordId, {
