@@ -299,7 +299,7 @@ export function DebtorsTable({
                   {[...debtors]
                     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
                     .map((debtor, index) => {
-                      const phoneStats = callStats?.[debtor.phone_number];
+                      const phoneStats = callStats?.[debtor.id];
                       const isSelected = selectedDebtors.has(debtor.id);
                       const rowNumber = index + 1;
 
