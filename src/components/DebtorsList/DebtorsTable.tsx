@@ -234,8 +234,8 @@ export function DebtorsTable({
                       </div>
                     </TableHead>
                     */}
-                    <TableHead className="text-xs whitespace-nowrap">Policy Number</TableHead>
-                    <TableHead className="text-xs whitespace-nowrap">Outstanding Amount</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Car Detail</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Total Debt</TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Overdue Installment</TableHead>
                     {variableColumns.map((varKey) => (
                       <TableHead
@@ -339,12 +339,12 @@ export function DebtorsTable({
                             </span>
                           </TableCell>
                           */}
-                          <TableCell className="text-sm">{formatVariableValue("policy_no", debtor.variables?.policy_no)}</TableCell>
+                          <TableCell className="text-sm">{formatVariableValue("car_detail", debtor.variables?.car_detail)}</TableCell>
                           <TableCell className="text-sm">
-                            {formatVariableValue("outstanding_amount", debtor.variables?.outstanding_amount)}
+                            {formatVariableValue("total_debt", debtor.variables?.total_debt)}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {formatVariableValue("overdue_installments", debtor.variables?.overdue_installments)}
+                            {formatVariableValue("overdue_installment", debtor.variables?.overdue_installment)}
                           </TableCell>
 
                           {variableColumns.map((varKey) => {

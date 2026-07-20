@@ -14,13 +14,7 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  DEBTOR_CUSTOMER_VARIABLE_KEYS,
-  parseDebtAmountForColumn,
-  parseDueDateForColumn,
-  constructIsoDateFromThaiParts,
-  toApiDate,
-} from "@/lib/debtorVariables";
+import { DEBTOR_CUSTOMER_VARIABLE_KEYS, parseDebtAmountForColumn } from "@/lib/debtorVariables";
 
 interface DebtorRow {
   phone_number: string;
@@ -80,25 +74,17 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
       switch (h) {
         case "phone_number":
           return "0891234567";
-        case "policy_no":
-          return "J12345";
         case "name":
           return "สมหญิง";
-        case "due_date":
-          return 10;
-        case "due_month":
-          return "เมษายน";
-        case "due_year":
-          return 2569;
-        case "outstanding_amount":
+        case "car_detail":
+          return "Toyota Vios / กข 1234";
+        case "total_debt":
           return 4000;
-        case "paid_date":
-          return 30;
-        case "paid_month":
-          return "เมษายน";
-        case "paid_year":
-          return 2569;
-        case "overdue_installments":
+        case "total_interest":
+          return 200;
+        case "total_fine":
+          return 100;
+        case "overdue_installment":
           return 2;
         default:
           return "ตัวอย่าง";
@@ -237,33 +223,15 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
         // The Go API creates debtors one at a time (POST /debtors); send the batch
         // concurrently. The owner (user_id) is bound server-side from the JWT.
         await Promise.all(
-          batch.map((row) => {
-            let dueDate = parseDueDateForColumn(row.variables.due_date);
-
-            // If the date column only had a day number (like "10"),
-            // try to construct a full ISO date from day, month, and year parts if they exist.
-            if (!dueDate && row.variables.due_date && row.variables.due_month && row.variables.due_year) {
-              dueDate = constructIsoDateFromThaiParts(
-                row.variables.due_date,
-                row.variables.due_month,
-                row.variables.due_year,
-              );
-            }
-
-            const variables = {
-              ...row.variables,
-              ...(dueDate ? { due_date_iso: dueDate } : {}),
-            };
-
-            return createDebtor({
+          batch.map((row) =>
+            createDebtor({
               phone_number: row.phone_number,
-              variables,
+              variables: row.variables,
               workspace_id: currentWorkspace.id,
               status: "active",
               total_debt: parseDebtAmountForColumn(row.variables.total_debt ?? ""),
-              ...(dueDate ? { due_date: toApiDate(dueDate) } : {}),
-            });
-          }),
+            }),
+          ),
         );
 
         uploaded += batch.length;
@@ -297,8 +265,8 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
           </DialogTitle>
           <DialogDescription>
             Upload an Excel file (.xlsx). First column = phone number. Remaining columns should match bot variables such
-            as <code className="text-xs">policy_no</code>, <code className="text-xs">name</code>,{" "}
-            <code className="text-xs">outstanding_amount</code>, etc.
+            as <code className="text-xs">name</code>, <code className="text-xs">car_detail</code>,{" "}
+            <code className="text-xs">total_debt</code>, etc.
           </DialogDescription>
         </DialogHeader>
 

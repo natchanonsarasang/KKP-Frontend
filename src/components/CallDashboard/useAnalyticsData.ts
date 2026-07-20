@@ -110,12 +110,13 @@ export function useAnalyticsData({
       const vars = debtor?.variables || {};
       const debtorName = vars.name || (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
       const amountVal =
+        vars.total_debt ||
         vars.amount ||
         vars.outstanding_amount ||
         (debtor?.total_debt != null ? String(debtor.total_debt) : "") ||
         record.amount ||
         "";
-      const dueDateVal = vars.due_date || debtor?.due_date || record.due_date || "";
+      const dueDateVal = vars.due_date_iso || debtor?.due_date || record.due_date || "";
       return {
         ...record,
         debtor_name: debtorName,

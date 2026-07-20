@@ -34,7 +34,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
     status: "active",
     notes: "",
     due_date: "",
-    paid_date: "",
   });
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>(() => emptyDebtorCustomerVariables());
   const [sortField, setSortField] = useState<string>("created_at");
@@ -88,7 +87,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       status: "active",
       notes: "",
       due_date: "",
-      paid_date: "",
     });
     setTemplateVariables(emptyDebtorCustomerVariables());
   };
@@ -149,11 +147,9 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       status: debtor.status,
       notes: debtor.notes || "",
       due_date: debtor.due_date ? debtor.due_date.slice(0, 10) : "",
-      paid_date: debtor.variables?.paid_date_iso || "",
     });
     const next = emptyDebtorCustomerVariables();
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-      if (["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(k)) continue;
       const v = debtorVars[k];
       next[k] = v != null && v !== undefined ? String(v) : "";
     }
@@ -170,20 +166,12 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       toast.error("Due date is required");
       return;
     }
-    if (!templateVariables.policy_no?.trim()) {
-      toast.error("Policy number is required");
-      return;
-    }
     if (!templateVariables.name?.trim()) {
       toast.error("Name is required");
       return;
     }
-    if (!templateVariables.outstanding_amount?.trim()) {
-      toast.error("Outstanding amount is required");
-      return;
-    }
-    if (!templateVariables.overdue_installments?.toString().trim()) {
-      toast.error("Overdue Installments is required");
+    if (!templateVariables.total_debt?.toString().trim()) {
+      toast.error("Total debt is required");
       return;
     }
 

@@ -20,7 +20,7 @@ export const STATUS_TONE_CLASS: Record<CallStatusTone, string> = {
 
 // Pinned keys are rendered as dedicated fixed columns and excluded from the
 // dynamic variable-column list. Hidden keys are internal/legacy and never shown.
-export const PINNED_VARIABLE_KEYS = ["name", "policy_no", "outstanding_amount", "overdue_installments"] as const;
-export const HIDDEN_VARIABLE_KEYS = ["due_date_iso", "paid_date_iso", "policy_number", "price"] as const;
+export const PINNED_VARIABLE_KEYS = ["name", "car_detail", "total_debt", "overdue_installment"] as const;
+export const HIDDEN_VARIABLE_KEYS = ["due_date_iso", "paid_date_iso", "policy_no", "policy_number", "outstanding_amount", "price"] as const;
 
 export const PAGE_SIZE = 50;
