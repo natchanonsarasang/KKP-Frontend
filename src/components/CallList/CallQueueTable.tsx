@@ -227,7 +227,7 @@ export function CallQueueTable({
                       <TableCell className="text-sm">
                         {(() => {
                           const vars = debtor?.variables || {};
-                          const raw = vars.amount || vars.outstanding_amount;
+                          const raw = vars.total_debt || vars.amount || vars.outstanding_amount;
                           const amount = raw != null && raw !== ""
                             ? Number(String(raw).replace(/,/g, ""))
                             : debtor?.total_debt;

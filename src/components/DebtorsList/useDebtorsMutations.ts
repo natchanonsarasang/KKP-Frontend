@@ -43,7 +43,7 @@ export function useDebtorsMutations({
       if (!targetUserId) throw new Error("Not authenticated");
       if (!workspaceId) throw new Error("No workspace selected");
 
-      const variablesData = buildVariablesToSave(data.variables, null, data.formData.due_date, data.formData.paid_date);
+      const variablesData = buildVariablesToSave(data.variables, null, data.formData.due_date);
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
       await createDebtor({
@@ -80,7 +80,7 @@ export function useDebtorsMutations({
       data: { formData: DebtorFormData; variables: Record<string, string> };
       existingVariables: Record<string, unknown> | null | undefined;
     }) => {
-      const variablesData = buildVariablesToSave(data.variables, existingVariables, data.formData.due_date, data.formData.paid_date);
+      const variablesData = buildVariablesToSave(data.variables, existingVariables, data.formData.due_date);
       const totalDebt = parseDebtAmountForColumn(variablesData.total_debt);
 
       await updateDebtor(id, workspaceId ?? "", {

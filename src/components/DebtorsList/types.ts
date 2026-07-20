@@ -29,7 +29,6 @@ export interface DebtorFormData {
   status: string;
   notes: string;
   due_date: string;
-  paid_date: string;
 }
 
 export interface DebtorsListProps {

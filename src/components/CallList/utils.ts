@@ -7,12 +7,12 @@ import type { CallAttempt } from "@/api/types";
 import type { CallListItem, Debtor, PreviewPayload, Template } from "./types";
 
 // The debtor's debt amount for Smart Queue Min/Max Debt filtering. Reads the
-// `outstanding_amount` variable shown in the Debtor List "Outstanding Amount"
-// column (stripping thousands separators), falling back to legacy Debt vars
-// and finally the `total_debt` field.
+// `total_debt` variable shown in the Debtor List "Total Debt" column (stripping
+// thousands separators), falling back to legacy amount vars and finally the
+// `total_debt` field.
 export function getDebtorDebt(d: Debtor): number {
   const vars = d.variables || {};
-  const raw = vars.outstanding_amount ?? vars.Debt ?? vars.debt;
+  const raw = vars.total_debt ?? vars.outstanding_amount ?? vars.Debt ?? vars.debt;
   if (raw != null && String(raw).trim() !== "") {
     const parsed = parseFloat(String(raw).replace(/,/g, ""));
     if (!isNaN(parsed)) return parsed;
@@ -202,7 +202,7 @@ export function exportCompletedCallsToExcel(
   const exportData = completedItems.map((item) => {
     const debtor = item.debtor;
     const vars = (debtor?.variables || {}) as Record<string, string>;
-    const rawAmount = vars.amount || vars.outstanding_amount;
+    const rawAmount = vars.total_debt || vars.amount || vars.outstanding_amount;
     const amount = rawAmount != null && rawAmount !== ""
       ? Number(String(rawAmount).replace(/,/g, ""))
       : debtor?.total_debt;

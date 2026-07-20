@@ -6,40 +6,21 @@ import { listDebtorsByWorkspace } from "@/api/debtors";
 import { listCallRecords } from "@/api/callRecords";
 import { isLicensePlateField, maskLicensePlate } from "@/lib/formatPhone";
 import { resolveLatestStatusLabel } from "@/lib/callStatuses";
-import { DEBTOR_CUSTOMER_VARIABLE_KEYS, formatThaiBuddhistDateShort, splitThaiDate } from "@/lib/debtorVariables";
+import { DEBTOR_CUSTOMER_VARIABLE_KEYS, formatThaiBuddhistDateShort } from "@/lib/debtorVariables";
 import type { Debtor } from "./types";
 
 export function buildVariablesToSave(
   tv: Record<string, string>,
   preserveTemplateFrom?: Record<string, unknown> | null,
   dueDateIso?: string,
-  paidDateIso?: string,
 ): Record<string, string> {
   const out: Record<string, string> = {};
 
-  const dueParts = splitThaiDate(dueDateIso);
-  const paidParts = splitThaiDate(paidDateIso);
-
   for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-    if (k === "due_date") {
-      out[k] = dueParts.day;
-    } else if (k === "due_month") {
-      out[k] = dueParts.month;
-    } else if (k === "due_year") {
-      out[k] = dueParts.year;
-    } else if (k === "paid_date") {
-      out[k] = paidParts.day;
-    } else if (k === "paid_month") {
-      out[k] = paidParts.month;
-    } else if (k === "paid_year") {
-      out[k] = paidParts.year;
-    } else {
-      out[k] = tv[k] ?? "";
-    }
+    out[k] = tv[k] ?? "";
   }
-  // Store ISO versions to restore date pickers when editing
+  // Store ISO version to restore the date picker when editing
   if (dueDateIso) out.due_date_iso = dueDateIso;
-  if (paidDateIso) out.paid_date_iso = paidDateIso;
 
   const mt = preserveTemplateFrom?.message_template;
   if (typeof mt === "string" && mt.length > 0) {
@@ -273,17 +254,19 @@ export async function exportDebtorsToExcel(
     const v = (d.variables ?? {}) as Record<string, string>;
     const rawStatus = latestStatusByDebtor?.get(d.id) ?? null;
     const statusLabel = rawStatus ? resolveLatestStatusLabel(rawStatus) : "-";
-    const dueParts = [v.due_date, v.due_month, v.due_year].filter((p) => p && String(p).trim());
+    const dueDate = parseDebtorDueDate(d);
     const s = exportStats[d.phone_number];
     return {
       Contact: d.phone_number || "-",
       Name: v.name || "-",
       "Latest Call Status": statusLabel || "-",
       "Callback Date": d.date_con ? formatThaiBuddhistDateShort(d.date_con) : "-",
-      "Policy Number": v.policy_no || "-",
-      "Outstanding Amount": v.outstanding_amount || "-",
-      "Overdue Installments": v.overdue_installments || "-",
-      "Due Date": dueParts.length > 0 ? dueParts.join(" ") : "-",
+      "Car Detail": v.car_detail || "-",
+      "Total Debt": v.total_debt || "-",
+      "Total Interest": v.total_interest || "-",
+      "Total Fine": v.total_fine || "-",
+      "Overdue Installments": v.overdue_installment || "-",
+      "Due Date": dueDate ? formatThaiBuddhistDateShort(dueDate) : "-",
       Picked: s?.picked_up ?? 0,
       "No Pick": s?.not_picked_up ?? 0,
       Calls: s?.total ?? 0,

@@ -42,7 +42,7 @@ export function formatDueDate(
     if (mm) return `${dd}/${mm}/${yearRaw}`;
   }
 
-  const iso = fallback || debtor?.due_date || "";
+  const iso = vars.due_date_iso || fallback || debtor?.due_date || "";
   if (iso && /^\d{4}-\d{2}-\d{2}/.test(iso)) {
     const [y, m, d] = iso.slice(0, 10).split("-");
     const buddhistYear = String(parseInt(y, 10) + 543);

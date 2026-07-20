@@ -55,10 +55,10 @@ export function DebtorFormDialog({
             <div>
               <Label className="text-sm">Customer data</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Variables sent to bot: <code className="text-xs bg-muted px-1 rounded">{"{policy_no}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{name}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{outstanding_amount}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{due_date}"}</code>, etc.
+                Variables sent to bot: <code className="text-xs bg-muted px-1 rounded">{"{name}"}</code>,{" "}
+                <code className="text-xs bg-muted px-1 rounded">{"{car_detail}"}</code>,{" "}
+                <code className="text-xs bg-muted px-1 rounded">{"{total_debt}"}</code>,{" "}
+                <code className="text-xs bg-muted px-1 rounded">{"{overdue_installment}"}</code>, etc.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -72,19 +72,9 @@ export function DebtorFormDialog({
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm">Paid Date</Label>
-                <Input
-                  type="date"
-                  value={formData.paid_date || ""}
-                  onChange={(e) => onFormDataChange((p) => ({ ...p, paid_date: e.target.value }))}
-                />
-              </div>
-
-              {DEBTOR_CUSTOMER_VARIABLE_KEYS.filter(
-                (key) => !["due_date", "due_month", "due_year", "paid_date", "paid_month", "paid_year"].includes(key),
-              ).map((key) => {
-                const isRequired = ["policy_no", "name", "outstanding_amount", "overdue_installments"].includes(key);
+              {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
+                const isRequired = ["name", "total_debt"].includes(key);
+                const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);
                 return (
                   <div key={key} className="space-y-1.5">
                     <Label className="text-sm">
@@ -92,9 +82,9 @@ export function DebtorFormDialog({
                       {isRequired && <span className="text-destructive ml-0.5">*</span>}
                     </Label>
                     <Input
-                      type={key === "overdue_installments" ? "number" : "text"}
-                      min={key === "overdue_installments" ? 0 : undefined}
-                      step={key === "overdue_installments" ? 1 : undefined}
+                      type={isNumeric ? "number" : "text"}
+                      min={isNumeric ? 0 : undefined}
+                      step={key === "overdue_installment" ? 1 : undefined}
                       required={isRequired}
                       value={templateVariables[key] ?? ""}
                       onChange={(e) =>
