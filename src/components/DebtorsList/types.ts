@@ -14,9 +14,6 @@ export interface Debtor {
   created_at: string;
   picked_up_count: number;
   not_picked_up_count: number;
-  accept_count: number;
-  reject_count: number;
-  other_count: number;
   variables: Record<string, string> | null;
   date_con: string | null;
   user_id?: string;

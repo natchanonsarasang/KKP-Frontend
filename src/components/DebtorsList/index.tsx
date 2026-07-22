@@ -162,12 +162,8 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       toast.error("Phone number is required");
       return;
     }
-    if (!formData.due_date?.trim()) {
-      toast.error("Due date is required");
-      return;
-    }
     if (!templateVariables.name?.trim()) {
-      toast.error("Name is required");
+      toast.error("Customer name is required");
       return;
     }
     if (!templateVariables.total_debt?.toString().trim()) {
@@ -250,6 +246,7 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
           dateRange,
           sortField,
           sortDirection,
+          callStats,
         },
         latestStatusByDebtor,
       );

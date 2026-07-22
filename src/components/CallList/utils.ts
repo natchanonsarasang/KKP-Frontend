@@ -1,7 +1,6 @@
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
-import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
 import { BOTNOI_TEMPLATE_ID } from "./constants";
 import type { CallAttempt } from "@/api/types";
 import type { CallListItem, Debtor, PreviewPayload, Template } from "./types";
@@ -207,14 +206,6 @@ export function exportCompletedCallsToExcel(
       ? Number(String(rawAmount).replace(/,/g, ""))
       : debtor?.total_debt;
 
-    // AI Status label (matches table badge)
-    const cat = item.ai_category;
-    let aiStatus = "-";
-    if (cat) {
-      const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
-      aiStatus = def ? def.label : resolveLatestStatusLabel(cat);
-    }
-
     const attempt = callAttemptsByItemId?.get(item.id);
     const audioUrl = attempt?.audio_url || null;
     const conversationLog = attempt?.conversation_log || null;
@@ -224,10 +215,8 @@ export function exportCompletedCallsToExcel(
       ชื่อ: vars.name || debtor?.name || "-",
       ยอด: amount && Number.isFinite(amount) ? amount : "-",
       วันครบกำหนด: formatDueDate(vars, debtor?.due_date),
-      รับสาย: item.picked_up === true ? "Yes" : item.picked_up === false ? "No" : "-",
       ผลการโทร: item.call_outcome || "-",
       สถานะ: item.status,
-      "Call Status": aiStatus,
       เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
       conversationlog: conversationLog || "-",
       audio_url: audioUrl || "-",

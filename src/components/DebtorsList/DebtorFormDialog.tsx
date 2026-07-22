@@ -62,16 +62,6 @@ export function DebtorFormDialog({
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">Due Date *</Label>
-                <Input
-                  type="date"
-                  required
-                  value={formData.due_date || ""}
-                  onChange={(e) => onFormDataChange((p) => ({ ...p, due_date: e.target.value }))}
-                />
-              </div>
-
               {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
                 const isRequired = ["name", "total_debt"].includes(key);
                 const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);

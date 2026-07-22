@@ -30,9 +30,6 @@ export interface Debtor {
   call_outcome: string;
   picked_up_count: number;
   not_picked_up_count: number;
-  accept_count: number;
-  reject_count: number;
-  other_count: number;
   variables: Record<string, string> | null;
   user_id: string;
   workspace_id: string;
@@ -53,6 +50,8 @@ export interface CallListItem {
   call_outcome: string;
   picked_up: boolean;
   ai_category: string;
+  ai_reason: string;
+  ai_confidence: number;
   next_retry_at: string | null;
   retry_count: number;
   notes: string;
@@ -76,6 +75,8 @@ export interface CallAttempt {
   call_outcome: string;
   picked_up: boolean;
   ai_category: string;
+  ai_reason: string;
+  ai_confidence: number;
   conversation_log: string;
   audio_url: string;
   call_duration: number;

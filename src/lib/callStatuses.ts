@@ -40,72 +40,95 @@ export interface StatusDef {
 // ---------------------------------------------------------------------
 export const MAIN_STATUSES: StatusDef[] = [
   {
-    key: "planned_more_than_3",
-    label: "Planned (>3 days)",
-    thai: "วางแผนชำระเกิน 3 วัน",
+    key: "convenient_to_pay",
+    label: "Convenient to Pay",
+    thai: "สะดวกจ่าย",
     color: "#10b981",
-    tone: "soft-callback",
-    match: (c) =>
-      c.includes("planned more than 3") ||
-      c.includes("planned_more_than_3") ||
-      c.includes("plan more than 3") ||
-      c.includes("วางแผนชำระเกิน") ||
-      // Legacy "Acknowledged" records collapse here for backward compatibility.
-      c.includes("acknowledge") ||
-      c.includes("normal flow") ||
-      c.includes("แจ้งข้อมูลครบกำหนด") ||
-      c.includes("รับทราบ"),
-  },
-  {
-    key: "promised",
-    label: "Promised to Pay",
-    thai: "รับปากชำระ",
-    color: "#3b82f6",
     tone: "done",
-    match: (c) => c.includes("promise") || c.includes("ยืนยันชำระ") || c.includes("รับปาก"),
+    // Willing/able to pay. Guarded so the "not/ไม่" variants never fall here.
+    match: (c) =>
+      (c.includes("convenient to pay") ||
+        c.includes("convenient_to_pay") ||
+        c.includes("able to pay") ||
+        c.includes("สะดวกจ่าย") ||
+        // Legacy "will pay / promised / already paid" outcomes collapse here.
+        c.includes("promise") ||
+        c.includes("already paid") ||
+        c.includes("รับปาก") ||
+        c.includes("ชำระเรียบร้อย")) &&
+      !c.includes("not convenient") &&
+      !c.includes("unable") &&
+      !c.includes("ไม่สะดวก"),
   },
   {
-    key: "restructure",
-    label: "Restructure Requested",
-    thai: "ขอปรับโครงสร้างหนี้",
-    color: "#8b5cf6",
-    tone: "soft-callback",
-    match: (c) => c.includes("restructure") || c.includes("ปรับโครงสร้าง"),
+    key: "not_convenient_to_pay",
+    label: "Not Convenient to Pay",
+    thai: "ไม่สะดวกจ่าย",
+    color: "#f43f5e",
+    tone: "skip",
+    // Cannot / will not pay now — folds in legacy refused & restructure outcomes.
+    match: (c) =>
+      c.includes("not convenient to pay") ||
+      c.includes("not_convenient_to_pay") ||
+      c.includes("unable to pay") ||
+      c.includes("ไม่สะดวกจ่าย") ||
+      c.includes("refuse") ||
+      c.includes("declined") ||
+      c.includes("rejected") ||
+      c.includes("restructure") ||
+      c.includes("ปฏิเสธ") ||
+      c.includes("ปรับโครงสร้าง"),
   },
   {
-    key: "inconvenient_with_date",
-    label: "Inconvenient (With Date)",
-    thai: "ไม่สะดวก (มีนัดหมาย)",
+    key: "not_convenient_to_talk",
+    label: "Not Convenient to Talk",
+    thai: "ไม่สะดวกคุย",
     color: "#f59e0b",
-    tone: "callback",
-    match: (c) =>
-      c.includes("inconvenient with date") ||
-      c.includes("inconvenient (with date)") ||
-      c.includes("ไม่สะดวก (มีนัดหมาย)") ||
-      c.includes("ไม่สะดวกมีนัดหมาย") ||
-      c.includes("callback scheduled") ||
-      c.includes("scheduled callback") ||
-      c.includes("นัดติดต่อ"),
-  },
-  {
-    key: "inconvenient_without_date",
-    label: "Inconvenient (Without Date)",
-    thai: "ไม่สะดวก (ไม่มีนัดหมาย)",
-    color: "#f97316",
     tone: "soft-callback",
+    // Picked up but cannot talk now (busy / call back later / audio problems).
     match: (c) =>
-      c.includes("inconvenient without date") ||
-      c.includes("inconvenient (without date)") ||
-      c.includes("ไม่สะดวก (ไม่มีนัดหมาย)") ||
-      c.includes("ไม่สะดวกไม่มีนัดหมาย"),
+      c.includes("not convenient to talk") ||
+      c.includes("not_convenient_to_talk") ||
+      c.includes("ไม่สะดวกคุย") ||
+      c.includes("not convenient") ||
+      // Legacy "Inconvenient (With/Without Date)" outcomes collapse here.
+      c.includes("inconvenient") ||
+      c.includes("call later") ||
+      c.includes("background noise") ||
+      c.includes("ไม่สะดวก"),
   },
   {
-    key: "already_paid",
-    label: "Already Paid",
-    thai: "ชำระเรียบร้อยแล้ว",
-    color: "#14b8a6",
-    tone: "done",
-    match: (c) => c.includes("already paid") || c.includes("ชำระเรียบร้อย"),
+    key: "silent",
+    label: "Silent",
+    thai: "เงียบ",
+    color: "#71717a",
+    tone: "other",
+    match: (c) => c.includes("silent") || c.includes("silence") || c.includes("เงียบ"),
+  },
+  {
+    key: "off_topic",
+    label: "Off Topic",
+    thai: "พูดเรื่องอื่น นอกเรื่อง",
+    color: "#22c55e",
+    tone: "other",
+    match: (c) =>
+      c.includes("off topic") ||
+      c.includes("off-topic") ||
+      c.includes("out of topic") ||
+      c.includes("พูดเรื่องอื่น") ||
+      c.includes("นอกเรื่อง"),
+  },
+  {
+    key: "wrong_number",
+    label: "Wrong Number",
+    thai: "โทรผิด",
+    color: "#ef4444",
+    tone: "skip",
+    match: (c) =>
+      c.includes("wrong number") ||
+      c.includes("wrong person") ||
+      c.includes("โทรผิด") ||
+      c.includes("ไม่ใช่ผู้"),
   },
   {
     key: "not_reached",
@@ -127,85 +150,14 @@ export const MAIN_STATUSES: StatusDef[] = [
       c.includes("ติดต่อไม่ได้") ||
       c.includes("ไม่รับสาย"),
   },
-  {
-    key: "refused",
-    label: "Refused",
-    thai: "ปฏิเสธ",
-    color: "#f43f5e",
-    tone: "skip",
-    match: (c) => c.includes("refuse") || c.includes("declined") || c.includes("rejected") || c.includes("ปฏิเสธ"),
-  },
 ];
 
 // ---------------------------------------------------------------------
-// 2. SUB STATUSES — secondary conversation behaviors
+// 2. SUB STATUSES — the taxonomy is now flat (all outcomes live in
+// MAIN_STATUSES), so there are no secondary conversation behaviors.
+// Kept as an (empty) export so downstream imports/resolvers still work.
 // ---------------------------------------------------------------------
-export const SUB_STATUSES: StatusDef[] = [
-  {
-    key: "not_convenient",
-    label: "Not Convenient",
-    thai: "ไม่สะดวกคุย",
-    color: "#f59e0b",
-    tone: "soft-callback",
-    match: (c) => c.includes("not convenient") || c.includes("ไม่สะดวก"),
-  },
-  {
-    key: "wrong_person",
-    label: "Wrong Person",
-    thai: "ไม่ใช่ผู้เอาประกัน",
-    color: "#ef4444",
-    tone: "skip",
-    match: (c) => c.includes("wrong person") || c.includes("ไม่ใช่ผู้"),
-  },
-  {
-    key: "call_later",
-    label: "Call Later",
-    thai: "นัดหมายให้ติดต่อใหม่",
-    color: "#f97316",
-    tone: "callback",
-    match: (c) => c.includes("call later") || c.includes("นัดหมายให้ติดต่อใหม่"),
-  },
-  {
-    key: "transfer",
-    label: "Transfer",
-    thai: "ขอคุยกับเจ้าหน้าที่",
-    color: "#a855f7",
-    tone: "transfer",
-    match: (c) => c.includes("transfer") || c.includes("ขอคุยกับเจ้าหน้าที่"),
-  },
-  {
-    key: "background_noise",
-    label: "Background Noise",
-    thai: "เสียงแทรก/เสียงรบกวน",
-    color: "#06b6d4",
-    tone: "other",
-    match: (c) => c.includes("background noise") || c.includes("เสียงแทรก") || c.includes("เสียงรบกวน"),
-  },
-  {
-    key: "silence",
-    label: "Silence",
-    thai: "ลูกค้าเงียบ",
-    color: "#71717a",
-    tone: "other",
-    match: (c) => c.includes("silence") || c.includes("เงียบ"),
-  },
-  {
-    key: "dropped_call",
-    label: "Dropped Call",
-    thai: "สายหลุดระหว่างสนทนา",
-    color: "#ec4899",
-    tone: "other",
-    match: (c) => c.includes("dropped") || c.includes("สายหลุด"),
-  },
-  {
-    key: "out_of_topic",
-    label: "Out of Topic",
-    thai: "พูดเรื่องอื่น",
-    color: "#22c55e",
-    tone: "other",
-    match: (c) => c.includes("out of topic") || c.includes("พูดเรื่องอื่น"),
-  },
-];
+export const SUB_STATUSES: StatusDef[] = [];
 
 // Convenience union for places that don't care about the domain.
 export const ALL_STATUSES: StatusDef[] = [...MAIN_STATUSES, ...SUB_STATUSES];

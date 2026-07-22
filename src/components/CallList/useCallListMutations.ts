@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createCallListItems, deleteCallListItem } from "@/api/callListItems";
+import { listCallAttemptsByWorkspace, deleteCallAttempt } from "@/api/callAttempts";
+import { deleteCallRecord } from "@/api/callRecords";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
 import { debtorMatchesStatusFilter, getDebtorDebt } from "./utils";
 import type { CallListItem, Debtor, Template } from "./types";
@@ -222,12 +224,27 @@ export function useCallListMutations({
       if (!workspaceId) throw new Error("No workspace selected");
       const done = ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"];
       const ids = (callListItems || []).filter((i) => done.includes(i.status)).map((i) => i.id);
+      const idSet = new Set(ids);
+
+      // The Analytics "Recent Calls" history is sourced from call_attempts, not
+      // call_list_items, so deleting the items alone leaves orphaned history rows
+      // (shown with a "-" debtor). Cascade-delete the attempts — and their
+      // call_records — belonging to the cleared items too.
+      const attempts = await listCallAttemptsByWorkspace(workspaceId);
+      const relatedAttempts = attempts.filter((a) => a.call_list_item_id && idSet.has(a.call_list_item_id));
+      const recordIds = new Set(relatedAttempts.map((a) => a.call_record_id).filter((rid): rid is string => !!rid));
+
+      await Promise.all(relatedAttempts.map((a) => deleteCallAttempt(a.id, workspaceId)));
+      await Promise.all([...recordIds].map((rid) => deleteCallRecord(rid)));
       await Promise.all(ids.map((id) => deleteCallListItem(id, workspaceId)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
       queryClient.invalidateQueries({ queryKey: ["available-debtors-for-call"] });
       queryClient.invalidateQueries({ queryKey: ["debtor-latest-call-status"] });
+      // Refresh the Analytics history queries so cleared rows disappear at once.
+      queryClient.invalidateQueries({ queryKey: ["call-attempts-analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["call-records"] });
       toast.success("Cleared completed calls");
     },
   });
