@@ -72,7 +72,13 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                     </TableCell>
                     <TableCell>{getOutcomeBadge(record.call_outcome, record.picked_up)}</TableCell>
                     <TableCell>{getAICategoryBadge(record.ai_category)}</TableCell>
-                    <TableCell>{getConfidenceMeter(record.ai_confidence)}</TableCell>
+                    <TableCell>
+                      {record.ai_reason ? (
+                        getConfidenceMeter(record.ai_confidence)
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-[240px]">
                       {record.ai_reason ? (
                         <p className="text-xs text-muted-foreground truncate" title={record.ai_reason}>
