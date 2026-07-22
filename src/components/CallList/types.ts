@@ -9,9 +9,6 @@ export interface Debtor {
   contact_attempts: number;
   picked_up_count: number;
   not_picked_up_count: number;
-  accept_count: number;
-  reject_count: number;
-  other_count: number;
   last_contact_at: string | null;
   call_outcome?: string | null;
   variables: Record<string, string> | null;

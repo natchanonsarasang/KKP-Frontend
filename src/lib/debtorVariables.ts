@@ -15,7 +15,7 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   DebtorCustomerVariableKey,
   string
 > = {
-  name: "Name",
+  name: "Customer Name",
   car_detail: "Car detail",
   total_debt: "Total debt",
   total_interest: "Total interest",

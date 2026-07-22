@@ -15,7 +15,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { maskPhoneNumber } from "@/lib/formatPhone";
-import { resolveMainStatus, resolveSubStatus, resolveLatestStatusLabel } from "@/lib/callStatuses";
 import type { CallAttempt } from "@/api/types";
 import type { CallListItem, SortDirection, SortField } from "./types";
 
@@ -133,12 +132,6 @@ export function CallQueueTable({
                   </TableHead>
                   <TableHead className="text-xs">ชื่อ</TableHead>
                   <TableHead className="text-xs">ยอด</TableHead>
-                  <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("picked_up")}>
-                    <span className="flex items-center">
-                      รับสาย
-                      {getSortIcon("picked_up")}
-                    </span>
-                  </TableHead>
                   <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("call_outcome")}>
                     <span className="flex items-center">
                       ผลการโทร
@@ -151,7 +144,6 @@ export function CallQueueTable({
                       {getSortIcon("status")}
                     </span>
                   </TableHead>
-                  <TableHead className="text-xs">Call Status</TableHead>
                   <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("called_at")}>
                     <span className="flex items-center">
                       เวลา
@@ -165,23 +157,8 @@ export function CallQueueTable({
                 {filteredCallListItems.map((item) => {
                   const debtor = item.debtor;
                   const isCurrentlyCalling = item.status === "calling";
-
-                  // Determine picked up display
-                  const getPickedUpDisplay = () => {
-                    if (item.picked_up === true)
-                      return (
-                        <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                          Yes
-                        </Badge>
-                      );
-                    if (item.picked_up === false)
-                      return (
-                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
-                          No
-                        </Badge>
-                      );
-                    return <span className="text-muted-foreground">-</span>;
-                  };
+                  // Rejected / hang-up calls have no meaningful conversation to view.
+                  const hasNoTranscript = /reject|hang/i.test(item.call_outcome || "");
 
                   // Determine outcome display
                   const getOutcomeDisplay = () => {
@@ -240,36 +217,8 @@ export function CallQueueTable({
                             : "-";
                         })()}
                       </TableCell>
-                      <TableCell>{getPickedUpDisplay()}</TableCell>
                       <TableCell>{getOutcomeDisplay()}</TableCell>
                       <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell>
-                        {(() => {
-                          const cat = item.ai_category;
-                          if (!cat) return <span className="text-muted-foreground">-</span>;
-                          const def = resolveMainStatus(cat) ?? resolveSubStatus(cat);
-                          const label = resolveLatestStatusLabel(cat);
-                          if (!def) {
-                            return (
-                              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                                {label}
-                              </Badge>
-                            );
-                          }
-                          return (
-                            <Badge
-                              variant="outline"
-                              style={{
-                                color: def.color,
-                                borderColor: `${def.color}66`,
-                                backgroundColor: `${def.color}1a`,
-                              }}
-                            >
-                              {def.label}
-                            </Badge>
-                          );
-                        })()}
-                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {item.called_at
                           ? new Date(item.called_at).toLocaleString("th-TH", {
@@ -288,15 +237,19 @@ export function CallQueueTable({
                         item.status === "no_response" ||
                         item.status === "no_answer" ||
                         item.status === "failed" ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
-                            title="View conversation"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </Button>
+                          hasNoTranscript ? (
+                            <span className="text-muted-foreground text-xs px-2">-</span>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                              title="View conversation"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </Button>
+                          )
                         ) : (
                           <Button
                             variant="ghost"

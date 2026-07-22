@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Download, FileText, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadAudioViaProxy } from "@/api/audioProxy";
+import { ProxyAudioPlayer } from "@/components/ProxyAudioPlayer";
 import { downloadConversationAsText } from "./utils";
 import type { TranscriptData } from "./types";
 
@@ -83,9 +84,7 @@ export function TranscriptDialog({ open, onOpenChange, transcriptData }: Transcr
                   <Volume2 className="w-4 h-4" />
                   Audio Recording
                 </Label>
-                <audio controls className="w-full" src={transcriptData.audioUrl}>
-                  Your browser does not support the audio element.
-                </audio>
+                <ProxyAudioPlayer url={transcriptData.audioUrl} className="w-full" />
                 <Button
                   variant="outline"
                   size="sm"
