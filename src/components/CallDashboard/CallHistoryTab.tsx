@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, PhoneCall, Search } from "lucide-react";
-import { getOutcomeBadge, getStatusBadge } from "./StatusBadges";
+import { getAICategoryBadge, getConfidenceMeter, getOutcomeBadge, getStatusBadge } from "./StatusBadges";
+import { ConversationLogCell } from "./ConversationLogCell";
 import type { EnrichedCallRecord } from "./types";
 
 interface CallHistoryTabProps {
@@ -46,8 +46,11 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                   <TableHead className="text-xs">เบอร์โทร</TableHead>
                   <TableHead className="text-xs">ชื่อ</TableHead>
                   <TableHead className="text-xs">ยอด</TableHead>
-                  <TableHead className="text-xs">รับสาย</TableHead>
                   <TableHead className="text-xs">ผลการโทร</TableHead>
+                  <TableHead className="text-xs">ผล AI</TableHead>
+                  <TableHead className="text-xs">ความมั่นใจ</TableHead>
+                  <TableHead className="text-xs">เหตุผล AI</TableHead>
+                  <TableHead className="text-xs">บทสนทนา</TableHead>
                   <TableHead className="text-xs">สถานะ</TableHead>
                   <TableHead className="text-xs">เวลา</TableHead>
                 </TableRow>
@@ -67,20 +70,19 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                           : "-";
                       })()}
                     </TableCell>
-                    <TableCell>
-                      {record.picked_up === true ? (
-                        <Badge variant="secondary" className="bg-success/10 text-success text-xs">
-                          ใช่
-                        </Badge>
-                      ) : record.picked_up === false ? (
-                        <Badge variant="secondary" className="bg-muted text-muted-foreground text-xs">
-                          ไม่
-                        </Badge>
+                    <TableCell>{getOutcomeBadge(record.call_outcome, record.picked_up)}</TableCell>
+                    <TableCell>{getAICategoryBadge(record.ai_category)}</TableCell>
+                    <TableCell>{getConfidenceMeter(record.ai_confidence)}</TableCell>
+                    <TableCell className="max-w-[240px]">
+                      {record.ai_reason ? (
+                        <p className="text-xs text-muted-foreground truncate" title={record.ai_reason}>
+                          {record.ai_reason}
+                        </p>
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
-                    <TableCell>{getOutcomeBadge(record.call_outcome, record.picked_up)}</TableCell>
+                    <TableCell><ConversationLogCell record={record} /></TableCell>
                     <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(record.created_at).toLocaleString("th-TH", {

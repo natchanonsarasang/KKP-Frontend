@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { maskLicensePlate, maskPhoneNumber, isLicensePlateField } from "@/lib/formatPhone";
 // import { formatThaiBuddhistDateShort } from "@/lib/debtorVariables"; // Callback Date column hidden
-import { MAIN_STATUSES, SUB_STATUSES } from "@/lib/callStatuses";
+import { MAIN_STATUSES } from "@/lib/callStatuses";
 import { statusConfig } from "./constants";
 import { formatVariableValue } from "./utils";
 import type { Debtor, PhoneCallStats, SortDirection } from "./types";
@@ -121,17 +121,9 @@ export function DebtorsTable({
               <SelectItem value="never">Never Called</SelectItem>
               <SelectItem value="Other">Other</SelectItem>
               <SelectGroup>
-                <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Main Status</SelectLabel>
+                <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Call Status</SelectLabel>
                 {MAIN_STATUSES.map((s) => (
                   <SelectItem key={`main-${s.key}`} value={s.label}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Sub Status</SelectLabel>
-                {SUB_STATUSES.map((s) => (
-                  <SelectItem key={`sub-${s.key}`} value={s.label}>
                     {s.label}
                   </SelectItem>
                 ))}
@@ -262,24 +254,6 @@ export function DebtorsTable({
                         {getSortIcon("not_picked_up_count")}
                       </div>
                     </TableHead>
-                    <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("accept_count")}>
-                      <div className="flex items-center">
-                        Accept
-                        {getSortIcon("accept_count")}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("reject_count")}>
-                      <div className="flex items-center">
-                        Reject
-                        {getSortIcon("reject_count")}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("other_count")}>
-                      <div className="flex items-center">
-                        Other
-                        {getSortIcon("other_count")}
-                      </div>
-                    </TableHead>
                     <TableHead className="text-xs cursor-pointer hover:bg-muted/50 select-none" onClick={() => onSort("contact_attempts")}>
                       <div className="flex items-center">
                         Calls
@@ -385,25 +359,6 @@ export function DebtorsTable({
                               className={`text-sm font-medium ${(phoneStats?.not_picked_up || 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
                             >
                               {phoneStats?.not_picked_up || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${(phoneStats?.confirmed || 0) > 0 ? "text-success" : "text-muted-foreground"}`}>
-                              {phoneStats?.confirmed || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`text-sm font-medium ${(phoneStats?.declined || 0) > 0 ? "text-destructive" : "text-muted-foreground"}`}
-                            >
-                              {phoneStats?.declined || 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`text-sm font-medium ${(phoneStats?.no_response || 0) > 0 ? "text-warning" : "text-muted-foreground"}`}
-                            >
-                              {phoneStats?.no_response || 0}
                             </span>
                           </TableCell>
                           <TableCell>

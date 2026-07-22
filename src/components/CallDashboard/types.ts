@@ -24,9 +24,20 @@ export interface CallListItem {
   scheduled_at: string | null;
   called_at: string | null;
   created_at: string;
+  updated_at?: string | null;
   template_id: string | null;
   ai_category?: string | null;
+  ai_reason?: string | null;
+  ai_confidence?: number | null;
   debtor_id: string;
+  call_record_id?: string | null;
+  user_id?: string | null;
+  workspace_id?: string | null;
+  // Debtor snapshot captured at creation (backend), used as the primary source
+  // for the history row so it stays readable even if the debtor is deleted.
+  debtor_phone?: string | null;
+  debtor_name?: string | null;
+  debtor_amount?: number | null;
 }
 
 export interface Debtor {
@@ -51,4 +62,9 @@ export interface EnrichedCallRecord extends CallRecord {
   debtor_name: string;
   picked_up: boolean | null;
   call_outcome: string | null;
+  ai_category: string | null;
+  ai_reason: string | null;
+  ai_confidence: number | null;
+  conversation_log: string | null;
+  audio_url: string | null;
 }

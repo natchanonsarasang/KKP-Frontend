@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { listCallRecords } from "@/api/callRecords";
 import { listCallListItemsByWorkspace } from "@/api/callListItems";
+import { listCallAttemptsByWorkspace } from "@/api/callAttempts";
 import { listDebtorsByWorkspace } from "@/api/debtors";
 import type { CallListItem, CallRecord, DateRangeType, Debtor, EnrichedCallRecord } from "./types";
 
@@ -29,7 +30,9 @@ export function useAnalyticsData({
 }: UseAnalyticsDataArgs) {
   const queryClient = useQueryClient();
 
-  const { data: callRecords, isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
+  // Kept for the loading state + manual refresh; the history table itself is now
+  // derived from call_list_items (see enrichedRecords below), not from this data.
+  const { isLoading: loadingRecords, refetch: refetchRecords } = useQuery({
     queryKey: ["call-records", effectiveUserId, workspaceId, dateRange, customRange],
     queryFn: async () => {
       if (!workspaceId) return [];
@@ -77,6 +80,30 @@ export function useAnalyticsData({
     enabled: !!effectiveUserId && !!workspaceId,
   });
 
+  // Call attempts drive the "Recent Calls" history — one row per dial, so retries
+  // show as separate entries. We request status="finished" so each completed dial
+  // yields exactly one canonical row (the webhook also writes a redundant
+  // success/failed row per dial, which this filter excludes).
+  const { data: callAttempts, isLoading: loadingAttempts, refetch: refetchAttempts } = useQuery({
+    queryKey: ["call-attempts-analytics", effectiveUserId, workspaceId, dateRange, customRange],
+    queryFn: async () => {
+      if (!workspaceId) return [];
+      let attempts = await listCallAttemptsByWorkspace(workspaceId, { status: "finished" });
+
+      if (effectiveUserId) attempts = attempts.filter((a) => a.user_id === effectiveUserId);
+      const { start, end } = getDateFilter();
+      if (start) attempts = attempts.filter((a) => a.created_at >= start);
+      if (end) attempts = attempts.filter((a) => a.created_at <= end);
+
+      return [...attempts].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+    refetchInterval: () => {
+      const session = queryClient.getQueryData<{ status: string } | null>(["active-call-session", effectiveUserId, workspaceId]);
+      return session && ["running", "stopping"].includes(session.status) ? 10000 : false;
+    },
+    enabled: !!effectiveUserId && !!workspaceId,
+  });
+
   const { data: debtors } = useQuery({
     queryKey: ["analytics-debtors", workspaceId],
     queryFn: async () => {
@@ -94,39 +121,77 @@ export function useAnalyticsData({
     return map;
   }, [debtors]);
 
-  // Enriched call history: join call_records with debtor info + call_list_items
-  const enrichedRecords = useMemo<EnrichedCallRecord[]>(() => {
-    if (!callRecords) return [];
-    // Build a map from call_record_id -> call_list_item for outcome/pickup
-    const cliByRecordId = new Map<string, CallListItem>();
-    (callListItems || []).forEach((item) => {
-      const recordId = (item as unknown as Record<string, unknown>).call_record_id as string | null;
-      if (recordId) cliByRecordId.set(recordId, item);
-    });
+  const debtorById = useMemo(() => {
+    const map = new Map<string, Debtor>();
+    (debtors || []).forEach((d) => map.set(d.id, d));
+    return map;
+  }, [debtors]);
 
-    return callRecords.map((record) => {
-      const debtor = debtorByPhone.get(record.phone_number);
-      const cli = cliByRecordId.get(record.id);
+  // call_list_item lookup (by id) so each attempt can resolve the debtor snapshot
+  // (phone/name/amount) captured on its parent list item.
+  const itemById = useMemo(() => {
+    const map = new Map<string, CallListItem>();
+    (callListItems || []).forEach((item) => map.set(item.id, item));
+    return map;
+  }, [callListItems]);
+
+  // Enriched call history — one row per call attempt (retries included). Sourced
+  // from call_attempts rather than call_records: a single dial's debtor identity
+  // is resolved from its parent call_list_item's snapshot, then the debtor record
+  // as a fallback. Each attempt already carries its own outcome + AI fields.
+  const enrichedRecords = useMemo<EnrichedCallRecord[]>(() => {
+    const attempts = callAttempts || [];
+    return attempts.map((attempt) => {
+      const item = attempt.call_list_item_id ? itemById.get(attempt.call_list_item_id) : undefined;
+      const debtorId = item?.debtor_id;
+      const debtor =
+        (debtorId ? debtorById.get(debtorId) : undefined) ||
+        (item?.debtor_phone ? debtorByPhone.get(item.debtor_phone) : undefined);
       const vars = debtor?.variables || {};
-      const debtorName = vars.name || (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
+
+      const phone = item?.debtor_phone || debtor?.phone_number || "";
+      const debtorName =
+        item?.debtor_name ||
+        vars.name ||
+        (debtor ? `${debtor.name || ""} ${debtor.last_name || ""}`.trim() : "");
       const amountVal =
+        (item?.debtor_amount != null ? String(item.debtor_amount) : "") ||
         vars.total_debt ||
         vars.amount ||
         vars.outstanding_amount ||
         (debtor?.total_debt != null ? String(debtor.total_debt) : "") ||
-        record.amount ||
         "";
-      const dueDateVal = vars.due_date_iso || debtor?.due_date || record.due_date || "";
+      const dueDateVal = vars.due_date_iso || debtor?.due_date || "";
+
       return {
-        ...record,
-        debtor_name: debtorName,
-        amount: amountVal,
+        id: attempt.id,
+        phone_number: phone,
         due_date: dueDateVal,
-        picked_up: cli?.picked_up ?? null,
-        call_outcome: cli?.call_outcome ?? null,
-      };
+        amount: amountVal,
+        // Prefer the parent item's two-state status (success/failed, set by the
+        // webhook) for the badge; fall back to the attempt's own status.
+        status: item?.status || attempt.status || "",
+        botnoi_call_id: attempt.call_record_id ?? null,
+        created_at: attempt.created_at,
+        updated_at: attempt.updated_at ?? attempt.created_at,
+        template_id: item?.template_id ?? null,
+        call_duration: attempt.call_duration ?? null,
+        result_data: null,
+        appointment_date: null,
+        appointment_time: null,
+        user_id: attempt.user_id ?? null,
+        workspace_id: attempt.workspace_id ?? null,
+        debtor_name: debtorName,
+        picked_up: attempt.picked_up ?? null,
+        call_outcome: attempt.call_outcome ?? null,
+        ai_category: attempt.ai_category ?? null,
+        ai_reason: attempt.ai_reason ?? null,
+        ai_confidence: attempt.ai_confidence ?? null,
+        conversation_log: attempt.conversation_log ?? null,
+        audio_url: attempt.audio_url ?? null,
+      } satisfies EnrichedCallRecord;
     });
-  }, [callRecords, callListItems, debtorByPhone]);
+  }, [callAttempts, itemById, debtorById, debtorByPhone]);
 
   // Filtered by search
   const filteredRecords = useMemo(() => {
@@ -138,6 +203,7 @@ export function useAnalyticsData({
   const handleRefresh = () => {
     refetchRecords();
     refetchItems();
+    refetchAttempts();
     toast.success("Data refreshed");
   };
 
@@ -145,7 +211,7 @@ export function useAnalyticsData({
     callListItems,
     debtorByPhone,
     filteredRecords,
-    isLoading: loadingRecords || loadingItems,
+    isLoading: loadingRecords || loadingItems || loadingAttempts,
     handleRefresh,
   };
 }

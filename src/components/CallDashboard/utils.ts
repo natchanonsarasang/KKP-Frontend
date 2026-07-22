@@ -63,6 +63,9 @@ export function exportCallHistoryToExcel(
     "สถานะ": r.status || "pending",
     "รับสาย": r.picked_up === true ? "ใช่" : r.picked_up === false ? "ไม่" : "-",
     "ผลการโทร": r.call_outcome || "-",
+    "ผล AI": r.ai_category || "-",
+    "ความมั่นใจ AI": r.ai_confidence != null ? `${Math.round(r.ai_confidence * 100)}%` : "-",
+    "เหตุผล AI": r.ai_reason || "-",
     "วันที่โทร": new Date(r.created_at).toLocaleString("th-TH"),
   }));
   const ws = XLSX.utils.json_to_sheet(rows);

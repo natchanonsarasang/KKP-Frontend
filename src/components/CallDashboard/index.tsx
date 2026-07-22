@@ -9,10 +9,8 @@ import {
   HourlyPickupChart,
   DayOfWeekChart,
   OutcomeDistributionChart,
-  TemplatePerformanceChart,
   TrendChart,
   MainStatusOverview,
-  SubStatusOverview,
 } from "../analytics/CallAnalyticsCharts";
 import { BestTimeInsights } from "../analytics/BestTimeInsights";
 import { useDateRangeFilter } from "./useDateRangeFilter";
@@ -97,12 +95,7 @@ const CallDashboard = () => {
             <MainStatusOverview callListItems={callListItems || []} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SubStatusOverview callListItems={callListItems || []} />
               <OutcomeDistributionChart callListItems={callListItems || []} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <TemplatePerformanceChart callListItems={callListItems || []} templates={templates} />
               <BestTimeInsights callListItems={callListItems || []} />
             </div>
             <div className="grid grid-cols-1 gap-4">

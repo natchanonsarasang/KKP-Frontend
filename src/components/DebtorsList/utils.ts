@@ -7,7 +7,7 @@ import { listCallRecords } from "@/api/callRecords";
 import { isLicensePlateField, maskLicensePlate } from "@/lib/formatPhone";
 import { resolveLatestStatusLabel } from "@/lib/callStatuses";
 import { DEBTOR_CUSTOMER_VARIABLE_KEYS, formatThaiBuddhistDateShort } from "@/lib/debtorVariables";
-import type { Debtor } from "./types";
+import type { Debtor, PhoneCallStats } from "./types";
 
 export function buildVariablesToSave(
   tv: Record<string, string>,
@@ -50,6 +50,23 @@ export interface DebtorFilterArgs {
   dateRange: DateRange | undefined;
   sortField: string;
   sortDirection: "asc" | "desc";
+  // Per-debtor derived call stats (keyed by debtor id). Used so sorting a
+  // call-stat column matches the numbers the table displays.
+  callStats?: Record<string, PhoneCallStats>;
+}
+
+// Call-stat sort columns map to a derived PhoneCallStats field rather than the
+// debtor's stored counter, so sort order matches the displayed (derived) value.
+const STAT_SORT_FIELDS: Record<string, keyof PhoneCallStats> = {
+  picked_up_count: "picked_up",
+  not_picked_up_count: "not_picked_up",
+  contact_attempts: "total",
+};
+
+// True when a sort column reads from derived call stats — callers use this to
+// avoid re-sorting the list on stats changes when sorting by other columns.
+export function isStatSortField(sortField: string): boolean {
+  return sortField in STAT_SORT_FIELDS;
 }
 
 // Helper to normalize day/month/year components to YYYY-MM-DD
@@ -144,7 +161,7 @@ export function parseDebtorPaidDate(d: Debtor): string | null {
 // The Go API returns all debtors for a workspace; filtering/sorting/pagination
 // that used to run in SQL now runs client-side here (and is reused by export).
 export function applyDebtorFilters(all: Debtor[], args: DebtorFilterArgs): Debtor[] {
-  const { effectiveUserId, statusFilter, callStatusFilter, latestStatusByDebtor, filteredDebtorIds, searchQuery, dateRange, sortField, sortDirection } = args;
+  const { effectiveUserId, statusFilter, callStatusFilter, latestStatusByDebtor, filteredDebtorIds, searchQuery, dateRange, sortField, sortDirection, callStats } = args;
   let rows = all;
 
   if (effectiveUserId) rows = rows.filter((d) => d.user_id === effectiveUserId);
@@ -189,6 +206,8 @@ export function applyDebtorFilters(all: Debtor[], args: DebtorFilterArgs): Debto
   const dir = sortDirection === "asc" ? 1 : -1;
   const getVal = (d: Debtor): unknown => {
     if (sortField.startsWith("var:")) return d.variables?.[sortField.slice(4)];
+    const statKey = STAT_SORT_FIELDS[sortField];
+    if (statKey) return callStats?.[d.id]?.[statKey] ?? 0;
     return (d as unknown as Record<string, unknown>)[sortField];
   };
   rows = [...rows].sort((a, b) => {
@@ -243,9 +262,21 @@ export async function exportDebtorsToExcel(
     if (!r.phone_number) return;
     const s = (exportStats[r.phone_number] ||= { total: 0, picked_up: 0, not_picked_up: 0 });
     s.total++;
-    if (r.status === "confirmed" || r.status === "declined" || r.status === "no_response" || r.status === "completed") {
+    if (
+      r.status === "confirmed" ||
+      r.status === "declined" ||
+      r.status === "no_response" ||
+      r.status === "completed" ||
+      r.status === "hanged_up"
+    ) {
       s.picked_up++;
-    } else if (r.status === "no_answer" || r.status === "failed") {
+    } else if (
+      r.status === "no_answer" ||
+      r.status === "failed" ||
+      r.status === "rejected" ||
+      r.status === "busy" ||
+      r.status === "voicemail"
+    ) {
       s.not_picked_up++;
     }
   });

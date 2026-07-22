@@ -19,14 +19,13 @@ import { MAIN_STATUSES, SUB_STATUSES, resolveMainStatus, resolveSubStatus } from
 
 // Tailwind class palettes for the Main Status cards (mapped by status key).
 const MAIN_STATUS_CARD_CLASSES: Record<string, { bg: string; border: string; text: string }> = {
-  planned_more_than_3: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
-  promised: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
-  restructure: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700" },
-  inconvenient_with_date: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
-  inconvenient_without_date: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
-  already_paid: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
+  convenient_to_pay: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
+  not_convenient_to_pay: { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-700" },
+  not_convenient_to_talk: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
+  silent: { bg: "bg-zinc-50", border: "border-zinc-200", text: "text-zinc-700" },
+  off_topic: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  wrong_number: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
   not_reached: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700" },
-  refused: { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-700" },
 };
 
 interface CallRecord {
@@ -483,65 +482,17 @@ export const AICategoryDistributionChart = ({ callListItems }: { callListItems: 
     "#71717a",
   ];
   const categoryData = useMemo(() => {
-    // Thai categories as primary display labels
-    const categories: Record<string, number> = {
-      "ลูกค้าไม่สะดวกคุย (Not Convenient)": 0,
-      "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)": 0,
-      "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)": 0,
-      "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)": 0,
-      "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)": 0,
-      "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)": 0,
-      "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)": 0,
-      "เสียงแทรก/เสียงรบกวน (Background Noise)": 0,
-      "ลูกค้าพูดเรื่องอื่น (Out of Topic)": 0,
-      "ลูกค้าเงียบ (Silence)": 0,
-      "สายหลุดระหว่างสนทนา (Dropped Call)": 0,
-      "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)": 0,
-    };
-
-    const englishToThai: Record<string, string> = {
-      "Not Convenient": "ลูกค้าไม่สะดวกคุย (Not Convenient)",
-      "Already Paid": "ลูกค้าแจ้งว่าชำระเรียบร้อยแล้ว (Already Paid)",
-      "Normal Flow": "แจ้งข้อมูลครบกำหนดชำระเบี้ยได้สำเร็จ (Normal Flow)",
-      "Wrong Person": "ลูกค้าแจ้งไม่ใช่ผู้เอาประกัน (Wrong Person)",
-      Transfer: "ลูกค้าขอคุยกับเจ้าหน้าที่ (Transfer)",
-      "Call Later": "ลูกค้านัดหมายให้ติดต่อใหม่ (Call Later)",
-      "Barge-in": "ลูกค้าสอบถามข้อมูลระหว่างสนทนา (Barge-in)",
-      "Background Noise": "เสียงแทรก/เสียงรบกวน (Background Noise)",
-      "Out of Topic": "ลูกค้าพูดเรื่องอื่น (Out of Topic)",
-      Silence: "ลูกค้าเงียบ (Silence)",
-      "Dropped Call": "สายหลุดระหว่างสนทนา (Dropped Call)",
-      "Repeat Request": "ลูกค้าแจ้งให้ทวนประโยคเดิม (Repeat Request)",
-    };
+    // Count every call into the flat MAIN_STATUSES taxonomy. Labels show as
+    // "Thai (English)" and the order is locked to the MAIN_STATUSES order.
+    const counts: Record<string, number> = Object.fromEntries(MAIN_STATUSES.map((s) => [s.key, 0]));
 
     callListItems.forEach((item) => {
       if (!item.ai_category) return;
-
-      const rawCategory = item.ai_category;
-
-      // 1. Try direct mapping from English if AI returned only English
-      let mappedCategory = englishToThai[rawCategory] || null;
-
-      // 2. If not found, try to find match among our Thai(English) keys
-      if (!mappedCategory) {
-        mappedCategory =
-          Object.keys(categories).find(
-            (cat) =>
-              rawCategory === cat ||
-              rawCategory.includes(cat.split(" (")[0]) ||
-              (cat.includes("(") && rawCategory.includes(cat.split("(")[1].split(")")[0])),
-          ) || null;
-      }
-
-      if (mappedCategory) {
-        categories[mappedCategory]++;
-      } else {
-        categories["ลูกค้าพูดเรื่องอื่น (Out of Topic)"]++;
-      }
+      const matched = resolveMainStatus(item.ai_category);
+      if (matched) counts[matched.key]++;
     });
 
-    return Object.entries(categories).map(([name, value]) => ({ name, value }));
-    // Removed sort to lock the order as defined above
+    return MAIN_STATUSES.map((s) => ({ name: `${s.thai} (${s.label})`, value: counts[s.key] }));
   }, [callListItems]);
 
   return (

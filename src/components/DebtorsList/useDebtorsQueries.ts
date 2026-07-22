@@ -3,11 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
 import { listDebtorsByWorkspace } from "@/api/debtors";
 import { listCallListItemsByWorkspace } from "@/api/callListItems";
-import { listCallAttemptsByWorkspace } from "@/api/callAttempts";
-import { listCallRecords } from "@/api/callRecords";
+import { getCallStatsByDebtor } from "@/api/callStats";
 import { resolveLatestStatusLabel, resolveMainStatus, resolveSubStatus } from "@/lib/callStatuses";
 import { PAGE_SIZE } from "./constants";
-import { applyDebtorFilters } from "./utils";
+import { applyDebtorFilters, isStatSortField } from "./utils";
 import type { Debtor, PhoneCallStats, SortDirection } from "./types";
 
 interface UseDebtorsQueriesArgs {
@@ -88,6 +87,26 @@ export function useDebtorsQueries({
     return ids;
   }, [callStatusFilter, latestStatusByDebtor]);
 
+  // Per-debtor call stats, keyed by DEBTOR ID. Computed server-side from
+  // call_records (the source of truth) by the /call-stats/by-debtor endpoint —
+  // the browser no longer pulls every call_record + list item + attempt to count
+  // client-side (which didn't scale past ~1000 rows and drifted from the DB).
+  // Declared before the debtor list so sorting by a call-stat column (Picked /
+  // No Pick / Accept / …) can use the same derived numbers the table shows.
+  const { data: callStats, dataUpdatedAt: callStatsUpdatedAt } = useQuery({
+    queryKey: ["call-stats-by-debtor", effectiveUserId, workspaceId],
+    queryFn: async (): Promise<Record<string, PhoneCallStats>> => {
+      if (!workspaceId) return {};
+      return getCallStatsByDebtor(workspaceId);
+    },
+    // Only poll while a call session is actually running/stopping — otherwise
+    // this hits the backend every 5s forever just from having the page open.
+    refetchInterval: () => {
+      const session = queryClient.getQueryData<{ status: string } | null>(["active-call-session", effectiveUserId, workspaceId]);
+      return session && ["running", "stopping"].includes(session.status) ? 5000 : false;
+    },
+  });
+
   // Paginated query (fetch-all + client-side filter/sort/slice)
   const {
     data: debtorsData,
@@ -107,6 +126,10 @@ export function useDebtorsQueries({
       workspaceId,
       dateRange?.from?.toISOString() ?? null,
       dateRange?.to?.toISOString() ?? null,
+      // Re-run when derived stats change ONLY while sorting by a call-stat
+      // column, so that order stays consistent with the displayed numbers
+      // without refetching the whole list on every stats poll otherwise.
+      isStatSortField(sortField) ? callStatsUpdatedAt : 0,
     ],
     queryFn: async () => {
       if (!workspaceId) return { debtors: [] as Debtor[], totalCount: 0 };
@@ -121,6 +144,7 @@ export function useDebtorsQueries({
         dateRange,
         sortField,
         sortDirection,
+        callStats,
       });
       const from = page * PAGE_SIZE;
       return { debtors: filtered.slice(from, from + PAGE_SIZE), totalCount: filtered.length };
@@ -132,77 +156,6 @@ export function useDebtorsQueries({
   const debtors = debtorsData?.debtors;
   const totalCount = debtorsData?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-  // Fetch call stats from raw call_records, keyed by DEBTOR ID (not phone number).
-  // Phone numbers aren't unique per debtor — two debtors can share one — so keying
-  // by phone made a newly-created debtor inherit another debtor's call history.
-  // call_records has no debtor_id, so we resolve record -> debtor via call_list_items
-  // (has both debtor_id and call_record_id) and call_attempts (covers retry records).
-  const { data: callStats } = useQuery({
-    queryKey: ["call-stats-by-debtor", effectiveUserId, workspaceId],
-    queryFn: async () => {
-      const stats: Record<string, PhoneCallStats> = {};
-      if (!workspaceId) return stats;
-
-      const [records, listItems, attempts] = await Promise.all([
-        listCallRecords({}),
-        listCallListItemsByWorkspace(workspaceId),
-        listCallAttemptsByWorkspace(workspaceId),
-      ]);
-
-      // Map each call_record_id to the debtor it belongs to.
-      const itemToDebtor = new Map(listItems.map((it) => [it.id, it.debtor_id]));
-      const recordToDebtor = new Map<string, string>();
-      listItems.forEach((it) => {
-        if (it.call_record_id) recordToDebtor.set(it.call_record_id, it.debtor_id);
-      });
-      // Attempts carry each retry's own record id; resolve via its list item.
-      attempts.forEach((att) => {
-        const debtorId = itemToDebtor.get(att.call_list_item_id);
-        if (att.call_record_id && debtorId) recordToDebtor.set(att.call_record_id, debtorId);
-      });
-
-      records.forEach((record) => {
-        const debtorId = recordToDebtor.get(record.id);
-        if (!debtorId) return; // record not linked to a debtor in this workspace
-
-        if (!stats[debtorId]) {
-          stats[debtorId] = {
-            total: 0,
-            confirmed: 0,
-            declined: 0,
-            no_response: 0,
-            picked_up: 0,
-            not_picked_up: 0,
-          };
-        }
-        stats[debtorId].total++;
-
-        // Count by status from call_records
-        if (record.status === "confirmed") {
-          stats[debtorId].confirmed++;
-          stats[debtorId].picked_up++;
-        } else if (record.status === "declined") {
-          stats[debtorId].declined++;
-          stats[debtorId].picked_up++;
-        } else if (record.status === "no_response") {
-          stats[debtorId].no_response++;
-          stats[debtorId].picked_up++;
-        } else if (record.status === "completed") {
-          stats[debtorId].picked_up++;
-        } else if (record.status === "no_answer" || record.status === "failed") {
-          stats[debtorId].not_picked_up++;
-        }
-      });
-      return stats;
-    },
-    // Only poll while a call session is actually running/stopping — otherwise
-    // this hits the backend every 5s forever just from having the page open.
-    refetchInterval: () => {
-      const session = queryClient.getQueryData<{ status: string } | null>(["active-call-session", effectiveUserId, workspaceId]);
-      return session && ["running", "stopping"].includes(session.status) ? 5000 : false;
-    },
-  });
 
   // Fetch aggregate stats separately using count queries to avoid 1000 row limit
   const { data: statsData } = useQuery({
