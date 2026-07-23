@@ -30,6 +30,98 @@ export function emptyDebtorCustomerVariables(): Record<string, string> {
   );
 }
 
+/**
+ * Maps the column headers users actually upload (the Thai labels from the
+ * standard import sheet, plus common English aliases) onto the internal debtor
+ * variable keys. Note: the vehicle plate + province arrive as one combined
+ * "car_detail" column — the backend splits it into car_detail + province when
+ * building the call, so we keep it combined here.
+ */
+const DEBTOR_IMPORT_HEADER_ALIASES: Record<string, string> = {
+  // phone number
+  phone_number: "phone_number",
+  phone: "phone_number",
+  "tel. number": "phone_number",
+  เบอร์โทร: "phone_number",
+  เบอร์โทรศัพท์: "phone_number",
+  // customer name
+  name: "name",
+  "ชื่อ-นามสกุล": "name",
+  "ชื่อ - นามสกุล": "name",
+  ชื่อนามสกุล: "name",
+  // vehicle plate + province (kept combined; backend splits it)
+  car_detail: "car_detail",
+  "หมายเลขทะเบียนรถ จังหวัด": "car_detail",
+  หมายเลขทะเบียนรถ: "car_detail",
+  ทะเบียนรถ: "car_detail",
+  // overdue installments
+  overdue_installment: "overdue_installment",
+  จำนวนงวดที่ค้าง: "overdue_installment",
+  // amounts
+  total_debt: "total_debt",
+  จำนวนเงินที่ค้าง: "total_debt",
+  total_interest: "total_interest",
+  จำนวนเงินดอกเบี้ยที่ค้าง: "total_interest",
+  total_fine: "total_fine",
+  จำนวนเงินค่าปรับ: "total_fine",
+};
+
+/** Columns from the standard sheet we intentionally drop on import. */
+const DEBTOR_IMPORT_IGNORED_HEADERS = new Set<string>([
+  "id",
+  "no",
+  "ลำดับ",
+  "จำนวนเงินค่าใช้จ่ายอื่น", // "other expenses" — not supported yet
+]);
+
+/** Reverse map: canonical key -> Thai label, used for the download template + hints. */
+export const DEBTOR_IMPORT_THAI_HEADERS: Record<string, string> = {
+  phone_number: "เบอร์โทร",
+  name: "ชื่อ-นามสกุล",
+  car_detail: "หมายเลขทะเบียนรถ จังหวัด",
+  overdue_installment: "จำนวนงวดที่ค้าง",
+  total_debt: "จำนวนเงินที่ค้าง",
+  total_interest: "จำนวนเงินดอกเบี้ยที่ค้าง",
+  total_fine: "จำนวนเงินค่าปรับ",
+};
+
+/** Human-friendly (Thai) label for a canonical debtor column key. */
+export function debtorImportHeaderLabel(key: string): string {
+  return DEBTOR_IMPORT_THAI_HEADERS[key] ?? key;
+}
+
+function normalizeHeaderText(raw: string): string {
+  return String(raw ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+export type ResolvedDebtorHeader =
+  | { kind: "key"; key: string }
+  | { kind: "ignore" };
+
+/**
+ * Resolve an uploaded Excel header to either a canonical debtor variable key or
+ * an "ignore" marker. Unknown headers pass through as-is so custom workspace
+ * columns keep working.
+ */
+export function resolveDebtorImportHeader(raw: string): ResolvedDebtorHeader {
+  const norm = normalizeHeaderText(raw);
+  if (!norm) return { kind: "ignore" };
+  if (DEBTOR_IMPORT_IGNORED_HEADERS.has(norm)) return { kind: "ignore" };
+  const alias = DEBTOR_IMPORT_HEADER_ALIASES[norm];
+  if (alias) return { kind: "key", key: alias };
+  return { kind: "key", key: String(raw).trim() };
+}
+
+/**
+ * Thai mobile numbers uploaded via Excel often lose their leading "0" when the
+ * cell is stored as a number (10-digit "0812345678" becomes 9-digit
+ * "812345678"). Restore it so the dialer receives a valid number.
+ */
+export function normalizeThaiPhone(raw: string): string {
+  const s = String(raw ?? "").trim();
+  return /^\d{9}$/.test(s) ? `0${s}` : s;
+}
+
 /** Parse amount for `debtors.total_debt` column from user-entered text (commas allowed). */
 export function parseDebtAmountForColumn(value: string): number {
   const n = Number(String(value).replace(/,/g, "").trim());
