@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, Loader2, Trash2, X, AlertTriangle, Download } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listDebtorsByWorkspace, createDebtor } from "@/api/debtors";
@@ -14,7 +13,13 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DEBTOR_CUSTOMER_VARIABLE_KEYS, parseDebtAmountForColumn } from "@/lib/debtorVariables";
+import {
+  DEBTOR_CUSTOMER_VARIABLE_KEYS,
+  parseDebtAmountForColumn,
+  resolveDebtorImportHeader,
+  normalizeThaiPhone,
+  debtorImportHeaderLabel,
+} from "@/lib/debtorVariables";
 
 interface DebtorRow {
   phone_number: string;
@@ -69,15 +74,18 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
   }, [open]);
 
   const downloadTemplate = () => {
-    const headers = ["phone_number", ...(workspaceSchema ?? [...DEBTOR_CUSTOMER_VARIABLE_KEYS])];
-    const sampleRow = headers.map((h) => {
+    const keys = ["phone_number", ...(workspaceSchema ?? [...DEBTOR_CUSTOMER_VARIABLE_KEYS])];
+    // Header row uses the Thai labels users upload; the plate + province go in
+    // one combined "car_detail" cell (the backend splits them).
+    const headers = keys.map((k) => debtorImportHeaderLabel(k));
+    const sampleRow = keys.map((h) => {
       switch (h) {
         case "phone_number":
           return "0891234567";
         case "name":
           return "สมหญิง";
         case "car_detail":
-          return "Toyota Vios / กข 1234";
+          return "ฅฆ 9091 ประจวบคีรีขันธ์";
         case "total_debt":
           return 4000;
         case "total_interest":
@@ -92,7 +100,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     });
 
     const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
-    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    ws["!cols"] = headers.map(() => ({ wch: 22 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Debtors");
     XLSX.writeFile(wb, "debtor_template.xlsx");
@@ -119,15 +127,28 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
           return;
         }
 
-        // First row is headers
-        const headers = data[0].map((h) => String(h || "").trim());
-        if (!headers[0]) {
-          toast.error("First column header (phone number) is required");
+        // First row is headers. Resolve each column to a canonical debtor key
+        // (Thai labels and English aliases both map through), dropping ignored
+        // columns like "id" and "other expenses".
+        const rawHeaders = data[0].map((h) => String(h || "").trim());
+        if (rawHeaders.every((h) => !h)) {
+          toast.error("Header row is empty");
           return;
         }
 
-        // Store headers (skip first one which is phone_number)
-        const variableHeaders = headers.slice(1).filter(Boolean);
+        const resolved = rawHeaders.map(resolveDebtorImportHeader);
+
+        // Locate the phone column (fall back to the first column for older sheets).
+        let phoneIdx = resolved.findIndex((r) => r.kind === "key" && r.key === "phone_number");
+        if (phoneIdx === -1) phoneIdx = 0;
+
+        // Variable columns = every mapped column that isn't the phone column.
+        const variableCols: { idx: number; key: string }[] = [];
+        resolved.forEach((r, idx) => {
+          if (idx === phoneIdx) return;
+          if (r.kind === "key") variableCols.push({ idx, key: r.key });
+        });
+        const variableHeaders = variableCols.map((c) => c.key);
 
         // Validate format matches existing workspace schema
         if (workspaceSchema && workspaceSchema.length > 0) {
@@ -154,16 +175,16 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
         const rows: DebtorRow[] = [];
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
-          if (!row || !row[0]) continue;
+          if (!row) continue;
 
-          const phoneNumber = String(row[0]).trim();
+          const phoneNumber = normalizeThaiPhone(String(row[phoneIdx] ?? ""));
           if (!phoneNumber) continue;
 
           const variables: Record<string, string> = {};
-          variableHeaders.forEach((header, idx) => {
-            const value = row[idx + 1];
-            if (value !== undefined && value !== null && value !== "") {
-              variables[header] = String(value);
+          variableCols.forEach(({ idx, key }) => {
+            const value = row[idx];
+            if (value !== undefined && value !== null && String(value).trim() !== "") {
+              variables[key] = String(value).trim();
             }
           });
 
@@ -264,13 +285,13 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             Import Debtors from Excel
           </DialogTitle>
           <DialogDescription>
-            Upload an Excel file (.xlsx). First column = phone number. Remaining columns should match bot variables such
-            as <code className="text-xs">name</code>, <code className="text-xs">car_detail</code>,{" "}
-            <code className="text-xs">total_debt</code>, etc.
+            Upload an Excel file (.xlsx) with the Thai column headers (
+            <code className="text-xs">เบอร์โทร</code>, <code className="text-xs">ชื่อ-นามสกุล</code>,{" "}
+            <code className="text-xs">หมายเลขทะเบียนรถ จังหวัด</code>, …)
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+        <div className="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
           {/* File Upload */}
           <div className="space-y-2">
             <Label>Excel File</Label>
@@ -294,12 +315,14 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             </Button>
             {workspaceSchema && workspaceSchema.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                <strong>Expected columns:</strong> Phone Number, {workspaceSchema.join(", ")}
+                <strong>Expected columns:</strong> เบอร์โทร,{" "}
+                {workspaceSchema.map((k) => debtorImportHeaderLabel(k)).join(", ")}
               </p>
             )}
             {!workspaceSchema && (
               <p className="text-xs text-muted-foreground">
-                <strong>Suggested headers after phone:</strong> {DEBTOR_CUSTOMER_VARIABLE_KEYS.join(", ")}
+                <strong>Suggested headers after phone:</strong>{" "}
+                {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((k) => debtorImportHeaderLabel(k)).join(", ")}
               </p>
             )}
           </div>
@@ -329,7 +352,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
 
           {/* Preview Table */}
           {debtorRows.length > 0 && (
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-sm">Preview ({debtorRows.length} rows)</Label>
                 {columnHeaders.length > 0 && (
@@ -338,14 +361,21 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
                   </span>
                 )}
               </div>
-              <ScrollArea className="flex-1 border rounded-md">
-                <Table>
-                  <TableHeader>
+              {/*
+                Native scroll container that owns BOTH axes. min-h-0 lets this
+                flex child shrink so vertical overflow actually scrolls;
+                [&>div]:overflow-visible disables the shadcn Table's own inner
+                overflow-auto wrapper so we don't get a second, nested scrollbar;
+                the Table's min-w forces horizontal overflow for wide sheets.
+              */}
+              <div className="flex-1 min-h-0 overflow-auto border rounded-md [&>div]:overflow-visible">
+                <Table className="min-w-[720px]">
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Phone Number</TableHead>
                       {columnHeaders.map((header) => (
-                        <TableHead key={header}>{header}</TableHead>
+                        <TableHead key={header} className="whitespace-nowrap">{header}</TableHead>
                       ))}
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
@@ -354,9 +384,9 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
                     {debtorRows.slice(0, 100).map((row, idx) => (
                       <TableRow key={idx}>
                         <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-                        <TableCell className="font-mono text-sm">{row.phone_number}</TableCell>
+                        <TableCell className="font-mono text-sm whitespace-nowrap">{row.phone_number}</TableCell>
                         {columnHeaders.map((header) => (
-                          <TableCell key={header} className="text-sm">
+                          <TableCell key={header} className="text-sm whitespace-nowrap">
                             {row.variables[header] || "-"}
                           </TableCell>
                         ))}
@@ -374,7 +404,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
                     Showing first 100 of {debtorRows.length} rows
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           )}
 
