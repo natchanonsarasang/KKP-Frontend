@@ -4,7 +4,12 @@ import { createDebtor, deleteDebtor, listDebtorsByWorkspace, updateDebtor } from
 import { createCallListItem, deleteCallListItem, listCallListItemsByWorkspace } from "@/api/callListItems";
 import { createCallRecord } from "@/api/callRecords";
 import { makeCall } from "@/api/voicebot";
-import { parseDebtAmountForColumn, toApiDate } from "@/lib/debtorVariables";
+import {
+  DEBTOR_AMOUNT_VARIABLE_KEYS,
+  formatThaiBahtSatang,
+  parseDebtAmountForColumn,
+  toApiDate,
+} from "@/lib/debtorVariables";
 import { buildVariablesToSave } from "./utils";
 import type { Debtor, DebtorFormData } from "./types";
 
@@ -166,6 +171,10 @@ export function useDebtorsMutations({
       const debtorVars = {
         ...((debtor.variables || {}) as Record<string, string>),
       };
+      // Speak money amounts as baht/satang, e.g. "1000.5" -> "1000 บาท 50 สตางค์".
+      for (const key of DEBTOR_AMOUNT_VARIABLE_KEYS) {
+        if (debtorVars[key]) debtorVars[key] = formatThaiBahtSatang(debtorVars[key]);
+      }
 
       // Create a unique client-side ID for the call record
       const callRecordId = crypto.randomUUID();

@@ -112,7 +112,7 @@ export function useCallSession({
         const debtorVars = {
           ...((debtor.variables || {}) as Record<string, string>),
         };
-        // Speak money amounts as baht/satang, e.g. "1000.5" -> "1000 บาท 50 สตางค์".
+        
         for (const key of DEBTOR_AMOUNT_VARIABLE_KEYS) {
           if (debtorVars[key]) debtorVars[key] = formatThaiBahtSatang(debtorVars[key]);
         }
