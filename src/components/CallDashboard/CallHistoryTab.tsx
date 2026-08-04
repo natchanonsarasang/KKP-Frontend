@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Download, PhoneCall, Search } from "lucide-react";
 import { getAICategoryBadge, getConfidenceMeter, getOutcomeBadge, getStatusBadge } from "./StatusBadges";
 import { ConversationLogCell } from "./ConversationLogCell";
+import { EditableConversationLogCell } from "./EditableConversationLogCell";
 import type { EnrichedCallRecord } from "./types";
 
 interface CallHistoryTabProps {
@@ -51,6 +52,7 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                   <TableHead className="text-xs">ความมั่นใจ</TableHead>
                   <TableHead className="text-xs">เหตุผล AI</TableHead>
                   <TableHead className="text-xs">บทสนทนา</TableHead>
+                  <TableHead className="text-xs">บทสนทนา (แก้ไขได้)</TableHead>
                   <TableHead className="text-xs">สถานะ</TableHead>
                   <TableHead className="text-xs">เวลา</TableHead>
                 </TableRow>
@@ -89,6 +91,7 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                       )}
                     </TableCell>
                     <TableCell><ConversationLogCell record={record} /></TableCell>
+                    <TableCell><EditableConversationLogCell record={record} /></TableCell>
                     <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(record.created_at).toLocaleString("th-TH", {
