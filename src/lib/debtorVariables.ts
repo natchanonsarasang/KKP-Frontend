@@ -128,6 +128,27 @@ export function parseDebtAmountForColumn(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Money (baht) columns among the debtor variables — kept to 2 decimals (satang). */
+export const DEBTOR_AMOUNT_VARIABLE_KEYS = new Set<string>([
+  "total_debt",
+  "total_interest",
+  "total_fine",
+]);
+
+/**
+ * Format a baht amount for storage/display in `debtors.variables`. When the value
+ * has a fractional (satang) part, pad it to exactly two decimals so "100.5" reads
+ * as "100.50" instead of losing the trailing zero. Whole-baht amounts keep no
+ * decimal part, and non-numeric input is returned untouched.
+ */
+export function formatDebtorAmount(value: string): string {
+  const s = String(value ?? "").trim();
+  if (!s) return s;
+  const n = Number(s.replace(/,/g, ""));
+  if (!Number.isFinite(n)) return s;
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
 /** Normalize Excel / pasted dates to YYYY-MM-DD for Postgres `date` and `variables.due_date`. */
 export function parseDueDateForColumn(
   raw: string | undefined | null
