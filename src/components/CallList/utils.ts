@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
+import { DEBTOR_AMOUNT_VARIABLE_KEYS, formatThaiBahtSatang } from "@/lib/debtorVariables";
 import { BOTNOI_TEMPLATE_ID } from "./constants";
 import type { CallAttempt } from "@/api/types";
 import type { CallListItem, Debtor, PreviewPayload, Template } from "./types";
@@ -115,11 +116,16 @@ export function buildCallPayload(item: CallListItem, templates: Template[]): Pre
       processedValue = toThaiPhonetic(processedValue);
     }
 
+    // Speak money amounts as baht/satang, e.g. "1000.5" -> "1000 บาท 50 สตางค์".
+    if (DEBTOR_AMOUNT_VARIABLE_KEYS.has(key)) {
+      processedValue = formatThaiBahtSatang(processedValue);
+    }
+
     constructedMessage = constructedMessage.replace(placeholder, processedValue);
   });
 
   // Also replace standard placeholders
-  const debtAmount = debtor.total_debt ? numberToThaiText(debtor.total_debt) + "บาท" : "-";
+  const debtAmount = debtor.total_debt ? formatThaiBahtSatang(debtor.total_debt) : "-";
   const formattedDueDate = debtor.due_date
     ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
     : "-";
