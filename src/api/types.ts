@@ -78,6 +78,7 @@ export interface CallAttempt {
   ai_reason: string;
   ai_confidence: number;
   conversation_log: string;
+  edited_conversation_log: string;
   audio_url: string;
   call_duration: number;
   error_reason: string;

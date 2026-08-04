@@ -66,5 +66,6 @@ export interface EnrichedCallRecord extends CallRecord {
   ai_reason: string | null;
   ai_confidence: number | null;
   conversation_log: string | null;
+  edited_conversation_log: string | null;
   audio_url: string | null;
 }
