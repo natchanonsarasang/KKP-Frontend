@@ -74,7 +74,8 @@ export function DebtorFormDialog({
                     <Input
                       type={isNumeric ? "number" : "text"}
                       min={isNumeric ? 0 : undefined}
-                      step={key === "overdue_installment" ? 1 : undefined}
+                      // Money fields allow satang (2 decimals); installments are whole numbers.
+                      step={isNumeric ? (key === "overdue_installment" ? 1 : 0.01) : undefined}
                       required={isRequired}
                       value={templateVariables[key] ?? ""}
                       onChange={(e) =>
