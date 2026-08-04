@@ -15,7 +15,9 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DEBTOR_CUSTOMER_VARIABLE_KEYS,
+  DEBTOR_AMOUNT_VARIABLE_KEYS,
   parseDebtAmountForColumn,
+  formatDebtorAmount,
   resolveDebtorImportHeader,
   normalizeThaiPhone,
   debtorImportHeaderLabel,
@@ -184,7 +186,11 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
           variableCols.forEach(({ idx, key }) => {
             const value = row[idx];
             if (value !== undefined && value !== null && String(value).trim() !== "") {
-              variables[key] = String(value).trim();
+              const str = String(value).trim();
+              // Money columns keep their satang: "100.5" -> "100.50".
+              variables[key] = DEBTOR_AMOUNT_VARIABLE_KEYS.has(key)
+                ? formatDebtorAmount(str)
+                : str;
             }
           });
 
