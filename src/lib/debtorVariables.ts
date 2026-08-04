@@ -151,20 +151,22 @@ export function formatDebtorAmount(value: string): string {
 
 /**
  * Render a baht amount as spoken-friendly Thai for the voicebot, splitting the
- * satang out: 1000.5 -> "1000 บาท 50 สตางค์", 1000 -> "1000 บาท". Non-numeric
- * input is returned untouched so free-text values pass through unchanged.
+ * satang out: 1000.5 -> "1000 บาท 50 สตางค์", 1000 -> "1000 บาท". The satang is
+ * read exactly as entered — the decimal digits are taken straight from the string
+ * (no rounding, so 0.999 never carries up to the next baht); a single decimal
+ * digit reads as tens ("1000.5" -> 50 สตางค์). Non-numeric input passes through
+ * untouched so free-text values are left as-is.
  */
 export function formatThaiBahtSatang(value: string | number): string {
   const raw = String(value ?? "").trim();
   if (!raw) return raw;
-  const n = Number(raw.replace(/,/g, ""));
-  if (!Number.isFinite(n)) return raw;
-  const sign = n < 0 ? "-" : "";
-  const abs = Math.abs(n);
-  const baht = Math.floor(abs);
-  const satang = Math.round((abs - baht) * 100);
-  // Rounding satang can carry into the next baht (e.g. 0.999 -> 100 satang).
-  if (satang === 100) return `${sign}${baht + 1} บาท`;
+  const cleaned = raw.replace(/,/g, "");
+  if (!/^-?\d*\.?\d+$/.test(cleaned)) return raw;
+  const sign = cleaned.startsWith("-") ? "-" : "";
+  const [intPart, fracPart = ""] = cleaned.replace(/^-/, "").split(".");
+  const baht = intPart.replace(/^0+(?=\d)/, "") || "0";
+  // Satang = first two decimal digits, as-is: "5" -> "50", "05" -> "5", no rounding.
+  const satang = parseInt((fracPart + "00").slice(0, 2), 10);
   return satang === 0
     ? `${sign}${baht} บาท`
     : `${sign}${baht} บาท ${satang} สตางค์`;
