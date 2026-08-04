@@ -188,6 +188,7 @@ export function useAnalyticsData({
         ai_reason: attempt.ai_reason ?? null,
         ai_confidence: attempt.ai_confidence ?? null,
         conversation_log: attempt.conversation_log ?? null,
+        edited_conversation_log: attempt.edited_conversation_log ?? null,
         audio_url: attempt.audio_url ?? null,
       } satisfies EnrichedCallRecord;
     });
