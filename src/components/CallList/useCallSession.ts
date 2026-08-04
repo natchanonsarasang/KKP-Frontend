@@ -6,6 +6,7 @@ import { createCallRecord, getCallRecord, updateCallRecord } from "@/api/callRec
 import { createCallSession, updateCallSession } from "@/api/callSessions";
 import { makeCall as apiMakeCall, processCallSession } from "@/api/voicebot";
 import type { CallSessionSettings } from "@/api/types";
+import { DEBTOR_AMOUNT_VARIABLE_KEYS, formatThaiBahtSatang } from "@/lib/debtorVariables";
 import { buildCallPayload } from "./utils";
 import type { AutoDialSettings, CallListItem, CallSession, PreviewPayload, Template } from "./types";
 
@@ -111,6 +112,10 @@ export function useCallSession({
         const debtorVars = {
           ...((debtor.variables || {}) as Record<string, string>),
         };
+        // Speak money amounts as baht/satang, e.g. "1000.5" -> "1000 บาท 50 สตางค์".
+        for (const key of DEBTOR_AMOUNT_VARIABLE_KEYS) {
+          if (debtorVars[key]) debtorVars[key] = formatThaiBahtSatang(debtorVars[key]);
+        }
 
         // Update call list item to calling
         await updateCallListItem(item.id, wsId, {

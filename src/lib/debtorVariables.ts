@@ -149,6 +149,27 @@ export function formatDebtorAmount(value: string): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
+/**
+ * Render a baht amount as spoken-friendly Thai for the voicebot, splitting the
+ * satang out: 1000.5 -> "1000 บาท 50 สตางค์", 1000 -> "1000 บาท". Non-numeric
+ * input is returned untouched so free-text values pass through unchanged.
+ */
+export function formatThaiBahtSatang(value: string | number): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return raw;
+  const n = Number(raw.replace(/,/g, ""));
+  if (!Number.isFinite(n)) return raw;
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  const baht = Math.floor(abs);
+  const satang = Math.round((abs - baht) * 100);
+  // Rounding satang can carry into the next baht (e.g. 0.999 -> 100 satang).
+  if (satang === 100) return `${sign}${baht + 1} บาท`;
+  return satang === 0
+    ? `${sign}${baht} บาท`
+    : `${sign}${baht} บาท ${satang} สตางค์`;
+}
+
 /** Normalize Excel / pasted dates to YYYY-MM-DD for Postgres `date` and `variables.due_date`. */
 export function parseDueDateForColumn(
   raw: string | undefined | null
