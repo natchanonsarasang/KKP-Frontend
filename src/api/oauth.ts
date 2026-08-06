@@ -51,18 +51,21 @@ export interface MicrosoftAuth {
 }
 
 /**
- * Opens `authUrl` in a popup and resolves with the callback data relayed back
- * from the OAuth callback page. Rejects on provider error or a state mismatch;
- * callers assert the specific field (`id_token` / `code`) they expect.
+ * Open the OAuth popup. This MUST be called synchronously from the click handler
+ * (before any `await`) or the browser's popup blocker will reject it — hence it
+ * opens `about:blank` first; the caller sets the real authorize URL once any
+ * async work (e.g. PKCE) is done. Returns null if the popup was blocked.
  */
-function openOAuthPopup(authUrl: string, expectedState: string): Promise<CallbackData> {
-  const popup = window.open(authUrl, "callecto-oauth", "width=500,height=650");
-  if (!popup) {
-    return Promise.reject(
-      new Error("Popup blocked. Please allow popups for this site and try again."),
-    );
-  }
+function openOAuthPopup(): Window | null {
+  return window.open("about:blank", "callecto-oauth", "width=500,height=650");
+}
 
+/**
+ * Resolve with the callback data relayed back from the OAuth callback page.
+ * Rejects on provider error or a state mismatch; callers assert the specific
+ * field (`id_token` / `code`) they expect.
+ */
+function awaitOAuthCallback(popup: Window, expectedState: string): Promise<CallbackData> {
   return new Promise<CallbackData>((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
@@ -101,6 +104,8 @@ function openOAuthPopup(authUrl: string, expectedState: string): Promise<Callbac
   });
 }
 
+const POPUP_BLOCKED = "Popup blocked. Please allow popups for this site and try again.";
+
 /** URL-safe base64 with no padding — the encoding PKCE requires. */
 function base64UrlEncode(bytes: ArrayBuffer): string {
   let str = "";
@@ -121,23 +126,35 @@ export async function getGoogleIdToken(): Promise<string> {
   if (!GOOGLE_CLIENT_ID) {
     throw new Error("Google sign-in is not configured (set VITE_GOOGLE_CLIENT_ID).");
   }
-  const redirectUri = `${window.location.origin}${OAUTH_CALLBACK_PATH}`;
-  const state = crypto.randomUUID();
-  const nonce = crypto.randomUUID();
-  const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    response_type: "id_token",
-    redirect_uri: redirectUri,
-    scope: "openid email profile",
-    response_mode: "fragment",
-    nonce,
-    state,
-    prompt: "select_account",
-  });
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  const data = await openOAuthPopup(authUrl, state);
-  if (!data.id_token) throw new Error("Provider did not return an id_token.");
-  return data.id_token;
+  // Open synchronously (within the click) so the popup isn't blocked.
+  const popup = openOAuthPopup();
+  if (!popup) throw new Error(POPUP_BLOCKED);
+  try {
+    const redirectUri = `${window.location.origin}${OAUTH_CALLBACK_PATH}`;
+    const state = crypto.randomUUID();
+    const nonce = crypto.randomUUID();
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      response_type: "id_token",
+      redirect_uri: redirectUri,
+      scope: "openid email profile",
+      response_mode: "fragment",
+      nonce,
+      state,
+      prompt: "select_account",
+    });
+    popup.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    const data = await awaitOAuthCallback(popup, state);
+    if (!data.id_token) throw new Error("Provider did not return an id_token.");
+    return data.id_token;
+  } catch (err) {
+    try {
+      popup.close();
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  }
 }
 
 /**
@@ -148,28 +165,41 @@ export async function getMicrosoftAuth(): Promise<MicrosoftAuth> {
   if (!MS_CLIENT_ID) {
     throw new Error("Microsoft sign-in is not configured (set VITE_MICROSOFT_CLIENT_ID).");
   }
-  const redirectUri = `${window.location.origin}${OAUTH_CALLBACK_PATH}`;
-  const state = crypto.randomUUID();
-  const nonce = crypto.randomUUID();
-  const { verifier, challenge } = await createPkcePair();
+  // Open synchronously (within the click) BEFORE the async PKCE work, otherwise
+  // the browser blocks the popup for not being tied to the user gesture.
+  const popup = openOAuthPopup();
+  if (!popup) throw new Error(POPUP_BLOCKED);
+  try {
+    const redirectUri = `${window.location.origin}${OAUTH_CALLBACK_PATH}`;
+    const state = crypto.randomUUID();
+    const nonce = crypto.randomUUID();
+    const { verifier, challenge } = await createPkcePair();
 
-  const params = new URLSearchParams({
-    client_id: MS_CLIENT_ID,
-    response_type: "code",
-    redirect_uri: redirectUri,
-    scope: MS_SCOPES,
-    response_mode: "fragment",
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-    nonce,
-    state,
-    prompt: "select_account",
-  });
-  const authUrl = `https://login.microsoftonline.com/${MS_TENANT}/oauth2/v2.0/authorize?${params.toString()}`;
+    const params = new URLSearchParams({
+      client_id: MS_CLIENT_ID,
+      response_type: "code",
+      redirect_uri: redirectUri,
+      scope: MS_SCOPES,
+      response_mode: "fragment",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      nonce,
+      state,
+      prompt: "select_account",
+    });
+    popup.location.href = `https://login.microsoftonline.com/${MS_TENANT}/oauth2/v2.0/authorize?${params.toString()}`;
 
-  const data = await openOAuthPopup(authUrl, state);
-  if (!data.code) throw new Error("Microsoft did not return an authorization code.");
-  return exchangeMicrosoftCode(data.code, verifier, redirectUri);
+    const data = await awaitOAuthCallback(popup, state);
+    if (!data.code) throw new Error("Microsoft did not return an authorization code.");
+    return await exchangeMicrosoftCode(data.code, verifier, redirectUri);
+  } catch (err) {
+    try {
+      popup.close();
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  }
 }
 
 /** Redeem the PKCE authorization code for id + access tokens at the token endpoint. */
