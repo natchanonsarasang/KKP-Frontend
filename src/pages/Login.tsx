@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
-import { getGoogleIdToken, getMicrosoftIdToken } from "@/api/oauth";
+import { getGoogleIdToken, getMicrosoftAuth } from "@/api/oauth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -63,8 +63,8 @@ const Login = () => {
 
   const handleMicrosoftLogin = async () => {
     try {
-      const idToken = await getMicrosoftIdToken();
-      await signInWithMicrosoft(idToken);
+      const { idToken, accessToken } = await getMicrosoftAuth();
+      await signInWithMicrosoft(idToken, accessToken);
       navigate("/dashboard");
     } catch (error: any) {
       toast.error("Microsoft login failed", {

@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 
-// Lightweight relay for the Microsoft (Entra) implicit popup flow.
-// The provider redirects here with the result in the URL fragment; we forward it
-// to the window that opened the popup (see src/test/api/oauth.ts) and close.
+// Lightweight relay for the Google (implicit) and Microsoft (auth code + PKCE)
+// popup flows. The provider redirects here with the result in the URL fragment;
+// we forward it to the window that opened the popup (see api/oauth.ts) and close.
+// Google returns `id_token`; Microsoft returns `code` (redeemed by the opener).
 const OAuthCallback = () => {
   useEffect(() => {
     const hash = window.location.hash.startsWith("#")
@@ -13,6 +14,7 @@ const OAuthCallback = () => {
     const payload = {
       type: "oauth-callback",
       id_token: params.get("id_token"),
+      code: params.get("code"),
       state: params.get("state"),
       error: params.get("error"),
       error_description: params.get("error_description"),
