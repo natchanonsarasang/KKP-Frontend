@@ -19,6 +19,7 @@ import {
   parseDebtAmountForColumn,
   formatDebtorAmount,
   resolveDebtorImportHeader,
+  isKnownIgnoredDebtorHeader,
   normalizeThaiPhone,
   debtorImportHeaderLabel,
 } from "@/lib/debtorVariables";
@@ -42,9 +43,11 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
   const [columnHeaders, setColumnHeaders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [formatMismatch, setFormatMismatch] = useState<{
-    expected: string[];
-    received: string[];
+  // Non-blocking import notice: which expected columns were not found (missing or
+  // misspelled) and which unknown columns were ignored. The import still proceeds.
+  const [importNotice, setImportNotice] = useState<{
+    missing: string[];
+    ignored: string[];
   } | null>(null);
 
   // Fetch existing workspace schema (variable columns) from debtors
@@ -68,10 +71,10 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     enabled: !!currentWorkspace?.id && open,
   });
 
-  // Reset format mismatch when dialog closes
+  // Reset import notice when dialog closes
   useEffect(() => {
     if (!open) {
-      setFormatMismatch(null);
+      setImportNotice(null);
     }
   }, [open]);
 
@@ -113,7 +116,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setFormatMismatch(null);
+    setImportNotice(null);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -140,9 +143,35 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
 
         const resolved = rawHeaders.map(resolveDebtorImportHeader);
 
-        // Locate the phone column (fall back to the first column for older sheets).
+        // Locate the phone column. If no header maps to phone (e.g. เบอร์โทร is
+        // misspelled), fall back to the first column that isn't an always-ignored
+        // standard column like "id" — that's the best guess for the phone data.
         let phoneIdx = resolved.findIndex((r) => r.kind === "key" && r.key === "phone_number");
-        if (phoneIdx === -1) phoneIdx = 0;
+        if (phoneIdx === -1) {
+          phoneIdx = rawHeaders.findIndex((h) => h && !isKnownIgnoredDebtorHeader(h));
+          if (phoneIdx === -1) phoneIdx = 0;
+        }
+
+        // Columns the system doesn't recognize are dropped (strict whitelist).
+        // The always-ignored standard columns (id, "other expenses") don't count.
+        const ignoredHeaders = rawHeaders.filter(
+          (h, idx) =>
+            idx !== phoneIdx &&
+            resolved[idx].kind === "ignore" &&
+            h &&
+            !isKnownIgnoredDebtorHeader(h),
+        );
+
+        // Expected columns = phone + the workspace's variable schema (or the
+        // standard customer keys for a fresh workspace). Any expected key with no
+        // matching header was missing/misspelled — we still import, but tell the user.
+        const resolvedKeys = new Set(
+          resolved.flatMap((r) => (r.kind === "key" ? [r.key] : [])),
+        );
+        const expectedKeys = ["phone_number", ...(workspaceSchema ?? [...DEBTOR_CUSTOMER_VARIABLE_KEYS])];
+        const missingLabels = expectedKeys
+          .filter((k) => !resolvedKeys.has(k))
+          .map((k) => debtorImportHeaderLabel(k));
 
         // Variable columns = every mapped column that isn't the phone column.
         const variableCols: { idx: number; key: string }[] = [];
@@ -152,22 +181,15 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
         });
         const variableHeaders = variableCols.map((c) => c.key);
 
-        // Validate format matches existing workspace schema
-        if (workspaceSchema && workspaceSchema.length > 0) {
-          const sortedExpected = [...workspaceSchema].sort();
-          const sortedReceived = [...variableHeaders].sort();
-
-          const columnsMatch =
-            sortedExpected.length === sortedReceived.length &&
-            sortedExpected.every((col, idx) => col === sortedReceived[idx]);
-
-          if (!columnsMatch) {
-            setFormatMismatch({
-              expected: workspaceSchema,
-              received: variableHeaders,
-            });
-            toast.error("Excel format doesn't match workspace schema");
-            return;
+        // Surface missing/ignored columns as a non-blocking notice — the import
+        // still proceeds with whatever columns were recognized.
+        if (missingLabels.length > 0 || ignoredHeaders.length > 0) {
+          setImportNotice({ missing: missingLabels, ignored: ignoredHeaders });
+          if (missingLabels.length > 0) {
+            toast.warning(`Missing column(s): ${missingLabels.join(", ")}`);
+          }
+          if (ignoredHeaders.length > 0) {
+            toast.warning(`Ignored unknown column(s): ${ignoredHeaders.join(", ")}`);
           }
         }
 
@@ -228,7 +250,7 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
     setDebtorRows([]);
     setColumnHeaders([]);
     setProgress(0);
-    setFormatMismatch(null);
+    setImportNotice(null);
   };
 
   const uploadMutation = useMutation({
@@ -333,24 +355,25 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             )}
           </div>
 
-          {/* Format Mismatch Alert */}
-          {formatMismatch && (
-            <Alert variant="destructive">
+          {/* Non-blocking import notice (missing / ignored columns) */}
+          {importNotice && (
+            <Alert>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Format Mismatch</AlertTitle>
+              <AlertTitle>Check your columns</AlertTitle>
               <AlertDescription className="space-y-2">
-                <p>The uploaded file doesn't match the existing workspace format.</p>
-                <div className="text-sm">
-                  <p>
-                    <strong>Expected columns:</strong> {formatMismatch.expected.join(", ") || "(none)"}
+                <p className="text-sm">The file was imported, but some columns need attention:</p>
+                {importNotice.missing.length > 0 && (
+                  <p className="text-sm">
+                    <strong>Missing (check spelling):</strong> {importNotice.missing.join(", ")}
                   </p>
-                  <p>
-                    <strong>Found columns:</strong> {formatMismatch.received.join(", ") || "(none)"}
+                )}
+                {importNotice.ignored.length > 0 && (
+                  <p className="text-sm">
+                    <strong>Ignored (unknown):</strong> {importNotice.ignored.join(", ")}
                   </p>
-                </div>
-                <p className="text-xs">
-                  Please use the same Excel format as your existing data, or create a new workspace for different
-                  formats.
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Missing columns won't be filled in. Rename the headers to match the template, or download it above.
                 </p>
               </AlertDescription>
             </Alert>
