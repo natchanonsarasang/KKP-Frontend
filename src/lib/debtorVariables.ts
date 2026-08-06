@@ -100,8 +100,10 @@ export type ResolvedDebtorHeader =
 
 /**
  * Resolve an uploaded Excel header to either a canonical debtor variable key or
- * an "ignore" marker. Unknown headers pass through as-is so custom workspace
- * columns keep working.
+ * an "ignore" marker. This is a strict whitelist: only headers that map through
+ * DEBTOR_IMPORT_HEADER_ALIASES (the known Thai labels + English aliases) are
+ * imported. Any unknown/unrecognized header is ignored so columns the system
+ * doesn't know about never get stored or shown in the Debtor List.
  */
 export function resolveDebtorImportHeader(raw: string): ResolvedDebtorHeader {
   const norm = normalizeHeaderText(raw);
@@ -109,7 +111,16 @@ export function resolveDebtorImportHeader(raw: string): ResolvedDebtorHeader {
   if (DEBTOR_IMPORT_IGNORED_HEADERS.has(norm)) return { kind: "ignore" };
   const alias = DEBTOR_IMPORT_HEADER_ALIASES[norm];
   if (alias) return { kind: "key", key: alias };
-  return { kind: "key", key: String(raw).trim() };
+  return { kind: "ignore" };
+}
+
+/**
+ * True for the standard sheet columns we always drop on purpose (id, "other
+ * expenses", …). Used to keep these out of the "unknown column ignored" warning,
+ * since they're expected — unlike genuinely unrecognized headers.
+ */
+export function isKnownIgnoredDebtorHeader(raw: string): boolean {
+  return DEBTOR_IMPORT_IGNORED_HEADERS.has(normalizeHeaderText(raw));
 }
 
 /**
