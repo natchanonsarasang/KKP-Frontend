@@ -224,7 +224,19 @@ const CallList = () => {
     (item) => item.called_at || (item.status && item.status !== "pending" && item.status !== "retry_pending"),
   );
 
-  const pickedUpCount = completedCallsStats.filter((item) => item.picked_up).length;
+  // A hang-up means the debtor answered then hung up. The backend flags these as
+  // picked_up=true, but we count them as Incomplete only so Complete and Incomplete
+  // don't overlap (otherwise the same call is counted in both cards). Detect via the
+  // call_outcome ("Hangup") or the raw webhook result status.
+  const isHangup = (item: (typeof completedCallsStats)[number]) => {
+    const outcome = (item.call_outcome || "").toLowerCase();
+    const resultStatus = (
+      (item as unknown as { call_record?: { result_data?: { status?: string } } }).call_record?.result_data?.status || ""
+    ).toLowerCase();
+    return outcome.includes("hang") || resultStatus.includes("hang");
+  };
+
+  const pickedUpCount = completedCallsStats.filter((item) => item.picked_up && !isHangup(item)).length;
 
   const categorizedStats = completedCallsStats.map((item) => {
     const rawOutcome = (item.call_outcome || "").toLowerCase().replace(/_/g, " ");
@@ -240,7 +252,7 @@ const CallList = () => {
     else if (rawOutcome === "voicemail") resolved = "voicemail";
     else if (rawOutcome === "busy") resolved = "busy";
     else if (rawOutcome === "failed") resolved = "failed";
-    else if (rawStatus === "hanged up" || rawOutcome === "hanged up") resolved = "hanged_up";
+    else if (rawStatus.includes("hang") || rawOutcome.includes("hang")) resolved = "hanged_up";
     else if (item.picked_up === false) resolved = "no_answer";
     else if (rawStatus === "no answer") resolved = "no_answer";
     else if (rawStatus === "busy") resolved = "busy";
