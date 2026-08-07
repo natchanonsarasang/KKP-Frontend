@@ -68,8 +68,11 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
       PINNED_VARIABLE_KEYS.includes(k as (typeof PINNED_VARIABLE_KEYS)[number]) ||
       HIDDEN_VARIABLE_KEYS.includes(k as (typeof HIDDEN_VARIABLE_KEYS)[number]);
     const ordered: string[] = [];
+    // Always show the standard customer columns (e.g. total_interest, total_fine)
+    // even when no debtor has a value yet — empty cells render as "-" instead of
+    // the whole column disappearing until some debtor happens to have a value.
     for (const k of DEBTOR_CUSTOMER_VARIABLE_KEYS) {
-      if (allKeys.has(k) && !isHidden(k)) ordered.push(k);
+      if (!isHidden(k)) ordered.push(k);
     }
     const rest = [...allKeys]
       .filter((k) => !DEBTOR_CUSTOMER_VARIABLE_KEYS.includes(k as (typeof DEBTOR_CUSTOMER_VARIABLE_KEYS)[number]))
