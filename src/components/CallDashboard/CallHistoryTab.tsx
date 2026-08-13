@@ -51,8 +51,8 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                   <TableHead className="text-xs">ผล AI</TableHead>
                   <TableHead className="text-xs">ความมั่นใจ</TableHead>
                   <TableHead className="text-xs">เหตุผล AI</TableHead>
-                  <TableHead className="text-xs">บทสนทนา</TableHead>
-                  <TableHead className="text-xs">บทสนทนา (แก้ไขได้)</TableHead>
+                  <TableHead className="text-xs text-primary font-semibold text-center">บทสนทนา</TableHead>
+                  <TableHead className="text-xs font-semibold text-center bg-muted text-primary">ASR Correction</TableHead>
                   <TableHead className="text-xs">สถานะ</TableHead>
                   <TableHead className="text-xs">เวลา</TableHead>
                 </TableRow>
@@ -91,7 +91,7 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                       )}
                     </TableCell>
                     <TableCell><ConversationLogCell record={record} /></TableCell>
-                    <TableCell><EditableConversationLogCell record={record} /></TableCell>
+                    <TableCell className="bg-muted"><EditableConversationLogCell record={record} /></TableCell>
                     <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(record.created_at).toLocaleString("th-TH", {
