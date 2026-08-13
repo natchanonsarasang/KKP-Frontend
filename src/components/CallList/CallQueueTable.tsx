@@ -11,6 +11,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Pencil,
   Phone,
   Trash2,
 } from "lucide-react";
@@ -34,6 +35,7 @@ interface CallQueueTableProps {
   onExportCompletedCalls: () => void;
   onPreviewCall: (item: CallListItem) => void;
   onViewTranscript: (attempt: CallAttempt | null) => void;
+  onEditTranscript: (attempt: CallAttempt | null) => void;
   onRemoveFromList: (id: string) => void;
   isRemovingFromList: boolean;
 }
@@ -54,6 +56,7 @@ export function CallQueueTable({
   onExportCompletedCalls,
   onPreviewCall,
   onViewTranscript,
+  onEditTranscript,
   onRemoveFromList,
   isRemovingFromList,
 }: CallQueueTableProps) {
@@ -241,15 +244,26 @@ export function CallQueueTable({
                           hasNoTranscript ? (
                             <span className="text-muted-foreground text-xs px-2">-</span>
                           ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-primary"
-                              onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
-                              title="View conversation"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                                title="View conversation"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() => onEditTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                                title="ASR Correction (แก้ไขบทสนทนา)"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            </>
                           )
                         ) : (
                           <Button

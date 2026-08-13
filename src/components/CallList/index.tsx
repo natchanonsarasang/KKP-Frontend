@@ -22,6 +22,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { FilterDialog } from "./FilterDialog";
 import { TranscriptDialog } from "./TranscriptDialog";
+import { EditableTranscriptDialog } from "./EditableTranscriptDialog";
 import type { AutoDialSettings, CallSession, SortDirection, SortField, Template, TranscriptData } from "./types";
 import { Badge } from "@/components/ui/badge";
 
@@ -44,6 +45,8 @@ const CallList = () => {
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [transcriptData, setTranscriptData] = useState<TranscriptData | null>(null);
+  const [showEditTranscriptDialog, setShowEditTranscriptDialog] = useState(false);
+  const [editTranscriptAttempt, setEditTranscriptAttempt] = useState<CallAttempt | null>(null);
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -180,6 +183,12 @@ const CallList = () => {
       audioUrl: attempt?.audio_url || null,
     });
     setShowTranscriptDialog(true);
+  };
+
+  // Handle editing transcript (ASR Correction) — saves to edited_conversation_log.
+  const handleEditTranscript = (attempt: CallAttempt | null) => {
+    setEditTranscriptAttempt(attempt);
+    setShowEditTranscriptDialog(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -530,6 +539,7 @@ const CallList = () => {
         onExportCompletedCalls={() => exportCompletedCallsToExcel(callListItems || [], callAttemptsByItemId)}
         onPreviewCall={handlePreviewCall}
         onViewTranscript={handleViewTranscript}
+        onEditTranscript={handleEditTranscript}
         onRemoveFromList={(id) => removeFromListMutation.mutate(id)}
         isRemovingFromList={removeFromListMutation.isPending}
       />
@@ -630,6 +640,12 @@ const CallList = () => {
         open={showTranscriptDialog}
         onOpenChange={setShowTranscriptDialog}
         transcriptData={transcriptData}
+      />
+
+      <EditableTranscriptDialog
+        open={showEditTranscriptDialog}
+        onOpenChange={setShowEditTranscriptDialog}
+        attempt={editTranscriptAttempt}
       />
     </div>
   );

@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, MessageSquareText, User } from "lucide-react";
+import { toast } from "sonner";
+import { Bot, Download, MessageSquareText, User } from "lucide-react";
 import { ProxyAudioPlayer } from "@/components/ProxyAudioPlayer";
+import { downloadAudioViaProxy } from "@/api/audioProxy";
 import { getAICategoryBadge, getConfidenceMeter } from "./StatusBadges";
 import type { EnrichedCallRecord } from "./types";
 
@@ -93,8 +95,23 @@ export function ConversationLogCell({ record }: { record: EnrichedCallRecord }) 
           </DialogHeader>
 
           {record.audio_url && (
-            <div className="border-b bg-muted/30 px-5 py-3">
+            <div className="space-y-2 border-b bg-muted/30 px-5 py-3">
               <ProxyAudioPlayer url={record.audio_url} className="w-full h-9" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    await downloadAudioViaProxy(record.audio_url!, "call_audio.mp3");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "ดาวน์โหลดไฟล์เสียงไม่สำเร็จ");
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                ดาวน์โหลดไฟล์เสียง
+              </Button>
             </div>
           )}
 
