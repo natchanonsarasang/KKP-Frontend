@@ -65,7 +65,7 @@ export function DebtorFormDialog({
               {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
                 const isInstallment = key === "overdue_installment";
                 // overdue_installment is required and must be at least 1 (can't be 0).
-                const isRequired = ["name", "total_debt", "overdue_installment"].includes(key);
+                const isRequired = ["name", "car_detail", "total_debt", "overdue_installment"].includes(key);
                 const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);
                 return (
                   <div key={key} className="space-y-1.5">
