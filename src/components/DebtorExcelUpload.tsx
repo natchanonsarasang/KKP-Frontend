@@ -43,11 +43,18 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
   const [columnHeaders, setColumnHeaders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  // Non-blocking import notice: which expected columns were not found (missing or
-  // misspelled) and which unknown columns were ignored. The import still proceeds.
+  // Import notice. Two flavours:
+  //  - `requiredMissing` set => the file was REJECTED (a required column, ชื่อ-นามสกุล
+  //    or จำนวนงวดที่ค้าง, is absent) and nothing was imported.
+  //  - otherwise it is a non-blocking notice: expected columns not found (missing or
+  //    misspelled), unknown columns ignored, and rows skipped for a bad
+  //    จำนวนงวดที่ค้าง value. The import still proceeds with the valid rows.
   const [importNotice, setImportNotice] = useState<{
     missing: string[];
     ignored: string[];
+    requiredMissing?: string[];
+    invalidInstallments?: { row: number; value: string }[];
+    emptyNames?: number[];
   } | null>(null);
 
   // Fetch existing workspace schema (variable columns) from debtors
@@ -143,6 +150,22 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
 
         const resolved = rawHeaders.map(resolveDebtorImportHeader);
 
+        // Required columns: ชื่อ-นามสกุล (name) and จำนวนงวดที่ค้าง (overdue_installment)
+        // must both be present, otherwise the file is rejected outright.
+        const presentKeys = new Set(
+          resolved.flatMap((r) => (r.kind === "key" ? [r.key] : [])),
+        );
+        const requiredMissing = ["name", "overdue_installment"]
+          .filter((k) => !presentKeys.has(k))
+          .map((k) => debtorImportHeaderLabel(k));
+        if (requiredMissing.length > 0) {
+          setDebtorRows([]);
+          setColumnHeaders([]);
+          setImportNotice({ missing: [], ignored: [], requiredMissing });
+          toast.error(`Missing required column(s): ${requiredMissing.join(", ")}`);
+          return;
+        }
+
         // Locate the phone column. If no header maps to phone (e.g. เบอร์โทร is
         // misspelled), fall back to the first column that isn't an always-ignored
         // standard column like "id" — that's the best guess for the phone data.
@@ -195,14 +218,44 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
 
         setColumnHeaders(variableHeaders);
 
+        // The จำนวนงวดที่ค้าง column index — every row's value must be a whole
+        // number ≥ 1 (1, 2, 3, …). 0, decimals (.5, .345), blanks and non-numbers
+        // are rejected and the offending row is skipped.
+        const installmentIdx = variableCols.find(
+          (c) => c.key === "overdue_installment",
+        )!.idx;
+        // The ชื่อ-นามสกุล column index — every row must have a non-empty name.
+        const nameIdx = variableCols.find((c) => c.key === "name")!.idx;
+
         // Parse data rows
         const rows: DebtorRow[] = [];
+        const invalidInstallments: { row: number; value: string }[] = [];
+        const emptyNames: number[] = [];
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
           if (!row) continue;
 
           const phoneNumber = normalizeThaiPhone(String(row[phoneIdx] ?? ""));
           if (!phoneNumber) continue;
+
+          // Validate ชื่อ-นามสกุล: must not be empty.
+          if (!String(row[nameIdx] ?? "").trim()) {
+            emptyNames.push(i + 1);
+            continue;
+          }
+
+          // Validate จำนวนงวดที่ค้าง: whole number ≥ 1 only.
+          const rawInstallment = String(row[installmentIdx] ?? "").trim();
+          const installmentNum = Number(rawInstallment.replace(/,/g, ""));
+          if (
+            !rawInstallment ||
+            !Number.isFinite(installmentNum) ||
+            !Number.isInteger(installmentNum) ||
+            installmentNum < 1
+          ) {
+            invalidInstallments.push({ row: i + 1, value: rawInstallment });
+            continue;
+          }
 
           const variables: Record<string, string> = {};
           variableCols.forEach(({ idx, key }) => {
@@ -220,6 +273,29 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             phone_number: phoneNumber,
             variables,
           });
+        }
+
+        // If ANY row has an empty ชื่อ-นามสกุล or a bad จำนวนงวดที่ค้าง, reject the
+        // whole file — nothing is imported until every row is valid.
+        if (emptyNames.length > 0 || invalidInstallments.length > 0) {
+          setDebtorRows([]);
+          setColumnHeaders([]);
+          setImportNotice({
+            missing: [],
+            ignored: [],
+            requiredMissing: [],
+            invalidInstallments,
+            emptyNames,
+          });
+          const reasons: string[] = [];
+          if (emptyNames.length > 0) {
+            reasons.push(`${emptyNames.length} row(s) with an empty ชื่อ-นามสกุล`);
+          }
+          if (invalidInstallments.length > 0) {
+            reasons.push(`${invalidInstallments.length} row(s) with an invalid จำนวนงวดที่ค้าง`);
+          }
+          toast.error(`File not imported: ${reasons.join(", ")}`);
+          return;
         }
 
         if (rows.length === 0) {
@@ -355,29 +431,102 @@ const DebtorExcelUpload = ({ open, onOpenChange }: DebtorExcelUploadProps) => {
             )}
           </div>
 
+          {/*
+            Blocking notice — nothing was imported. Two reasons:
+              1. a required column (ชื่อ-นามสกุล / จำนวนงวดที่ค้าง) is missing, or
+              2. one or more rows have an invalid จำนวนงวดที่ค้าง (not a whole number ≥ 1).
+          */}
+          {importNotice &&
+            ((importNotice.requiredMissing && importNotice.requiredMissing.length > 0) ||
+              (importNotice.invalidInstallments && importNotice.invalidInstallments.length > 0) ||
+              (importNotice.emptyNames && importNotice.emptyNames.length > 0)) && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>File not imported</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  {importNotice.emptyNames && importNotice.emptyNames.length > 0 && (
+                    <>
+                      <p className="text-sm">
+                        Every row must have a <strong>ชื่อ-นามสกุล</strong>. These row(s) are
+                        empty, so the whole file was rejected:
+                      </p>
+                      <p className="text-sm">
+                        {importNotice.emptyNames
+                          .slice(0, 20)
+                          .map((r) => `row ${r}`)
+                          .join(", ")}
+                        {importNotice.emptyNames.length > 20 &&
+                          ` … +${importNotice.emptyNames.length - 20} more`}
+                      </p>
+                      <p className="text-xs">
+                        Fill in the ชื่อ-นามสกุล value(s) above, then upload again.
+                      </p>
+                    </>
+                  )}
+                  {importNotice.requiredMissing && importNotice.requiredMissing.length > 0 && (
+                    <>
+                      <p className="text-sm">
+                        These required column(s) are missing, so the file cannot be imported:
+                      </p>
+                      <p className="text-sm">
+                        <strong>{importNotice.requiredMissing.join(", ")}</strong>
+                      </p>
+                      <p className="text-xs">
+                        Both <strong>ชื่อ-นามสกุล</strong> and <strong>จำนวนงวดที่ค้าง</strong> are required.
+                        Add the missing column(s), then upload again — or download the template above.
+                      </p>
+                    </>
+                  )}
+                  {importNotice.invalidInstallments && importNotice.invalidInstallments.length > 0 && (
+                    <>
+                      <p className="text-sm">
+                        Every <strong>จำนวนงวดที่ค้าง</strong> must be a whole number ≥ 1 (1, 2, 3, …).
+                        These row(s) are invalid, so the whole file was rejected:
+                      </p>
+                      <p className="text-sm">
+                        {importNotice.invalidInstallments
+                          .slice(0, 20)
+                          .map((r) => `row ${r.row}${r.value ? ` ("${r.value}")` : " (empty)"}`)
+                          .join(", ")}
+                        {importNotice.invalidInstallments.length > 20 &&
+                          ` … +${importNotice.invalidInstallments.length - 20} more`}
+                      </p>
+                      <p className="text-xs">
+                        Fix the จำนวนงวดที่ค้าง value(s) above, then upload again.
+                      </p>
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
           {/* Non-blocking import notice (missing / ignored columns) */}
-          {importNotice && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Check your columns</AlertTitle>
-              <AlertDescription className="space-y-2">
-                <p className="text-sm">The file was imported, but some columns need attention:</p>
-                {importNotice.missing.length > 0 && (
-                  <p className="text-sm">
-                    <strong>Missing (check spelling):</strong> {importNotice.missing.join(", ")}
+          {importNotice &&
+            !(importNotice.requiredMissing && importNotice.requiredMissing.length > 0) &&
+            !(importNotice.invalidInstallments && importNotice.invalidInstallments.length > 0) &&
+            !(importNotice.emptyNames && importNotice.emptyNames.length > 0) &&
+            (importNotice.missing.length > 0 || importNotice.ignored.length > 0) && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Check your columns</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p className="text-sm">The file was imported, but some columns need attention:</p>
+                  {importNotice.missing.length > 0 && (
+                    <p className="text-sm">
+                      <strong>Missing (check spelling):</strong> {importNotice.missing.join(", ")}
+                    </p>
+                  )}
+                  {importNotice.ignored.length > 0 && (
+                    <p className="text-sm">
+                      <strong>Ignored (unknown):</strong> {importNotice.ignored.join(", ")}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Missing columns won't be filled in. Rename the headers to match the template, or download it above.
                   </p>
-                )}
-                {importNotice.ignored.length > 0 && (
-                  <p className="text-sm">
-                    <strong>Ignored (unknown):</strong> {importNotice.ignored.join(", ")}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Missing columns won't be filled in. Rename the headers to match the template, or download it above.
-                </p>
-              </AlertDescription>
-            </Alert>
-          )}
+                </AlertDescription>
+              </Alert>
+            )}
 
           {/* Preview Table */}
           {debtorRows.length > 0 && (
