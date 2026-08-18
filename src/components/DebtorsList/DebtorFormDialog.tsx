@@ -63,7 +63,9 @@ export function DebtorFormDialog({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
-                const isRequired = ["name", "total_debt"].includes(key);
+                const isInstallment = key === "overdue_installment";
+                // overdue_installment is required and must be at least 1 (can't be 0).
+                const isRequired = ["name", "car_detail", "total_debt", "overdue_installment"].includes(key);
                 const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);
                 return (
                   <div key={key} className="space-y-1.5">
@@ -73,9 +75,9 @@ export function DebtorFormDialog({
                     </Label>
                     <Input
                       type={isNumeric ? "number" : "text"}
-                      min={isNumeric ? 0 : undefined}
+                      min={isNumeric ? (isInstallment ? 1 : 0) : undefined}
                       // Money fields allow satang (2 decimals); installments are whole numbers.
-                      step={isNumeric ? (key === "overdue_installment" ? 1 : 0.01) : undefined}
+                      step={isNumeric ? (isInstallment ? 1 : 0.01) : undefined}
                       required={isRequired}
                       value={templateVariables[key] ?? ""}
                       onChange={(e) =>
