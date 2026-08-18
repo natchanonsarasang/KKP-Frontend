@@ -160,8 +160,9 @@ export function CallQueueTable({
                 {filteredCallListItems.map((item) => {
                   const debtor = item.debtor;
                   const isCurrentlyCalling = item.status === "calling";
-                  // Rejected / hang-up calls have no meaningful conversation to view.
-                  const hasNoTranscript = /reject|hang/i.test(item.call_outcome || "");
+                  // Rejected calls have no meaningful conversation to view. Hang-ups
+                  // now deliver a webhook (transcript + audio), so they DO show it.
+                  const hasNoTranscript = /reject/i.test(item.call_outcome || "");
 
                   // Determine outcome display
                   const getOutcomeDisplay = () => {
