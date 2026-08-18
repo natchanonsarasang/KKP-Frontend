@@ -49,10 +49,11 @@ function parseConversation(log: string): ConversationTurn[] {
 
 // Outcomes with no meaningful conversation to show — the call never produced a
 // real transcript, so the transcript column renders "-" instead of a link.
+// Hang-ups now deliver a webhook (transcript + audio), so they are NOT excluded.
 function hasNoTranscript(outcome: string | null | undefined): boolean {
   if (!outcome) return false;
   const o = outcome.toLowerCase();
-  return o.includes("reject") || o.includes("hang");
+  return o.includes("reject");
 }
 
 export function ConversationLogCell({ record }: { record: EnrichedCallRecord }) {
@@ -61,7 +62,7 @@ export function ConversationLogCell({ record }: { record: EnrichedCallRecord }) 
 
   const turns = useMemo(() => (log ? parseConversation(log) : []), [log]);
 
-  // Rejected / hang-up calls have no meaningful conversation — show "-".
+  // Rejected calls (or any record with no log) have nothing to show — render "-".
   if (!log || hasNoTranscript(record.call_outcome)) {
     return <span className="text-muted-foreground text-xs">-</span>;
   }
