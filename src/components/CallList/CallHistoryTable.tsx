@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Download, FileText, History, Loader2, Volume2 } from "lucide-react";
+import { AlertCircle, Download, FileText, History, Loader2, RefreshCw, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getBotnoiAudioBlobUrl,
@@ -29,14 +29,14 @@ export function CallHistoryTable() {
   const startDate = format(subDays(today, rangeDays), "yyyy/MM/dd");
   const endDate = format(today, "yyyy/MM/dd");
 
-  const { data: conversations, isLoading, error } = useQuery({
+  const { data: conversations, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["botnoi-conversations", startDate, endDate],
     queryFn: () => listBotnoiConversations(startDate, endDate),
   });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center">
+      <div className="flex items-center justify-between">
         <div className="flex gap-1 bg-muted p-1 rounded-lg">
           {RANGE_OPTIONS.map((days) => (
             <button
@@ -50,6 +50,10 @@ export function CallHistoryTable() {
             </button>
           ))}
         </div>
+        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {isLoading ? (
