@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import {
   Clock,
   Download,
   FileText,
+  History,
   Loader2,
   Pencil,
   Phone,
@@ -20,8 +22,8 @@ import type { CallAttempt } from "@/api/types";
 import type { CallListItem, SortDirection, SortField } from "./types";
 
 interface CallQueueTableProps {
-  activeTab: "pending" | "calling" | "completed";
-  onTabChange: (tab: "pending" | "calling" | "completed") => void;
+  activeTab: "pending" | "calling" | "completed" | "history";
+  onTabChange: (tab: "pending" | "calling" | "completed" | "history") => void;
   pendingCount: number;
   callingCount: number;
   processedCount: number;
@@ -38,6 +40,7 @@ interface CallQueueTableProps {
   onEditTranscript: (attempt: CallAttempt | null) => void;
   onRemoveFromList: (id: string) => void;
   isRemovingFromList: boolean;
+  historyContent: ReactNode;
 }
 
 export function CallQueueTable({
@@ -59,6 +62,7 @@ export function CallQueueTable({
   onEditTranscript,
   onRemoveFromList,
   isRemovingFromList,
+  historyContent,
 }: CallQueueTableProps) {
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
@@ -113,12 +117,27 @@ export function CallQueueTable({
               >
                 Completed ({processedCount})
               </button>
+              <button
+                onClick={() => onTabChange("history")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === "history"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <History className="w-3 h-3" />
+                  History
+                </span>
+              </button>
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {activeTab === "history" ? (
+          historyContent
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>

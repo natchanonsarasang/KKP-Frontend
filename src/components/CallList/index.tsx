@@ -17,6 +17,7 @@ import { StatsCards } from "./StatsCards";
 import { ActiveSessionBanner } from "./ActiveSessionBanner";
 import { ActionsBar } from "./ActionsBar";
 import { CallQueueTable } from "./CallQueueTable";
+import { CallHistoryTable } from "./CallHistoryTable";
 import { AddToListDialog } from "./AddToListDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { PreviewDialog } from "./PreviewDialog";
@@ -40,7 +41,7 @@ const CallList = () => {
   const [selectedDebtors, setSelectedDebtors] = useState<string[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [scheduledTime, setScheduledTime] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"pending" | "calling" | "completed">("pending");
+  const [activeTab, setActiveTab] = useState<"pending" | "calling" | "completed" | "history">("pending");
   const [filterMatchCount, setFilterMatchCount] = useState<number | undefined>(undefined);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
@@ -542,6 +543,7 @@ const CallList = () => {
         onEditTranscript={handleEditTranscript}
         onRemoveFromList={(id) => removeFromListMutation.mutate(id)}
         isRemovingFromList={removeFromListMutation.isPending}
+        historyContent={<CallHistoryTable />}
       />
 
       <AddToListDialog
