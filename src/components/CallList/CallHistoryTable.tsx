@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -11,37 +10,17 @@ import { toast } from "sonner";
 import {
   getBotnoiAudioBlobUrl,
   listBotnoiConversations,
-  lookupBotnoiConversations,
   parseBotnoiLog,
   readBotnoiLog,
   type BotnoiConversation,
-  type BotnoiConversationLink,
 } from "@/api/botnoiLogs";
-import { maskPhoneNumber } from "@/lib/formatPhone";
-import { displayCallOutcome, downloadConversationAsText } from "./utils";
+import { downloadConversationAsText } from "./utils";
 
 const RANGE_OPTIONS = [7, 30, 90] as const;
 
-function OutcomeBadge({ link }: { link: BotnoiConversationLink }) {
-  const text = displayCallOutcome(link.call_outcome) || link.status;
-  if (!text) return <span className="text-muted-foreground">-</span>;
-  const t = text.toLowerCase();
-  const tone =
-    t.includes("ยืนยัน") || t.includes("confirm") || t === "completed"
-      ? "bg-success/10 text-success border-success/20"
-      : t.includes("ปฏิเสธ") || t.includes("decline") || t.includes("reject") || t.includes("fail")
-        ? "bg-destructive/10 text-destructive border-destructive/20"
-        : "bg-warning/10 text-warning border-warning/20";
-  return (
-    <Badge variant="outline" className={tone}>
-      {text}
-    </Badge>
-  );
-}
-
 // Botnoi conversation history for the configured agent, one row per
-// conversation id. Each conversation is matched to the debtor it called via
-// our call records; calls not placed through this system have no match.
+// conversation. Botnoi logs carry no link to our debtors, so rows show the
+// call time only.
 export function CallHistoryTable() {
   const [rangeDays, setRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(7);
   const [selected, setSelected] = useState<BotnoiConversation | null>(null);
@@ -53,13 +32,6 @@ export function CallHistoryTable() {
   const { data: conversations, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["botnoi-conversations", startDate, endDate],
     queryFn: () => listBotnoiConversations(startDate, endDate),
-  });
-
-  const conversationIds = (conversations ?? []).map((c) => c.id);
-  const { data: links } = useQuery({
-    queryKey: ["botnoi-conversation-links", conversationIds],
-    queryFn: () => lookupBotnoiConversations(conversationIds),
-    enabled: conversationIds.length > 0,
   });
 
   return (
@@ -106,67 +78,37 @@ export function CallHistoryTable() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">เวลา</TableHead>
-                <TableHead className="text-xs">ชื่อ</TableHead>
-                <TableHead className="text-xs">ผลการโทร</TableHead>
                 <TableHead className="text-xs w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {conversations.map((conv) => {
-                const link = links?.get(conv.id);
-                return (
-                  <TableRow key={conv.id}>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{conv.startedAt ?? "-"}</TableCell>
-                    <TableCell>
-                      {link ? (
-                        <>
-                          <div className="text-sm font-medium">{link.debtor_name || "-"}</div>
-                          <div className="font-mono text-xs text-muted-foreground">{maskPhoneNumber(link.debtor_phone)}</div>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">ไม่ได้โทรผ่านระบบ</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {link ? <OutcomeBadge link={link} /> : <span className="text-muted-foreground">-</span>}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-primary"
-                        onClick={() => setSelected(conv)}
-                        title="View conversation"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {conversations.map((conv) => (
+                <TableRow key={conv.id}>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{conv.startedAt ?? "-"}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                      onClick={() => setSelected(conv)}
+                      title="View conversation"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
       )}
 
-      <ConversationDialog
-        conversation={selected}
-        link={selected ? links?.get(selected.id) : undefined}
-        onClose={() => setSelected(null)}
-      />
+      <ConversationDialog conversation={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-function ConversationDialog({
-  conversation,
-  link,
-  onClose,
-}: {
-  conversation: BotnoiConversation | null;
-  link?: BotnoiConversationLink;
-  onClose: () => void;
-}) {
+function ConversationDialog({ conversation, onClose }: { conversation: BotnoiConversation | null; onClose: () => void }) {
   const logPath = conversation?.logPath ?? null;
   const { data: log, isLoading } = useQuery({
     queryKey: ["botnoi-log", logPath],
@@ -188,11 +130,8 @@ function ConversationDialog({
     <Dialog open={!!conversation} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{link?.debtor_name || "Conversation"}</DialogTitle>
-          <DialogDescription className="text-xs">
-            {link ? `${maskPhoneNumber(link.debtor_phone)} · ` : ""}
-            {conversation?.startedAt ?? ""}
-          </DialogDescription>
+          <DialogTitle>Conversation</DialogTitle>
+          <DialogDescription className="text-xs">{conversation?.startedAt ?? ""}</DialogDescription>
         </DialogHeader>
         {conversation && (
           <div className="space-y-4">

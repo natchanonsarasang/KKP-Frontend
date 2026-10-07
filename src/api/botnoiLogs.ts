@@ -72,42 +72,6 @@ export async function listBotnoiConversations(startDate: string, endDate: string
   return [...byId.values()].sort((a, b) => (b.startedAt || "").localeCompare(a.startedAt || ""));
 }
 
-/** A conversation linked back to the call record and debtor it belongs to. */
-export interface BotnoiConversationLink {
-  conversation_id: string;
-  call_record_id: string;
-  debtor_name: string;
-  debtor_phone: string;
-  status: string;
-  call_outcome: string;
-  ai_category: string;
-  call_duration: number;
-}
-
-// Ids go in the query string, so look them up in batches to keep URLs short.
-const LOOKUP_BATCH = 50;
-
-/**
- * Look up which debtor each conversation belongs to. Only conversations from
- * calls placed through this system (and owned by the caller) come back.
- */
-export async function lookupBotnoiConversations(ids: string[]): Promise<Map<string, BotnoiConversationLink>> {
-  const batches: string[][] = [];
-  for (let i = 0; i < ids.length; i += LOOKUP_BATCH) batches.push(ids.slice(i, i + LOOKUP_BATCH));
-
-  const results = await Promise.all(
-    batches.map((batch) =>
-      api.get<{ data: BotnoiConversationLink[] | null }>("/botnoi-logs/conversations", { ids: batch.join(",") }),
-    ),
-  );
-
-  const byId = new Map<string, BotnoiConversationLink>();
-  for (const res of results) {
-    for (const link of res.data ?? []) byId.set(link.conversation_id, link);
-  }
-  return byId;
-}
-
 export async function readBotnoiLog(filePath: string): Promise<unknown> {
   const res = await api.get<{ data: unknown }>("/botnoi-logs/log", { file_path: filePath });
   return res.data;
