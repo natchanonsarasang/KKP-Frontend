@@ -5,7 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import { DEBTOR_CUSTOMER_VARIABLE_KEYS, DEBTOR_CUSTOMER_VARIABLE_LABELS } from "@/lib/debtorVariables";
+import {
+  DEBTOR_CUSTOMER_VARIABLE_KEYS,
+  DEBTOR_CUSTOMER_VARIABLE_LABELS,
+  DEBTOR_CUSTOMER_VARIABLE_PLACEHOLDERS,
+} from "@/lib/debtorVariables";
 import type { Debtor, DebtorFormData } from "./types";
 
 interface DebtorFormDialogProps {
@@ -43,7 +47,9 @@ export function DebtorFormDialog({
         <form onSubmit={onSubmit} className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto pr-2">
           {/* Phone Number - Always required */}
           <div className="space-y-1.5">
-            <Label className="text-sm">Phone Number *</Label>
+            <Label className="text-sm">
+              Phone Number<span className="text-destructive ml-0.5">*</span>
+            </Label>
             <Input
               value={formData.phone_number}
               onChange={(e) => onFormDataChange((p) => ({ ...p, phone_number: e.target.value }))}
@@ -51,47 +57,36 @@ export function DebtorFormDialog({
             />
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <Label className="text-sm">Customer data</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Variables sent to bot: <code className="text-xs bg-muted px-1 rounded">{"{name}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{car_detail}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{total_debt}"}</code>,{" "}
-                <code className="text-xs bg-muted px-1 rounded">{"{overdue_installment}"}</code>, etc.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
-                const isInstallment = key === "overdue_installment";
-                // overdue_installment is required and must be at least 1 (can't be 0).
-                const isRequired = ["name", "car_detail", "total_debt", "overdue_installment"].includes(key);
-                const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <Label className="text-sm">
-                      {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
-                      {isRequired && <span className="text-destructive ml-0.5">*</span>}
-                    </Label>
-                    <Input
-                      type={isNumeric ? "number" : "text"}
-                      min={isNumeric ? (isInstallment ? 1 : 0) : undefined}
-                      // Money fields allow satang (2 decimals); installments are whole numbers.
-                      step={isNumeric ? (isInstallment ? 1 : 0.01) : undefined}
-                      required={isRequired}
-                      value={templateVariables[key] ?? ""}
-                      onChange={(e) =>
-                        onTemplateVariablesChange((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
-                      }
-                      placeholder={key}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {DEBTOR_CUSTOMER_VARIABLE_KEYS.map((key) => {
+              const isInstallment = key === "overdue_installment";
+              // overdue_installment is required and must be at least 1 (can't be 0).
+              const isRequired = ["name", "car_detail", "total_debt", "overdue_installment"].includes(key);
+              const isNumeric = ["total_debt", "total_interest", "total_fine", "overdue_installment"].includes(key);
+              return (
+                <div key={key} className="space-y-1.5">
+                  <Label className="text-sm">
+                    {DEBTOR_CUSTOMER_VARIABLE_LABELS[key]}
+                    {isRequired && <span className="text-destructive ml-0.5">*</span>}
+                  </Label>
+                  <Input
+                    type={isNumeric ? "number" : "text"}
+                    min={isNumeric ? (isInstallment ? 1 : 0) : undefined}
+                    // Money fields allow satang (2 decimals); installments are whole numbers.
+                    step={isNumeric ? (isInstallment ? 1 : 0.01) : undefined}
+                    required={isRequired}
+                    value={templateVariables[key] ?? ""}
+                    onChange={(e) =>
+                      onTemplateVariablesChange((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    placeholder={DEBTOR_CUSTOMER_VARIABLE_PLACEHOLDERS[key]}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           <div className="space-y-1.5">

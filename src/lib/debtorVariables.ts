@@ -23,6 +23,19 @@ export const DEBTOR_CUSTOMER_VARIABLE_LABELS: Record<
   overdue_installment: "Overdue Installments",
 };
 
+/** Example values shown as input placeholders in the debtor form. */
+export const DEBTOR_CUSTOMER_VARIABLE_PLACEHOLDERS: Record<
+  DebtorCustomerVariableKey,
+  string
+> = {
+  name: "สมชาย ใจดี",
+  car_detail: "กข 1234 สงขลา",
+  total_debt: "15000",
+  total_interest: "500",
+  total_fine: "200",
+  overdue_installment: "2",
+};
+
 /** Text fields in `variables`. */
 export function emptyDebtorCustomerVariables(): Record<string, string> {
   return Object.fromEntries(
