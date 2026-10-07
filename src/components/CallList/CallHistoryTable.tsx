@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +24,9 @@ const RANGE_OPTIONS = [7, 30, 90] as const;
 export function CallHistoryTable() {
   const [rangeDays, setRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(7);
   const [selected, setSelected] = useState<BotnoiConversation | null>(null);
+  // Kept separate from `selected` so the dialog keeps its content while the
+  // close animation plays, instead of collapsing to an empty box.
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const today = new Date();
   const startDate = format(subDays(today, rangeDays), "yyyy/MM/dd");
@@ -78,6 +81,7 @@ export function CallHistoryTable() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">เวลา</TableHead>
+                <TableHead className="text-xs">เสียง</TableHead>
                 <TableHead className="text-xs w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -86,11 +90,17 @@ export function CallHistoryTable() {
                 <TableRow key={conv.id}>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{conv.startedAt ?? "-"}</TableCell>
                   <TableCell>
+                    <BotnoiAudioPlayer filePath={conv.logPath} downloadName={`call_${conv.id}`} compact />
+                  </TableCell>
+                  <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-primary"
-                      onClick={() => setSelected(conv)}
+                      onClick={() => {
+                        setSelected(conv);
+                        setDialogOpen(true);
+                      }}
                       title="View conversation"
                     >
                       <FileText className="w-3.5 h-3.5" />
@@ -103,12 +113,20 @@ export function CallHistoryTable() {
         </div>
       )}
 
-      <ConversationDialog conversation={selected} onClose={() => setSelected(null)} />
+      <ConversationDialog conversation={selected} open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </div>
   );
 }
 
-function ConversationDialog({ conversation, onClose }: { conversation: BotnoiConversation | null; onClose: () => void }) {
+function ConversationDialog({
+  conversation,
+  open,
+  onClose,
+}: {
+  conversation: BotnoiConversation | null;
+  open: boolean;
+  onClose: () => void;
+}) {
   const logPath = conversation?.logPath ?? null;
   const { data: log, isLoading } = useQuery({
     queryKey: ["botnoi-log", logPath],
@@ -127,7 +145,7 @@ function ConversationDialog({ conversation, onClose }: { conversation: BotnoiCon
           : JSON.stringify(log, null, 2);
 
   return (
-    <Dialog open={!!conversation} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open && !!conversation} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Conversation</DialogTitle>
@@ -201,14 +219,46 @@ function ConversationDialog({ conversation, onClose }: { conversation: BotnoiCon
   );
 }
 
-function BotnoiAudioPlayer({ filePath, downloadName }: { filePath: string | null; downloadName: string }) {
+// Pause every other <audio> on the page so only one recording plays at a time.
+function pauseOtherAudio(current: HTMLAudioElement) {
+  document.querySelectorAll("audio").forEach((el) => {
+    if (el !== current) el.pause();
+  });
+}
+
+// The recording player used in both the conversation dialog and the table rows
+// (`compact`). Recordings are ~1 MB each, so a compact (table row) player waits
+// until it is scrolled into view before fetching.
+function BotnoiAudioPlayer({
+  filePath,
+  downloadName,
+  compact = false,
+}: {
+  filePath: string | null;
+  downloadName: string;
+  compact?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(!compact);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [blobType, setBlobType] = useState("");
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!filePath) return;
+    if (inView || !containerRef.current) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setInView(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [inView]);
+
+  useEffect(() => {
+    if (!filePath || !inView) return;
     let active = true;
     let created: string | null = null;
 
@@ -233,21 +283,10 @@ function BotnoiAudioPlayer({ filePath, downloadName }: { filePath: string | null
       active = false;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [filePath]);
-
-  if (!filePath || failed) {
-    return <p className="text-xs text-muted-foreground italic">No audio available</p>;
-  }
-  if (loading || !blobUrl) {
-    return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        กำลังโหลดไฟล์เสียง...
-      </div>
-    );
-  }
+  }, [filePath, inView]);
 
   const handleDownload = () => {
+    if (!blobUrl) return;
     try {
       const ext = blobType.includes("mpeg") || blobType.includes("mp3") ? "mp3" : "wav";
       const a = document.createElement("a");
@@ -262,13 +301,46 @@ function BotnoiAudioPlayer({ filePath, downloadName }: { filePath: string | null
     }
   };
 
+  let content: ReactNode;
+  if (!filePath || failed) {
+    content = <p className="text-xs text-muted-foreground italic">No audio available</p>;
+  } else if (loading || !blobUrl) {
+    content = (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        กำลังโหลดไฟล์เสียง...
+      </div>
+    );
+  } else if (compact) {
+    content = (
+      <>
+        <audio controls src={blobUrl} className="h-8 w-[260px]" onPlay={(e) => pauseOtherAudio(e.currentTarget)} />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-primary"
+          onClick={handleDownload}
+          title="Download Audio"
+        >
+          <Download className="w-3.5 h-3.5" />
+        </Button>
+      </>
+    );
+  } else {
+    content = (
+      <>
+        <audio controls src={blobUrl} className="w-full" onPlay={(e) => pauseOtherAudio(e.currentTarget)} />
+        <Button variant="outline" size="sm" className="w-full" onClick={handleDownload}>
+          <Download className="w-4 h-4 mr-2" />
+          Download Audio
+        </Button>
+      </>
+    );
+  }
+
   return (
-    <>
-      <audio controls src={blobUrl} className="w-full" />
-      <Button variant="outline" size="sm" className="w-full" onClick={handleDownload}>
-        <Download className="w-4 h-4 mr-2" />
-        Download Audio
-      </Button>
-    </>
+    <div ref={containerRef} className={compact ? "flex items-center gap-1" : "space-y-2"}>
+      {content}
+    </div>
   );
 }
