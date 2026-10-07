@@ -3,6 +3,24 @@ import { toast } from "sonner";
 import type { CallAttempt } from "@/api/types";
 import type { CallListItem, Debtor } from "./types";
 
+// When a call fails to dial, the backend stores the raw upstream error as the
+// call outcome (e.g. `batch creation failed: ... (HTTP 401 ...): {"detail":...}`).
+// Detect those so users see a plain label instead of the technical message.
+const TECHNICAL_OUTCOME_RE = /HTTP \d{3}|error|failed:|[{}]/i;
+
+export const FAILED_CALL_OUTCOME_LABEL = "Call failed";
+
+/** True when the outcome is a raw technical error rather than a call result. */
+export function isTechnicalCallOutcome(outcome: string | null | undefined): boolean {
+  return !!outcome && TECHNICAL_OUTCOME_RE.test(outcome);
+}
+
+/** The call outcome as shown to users: raw technical errors become a plain label. */
+export function displayCallOutcome(outcome: string | null | undefined): string {
+  if (!outcome) return "";
+  return isTechnicalCallOutcome(outcome) ? FAILED_CALL_OUTCOME_LABEL : outcome;
+}
+
 // The debtor's debt amount for Smart Queue Min/Max Debt filtering. Reads the
 // `total_debt` variable shown in the Debtor List "Total Debt" column (stripping
 // thousands separators), falling back to legacy amount vars and finally the
@@ -171,7 +189,7 @@ export function exportCompletedCallsToExcel(
       ชื่อ: vars.name || debtor?.name || "-",
       ยอด: amount && Number.isFinite(amount) ? amount : "-",
       วันครบกำหนด: formatDueDate(vars, debtor?.due_date),
-      ผลการโทร: item.call_outcome || "-",
+      ผลการโทร: displayCallOutcome(item.call_outcome) || "-",
       สถานะ: item.status,
       เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
       conversationlog: conversationLog || "-",
