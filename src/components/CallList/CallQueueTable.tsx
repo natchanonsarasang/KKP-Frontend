@@ -35,7 +35,6 @@ interface CallQueueTableProps {
   onSort: (field: SortField) => void;
   getStatusBadge: (status: string) => JSX.Element;
   onExportCompletedCalls: () => void;
-  onPreviewCall: (item: CallListItem) => void;
   onViewTranscript: (attempt: CallAttempt | null) => void;
   onEditTranscript: (attempt: CallAttempt | null) => void;
   onRemoveFromList: (id: string) => void;
@@ -57,7 +56,6 @@ export function CallQueueTable({
   onSort,
   getStatusBadge,
   onExportCompletedCalls,
-  onPreviewCall,
   onViewTranscript,
   onEditTranscript,
   onRemoveFromList,
@@ -285,17 +283,7 @@ export function CallQueueTable({
                               </Button>
                             </>
                           )
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => onPreviewCall(item)}
-                            title="Preview call payload"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
+                        ) : null}
                         {(item.status === "pending" || item.status === "retry_pending") && (
                           <Button
                             variant="ghost"

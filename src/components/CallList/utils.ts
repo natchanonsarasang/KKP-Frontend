@@ -1,10 +1,7 @@
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { toThaiPhonetic, shouldUsePhonetic } from "@/lib/thaiPhonetic";
-import { DEBTOR_AMOUNT_VARIABLE_KEYS, formatThaiBahtSatang } from "@/lib/debtorVariables";
-import { BOTNOI_TEMPLATE_ID } from "./constants";
 import type { CallAttempt } from "@/api/types";
-import type { CallListItem, Debtor, PreviewPayload, Template } from "./types";
+import type { CallListItem, Debtor } from "./types";
 
 // The debtor's debt amount for Smart Queue Min/Max Debt filtering. Reads the
 // `total_debt` variable shown in the Debtor List "Total Debt" column (stripping
@@ -93,53 +90,6 @@ export function numberToThaiText(num: number): string {
   }
 
   return result;
-}
-
-// Build the payload for preview/call
-export function buildCallPayload(item: CallListItem, templates: Template[]): PreviewPayload | null {
-  const selectedTemplate = templates?.find((t) => t.id === item.template_id) || templates?.[0];
-  if (!selectedTemplate?.message || !item.debtor) return null;
-
-  const debtor = item.debtor;
-  const debtorVars = debtor.variables || {};
-
-  // Construct the full message by replacing placeholders with debtor variables
-  let constructedMessage = selectedTemplate.message;
-
-  // Replace all {placeholder} with actual values from debtor variables
-  Object.entries(debtorVars).forEach(([key, value]) => {
-    const placeholder = new RegExp(`\\{${key}\\}`, "gi");
-    let processedValue = String(value);
-
-    // Convert license plate fields to Thai phonetic reading
-    if (shouldUsePhonetic(key)) {
-      processedValue = toThaiPhonetic(processedValue);
-    }
-
-    // Speak money amounts as baht/satang, e.g. "1000.5" -> "1000 บาท 50 สตางค์".
-    if (DEBTOR_AMOUNT_VARIABLE_KEYS.has(key)) {
-      processedValue = formatThaiBahtSatang(processedValue);
-    }
-
-    constructedMessage = constructedMessage.replace(placeholder, processedValue);
-  });
-
-  // Also replace standard placeholders
-  const debtAmount = debtor.total_debt ? formatThaiBahtSatang(debtor.total_debt) : "-";
-  const formattedDueDate = debtor.due_date
-    ? new Date(debtor.due_date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
-    : "-";
-
-  constructedMessage = constructedMessage.replace(/\{debt\}/gi, debtAmount);
-  constructedMessage = constructedMessage.replace(/\{Debt\}/g, debtAmount);
-  constructedMessage = constructedMessage.replace(/\{due_date\}/gi, formattedDueDate);
-
-  return {
-    phone: debtor.phone_number,
-    templateId: BOTNOI_TEMPLATE_ID,
-    message: constructedMessage,
-    item,
-  };
 }
 
 // Export completed calls to Excel

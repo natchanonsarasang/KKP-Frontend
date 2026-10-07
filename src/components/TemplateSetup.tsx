@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { listDebtorsByWorkspace } from "@/api/debtors";
-import { makeCall } from "@/api/voicebot";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Loader2, MessageSquare, CheckCircle, XCircle, HelpCircle, Trash2, Eye, Info, Phone } from "lucide-react";
+import { Plus, Loader2, MessageSquare, CheckCircle, XCircle, HelpCircle, Trash2, Eye, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -60,10 +59,7 @@ const TemplateSetup = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showTestCallDialog, setShowTestCallDialog] = useState(false);
-  const [testCallPhone, setTestCallPhone] = useState("");
-  const [testCallTemplateId, setTestCallTemplateId] = useState<string>("");
-  
+
   const [formData, setFormData] = useState({
     message:
       "สวัสดีค่ะ จากบอทน้อยนะคะ คุณมียอดค้างชำระจำนวน {Amount} บาท กำหนดชำระภายในวันที่ {Due Date} ต้องการยืนยันการชำระเงินมั้ยคะ",
@@ -440,68 +436,6 @@ const TemplateSetup = () => {
         )}
       </div>
 
-      {/* Test Call Dialog (5.5 - Campaign testing) */}
-      <Card className="border-dashed">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Phone className="w-4 h-4" />
-            ทดสอบการโทร (Test Call)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            เลือก Template/แคมเปญ และใส่เบอร์โทรเพื่อทดสอบสคริปต่างๆ
-          </p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label className="text-sm">เลือก Template</Label>
-              <Select value={testCallTemplateId} onValueChange={setTestCallTemplateId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือก Template" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {templates?.filter(t => t.template_id).map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.org_name} {t.is_system_default ? "(Default)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm">เบอร์โทรทดสอบ</Label>
-              <Input
-                placeholder="08x-xxx-xxxx"
-                value={testCallPhone}
-                onChange={(e) => setTestCallPhone(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                onClick={async () => {
-                  const template = templates?.find(t => t.id === testCallTemplateId);
-                  if (!template?.template_id || !testCallPhone) {
-                    toast.error("กรุณาเลือก Template และใส่เบอร์โทร");
-                    return;
-                  }
-                  try {
-                    await makeCall({ phone_number: testCallPhone, variables: {} });
-                    toast.success(`ทดสอบโทรไปยัง ${testCallPhone} ด้วย "${template.org_name}" สำเร็จ`);
-                  } catch (err) {
-                    toast.error("ทดสอบโทรล้มเหลว");
-                    console.error(err);
-                  }
-                }}
-                disabled={!testCallTemplateId || !testCallPhone}
-                className="w-full"
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                โทรทดสอบ
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
