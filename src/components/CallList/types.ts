@@ -78,13 +78,6 @@ export interface AutoDialSettings {
 export type SortField = "phone" | "status" | "picked_up" | "call_outcome" | "called_at" | "created_at";
 export type SortDirection = "asc" | "desc";
 
-export interface PreviewPayload {
-  phone: string;
-  templateId: string;
-  message: string;
-  item: CallListItem;
-}
-
 export interface TranscriptData {
   conversationLog: string | null;
   audioUrl: string | null;

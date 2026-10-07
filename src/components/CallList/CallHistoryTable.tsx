@@ -19,8 +19,8 @@ import { downloadConversationAsText } from "./utils";
 const RANGE_OPTIONS = [7, 30, 90] as const;
 
 // Botnoi conversation history for the configured agent, one row per
-// conversation id. Botnoi logs carry no link to our debtors, so rows are
-// identified by conversation id and time only.
+// conversation. Botnoi logs carry no link to our debtors, so rows show the
+// call time only.
 export function CallHistoryTable() {
   const [rangeDays, setRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(7);
   const [selected, setSelected] = useState<BotnoiConversation | null>(null);
@@ -78,7 +78,6 @@ export function CallHistoryTable() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">เวลา</TableHead>
-                <TableHead className="text-xs">Conversation ID</TableHead>
                 <TableHead className="text-xs w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -86,7 +85,6 @@ export function CallHistoryTable() {
               {conversations.map((conv) => (
                 <TableRow key={conv.id}>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{conv.startedAt ?? "-"}</TableCell>
-                  <TableCell className="font-mono text-xs">{conv.id}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -133,7 +131,7 @@ function ConversationDialog({ conversation, onClose }: { conversation: BotnoiCon
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Conversation</DialogTitle>
-          <DialogDescription className="font-mono text-xs break-all">{conversation?.id}</DialogDescription>
+          <DialogDescription className="text-xs">{conversation?.startedAt ?? ""}</DialogDescription>
         </DialogHeader>
         {conversation && (
           <div className="space-y-4">

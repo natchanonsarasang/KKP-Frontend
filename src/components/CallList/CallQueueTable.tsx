@@ -20,6 +20,7 @@ import {
 import { maskPhoneNumber } from "@/lib/formatPhone";
 import type { CallAttempt } from "@/api/types";
 import type { CallListItem, SortDirection, SortField } from "./types";
+import { FAILED_CALL_OUTCOME_LABEL, isTechnicalCallOutcome } from "./utils";
 
 interface CallQueueTableProps {
   activeTab: "pending" | "calling" | "completed" | "history";
@@ -35,7 +36,6 @@ interface CallQueueTableProps {
   onSort: (field: SortField) => void;
   getStatusBadge: (status: string) => JSX.Element;
   onExportCompletedCalls: () => void;
-  onPreviewCall: (item: CallListItem) => void;
   onViewTranscript: (attempt: CallAttempt | null) => void;
   onEditTranscript: (attempt: CallAttempt | null) => void;
   onRemoveFromList: (id: string) => void;
@@ -57,7 +57,6 @@ export function CallQueueTable({
   onSort,
   getStatusBadge,
   onExportCompletedCalls,
-  onPreviewCall,
   onViewTranscript,
   onEditTranscript,
   onRemoveFromList,
@@ -186,6 +185,18 @@ export function CallQueueTable({
                   // Determine outcome display
                   const getOutcomeDisplay = () => {
                     if (!item.call_outcome) return <span className="text-muted-foreground">-</span>;
+                    if (isTechnicalCallOutcome(item.call_outcome)) {
+                      // Hover still shows the underlying error for troubleshooting.
+                      return (
+                        <Badge
+                          variant="outline"
+                          className="bg-destructive/10 text-destructive border-destructive/20"
+                          title={item.call_outcome}
+                        >
+                          {FAILED_CALL_OUTCOME_LABEL}
+                        </Badge>
+                      );
+                    }
                     const outcome = item.call_outcome.toLowerCase();
                     if (outcome.includes("ยืนยัน") || outcome.includes("confirm")) {
                       return (
@@ -285,17 +296,7 @@ export function CallQueueTable({
                               </Button>
                             </>
                           )
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary"
-                            onClick={() => onPreviewCall(item)}
-                            title="Preview call payload"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
+                        ) : null}
                         {(item.status === "pending" || item.status === "retry_pending") && (
                           <Button
                             variant="ghost"

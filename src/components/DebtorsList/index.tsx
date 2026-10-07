@@ -108,7 +108,6 @@ const DebtorsList = ({ onNextStep }: DebtorsListProps) => {
         resetForm();
       },
       onClearAllSuccess: () => setSelectedDebtors(new Set()),
-      onMakeCallSettled: () => {},
       onSendToCallListSuccess: () => {
         setSelectedDebtors(new Set());
         onNextStep?.();

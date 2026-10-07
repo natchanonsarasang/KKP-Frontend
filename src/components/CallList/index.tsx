@@ -20,7 +20,6 @@ import { CallQueueTable } from "./CallQueueTable";
 import { CallHistoryTable } from "./CallHistoryTable";
 import { AddToListDialog } from "./AddToListDialog";
 import { SettingsDialog } from "./SettingsDialog";
-import { PreviewDialog } from "./PreviewDialog";
 import { FilterDialog } from "./FilterDialog";
 import { TranscriptDialog } from "./TranscriptDialog";
 import { EditableTranscriptDialog } from "./EditableTranscriptDialog";
@@ -162,13 +161,7 @@ const CallList = () => {
     pauseCalling,
     resumeCalling,
     stopCalling,
-    makeCall,
-    handlePreviewCall,
-    previewPayload,
-    showPreviewDialog,
-    setShowPreviewDialog,
   } = useCallSession({
-    templates,
     workspaceId,
     settings,
     effectiveUserId,
@@ -538,7 +531,6 @@ const CallList = () => {
         onSort={handleSort}
         getStatusBadge={getStatusBadge}
         onExportCompletedCalls={() => exportCompletedCallsToExcel(callListItems || [], callAttemptsByItemId)}
-        onPreviewCall={handlePreviewCall}
         onViewTranscript={handleViewTranscript}
         onEditTranscript={handleEditTranscript}
         onRemoveFromList={(id) => removeFromListMutation.mutate(id)}
@@ -573,54 +565,6 @@ const CallList = () => {
         settings={settings}
         onSettingsChange={setSettings}
         todayCallCount={todayCallCount || 0}
-      />
-
-      <PreviewDialog
-        open={showPreviewDialog}
-        onOpenChange={setShowPreviewDialog}
-        previewPayload={previewPayload}
-        onMakeCallNow={async () => {
-          setShowPreviewDialog(false);
-          if (!previewPayload?.item) return;
-
-          const item = previewPayload.item;
-
-          // Status → human-readable label
-          const statusLabel: Record<string, string> = {
-            confirmed:   "✅ Confirmed — customer agreed",
-            declined:    "❌ Declined — customer refused",
-            no_response: "🤐 No Response — customer stayed silent",
-            no_answer:   "📵 No Answer — call not picked up",
-            failed:      "⚠️ Call Failed",
-            completed:   "✅ Call Completed",
-          };
-
-          // 1. Start the call promise
-          const callPromise = makeCall(item);
-
-          // Switch tab to 'calling' automatically so the user sees the active call
-          setActiveTab("calling");
-
-          // 2. Immediately call refetch so the row shows 'calling' right away in the UI.
-          // We also do a tiny 800ms fallback refresh to verify the DB state has completed transitioning.
-          refetch();
-          setTimeout(() => refetch(), 800);
-
-          // 3. Keep a "Calling…" spinner toast, resolving to final outcome when finished.
-          toast.promise(
-            callPromise.then((result) => {
-              refetch(); // final update
-              return result;
-            }),
-            {
-              loading: "📞 Calling…",
-              success: (result) =>
-                statusLabel[result.finalStatus] ??
-                `Call ended — ${result.finalStatus}`,
-              error: "⚠️ Call failed unexpectedly",
-            },
-          );
-        }}
       />
 
       <FilterDialog
