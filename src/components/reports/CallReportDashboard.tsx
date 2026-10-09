@@ -74,6 +74,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { downloadAudioViaProxy } from "@/api/audioProxy";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { cleanConversationLog } from "@/lib/conversationLog";
 
 interface CallListItem {
   id: string;
@@ -1023,7 +1024,7 @@ const CallReportDashboard = () => {
           {transcriptData && (
             <div className="bg-muted/30 rounded-lg p-3 min-h-[150px] max-h-[400px] overflow-y-auto space-y-3">
               {transcriptData.conversationLog ? (
-                transcriptData.conversationLog.split("\n").filter((l) => l.trim()).map((line, idx) => {
+                cleanConversationLog(transcriptData.conversationLog).split("\n").filter((l) => l.trim()).map((line, idx) => {
                   const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(Bot|User):\s*(.*)$/i);
                   if (!match) return <p key={idx} className="text-sm text-muted-foreground">{line}</p>;
                   const [, timestamp, role, message] = match;

@@ -14,6 +14,7 @@ import {
   readBotnoiLog,
   type BotnoiConversation,
 } from "@/api/botnoiLogs";
+import { cleanConversationLog } from "@/lib/conversationLog";
 import { downloadConversationAsText } from "./utils";
 
 const RANGE_OPTIONS = [7, 30, 90] as const;
@@ -139,9 +140,9 @@ function ConversationDialog({
     log === undefined
       ? null
       : typeof (log as { text?: unknown })?.text === "string"
-        ? (log as { text: string }).text
+        ? cleanConversationLog((log as { text: string }).text)
         : typeof log === "string"
-          ? log
+          ? cleanConversationLog(log)
           : JSON.stringify(log, null, 2);
 
   return (

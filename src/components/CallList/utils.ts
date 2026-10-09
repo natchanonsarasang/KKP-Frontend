@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import type { CallAttempt } from "@/api/types";
+import { cleanConversationLog } from "@/lib/conversationLog";
 import type { CallListItem, Debtor } from "./types";
 
 // When a call fails to dial, the backend stores the raw upstream error as the
@@ -192,7 +193,7 @@ export function exportCompletedCallsToExcel(
       ผลการโทร: displayCallOutcome(item.call_outcome) || "-",
       สถานะ: item.status,
       เวลา: item.called_at ? new Date(item.called_at).toLocaleString("th-TH") : "-",
-      conversationlog: conversationLog || "-",
+      conversationlog: conversationLog ? cleanConversationLog(conversationLog) : "-",
       audio_url: audioUrl || "-",
     };
   });
