@@ -198,6 +198,15 @@ export function CallQueueTable({
                       );
                     }
                     const outcome = item.call_outcome.toLowerCase();
+                    // The webhook stores Botnoi's status title-cased: "Completed" means
+                    // the call was picked up and finished (status "success").
+                    if (outcome === "completed" || outcome === "complete") {
+                      return (
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                          Complete
+                        </Badge>
+                      );
+                    }
                     if (outcome.includes("ยืนยัน") || outcome.includes("confirm")) {
                       return (
                         <Badge variant="outline" className="bg-success/10 text-success border-success/20">
@@ -221,7 +230,8 @@ export function CallQueueTable({
                     }
                     return (
                       <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
-                        {item.call_outcome}
+                        {/* Webhook statuses like "No_answer" read better with spaces. */}
+                        {item.call_outcome.replace(/_/g, " ")}
                       </Badge>
                     );
                   };
