@@ -10,7 +10,6 @@ interface ActiveSessionBannerProps {
   callingCount: number;
   activeSessionConcurrentCalls: number;
   onResume: () => void;
-  onPause: () => void;
   onStop: () => void;
 }
 
@@ -20,7 +19,6 @@ export function ActiveSessionBanner({
   callingCount,
   activeSessionConcurrentCalls,
   onResume,
-  onPause,
   onStop,
 }: ActiveSessionBannerProps) {
   const isDone = activeSession.completed_calls + activeSession.failed_calls >= activeSession.total_calls;
@@ -89,16 +87,10 @@ export function ActiveSessionBanner({
                     Finish Session
                   </Button>
                 ) : (
-                  <>
-                    <Button size="sm" variant="secondary" onClick={onPause}>
-                      <Square className="w-4 h-4 mr-2" />
-                      Pause
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={onStop}>
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Stop
-                    </Button>
-                  </>
+                  <Button size="sm" variant="destructive" onClick={onStop}>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Stop
+                  </Button>
                 )}
               </>
             )}
