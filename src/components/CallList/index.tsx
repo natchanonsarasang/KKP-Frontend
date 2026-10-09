@@ -158,7 +158,6 @@ const CallList = () => {
   const {
     isWithinBusinessHours,
     startCalling,
-    pauseCalling,
     resumeCalling,
     stopCalling,
   } = useCallSession({
@@ -480,7 +479,6 @@ const CallList = () => {
           callingCount={callingCount}
           activeSessionConcurrentCalls={activeSessionConcurrentCalls}
           onResume={resumeCalling}
-          onPause={pauseCalling}
           onStop={stopCalling}
         />
       )}
