@@ -100,7 +100,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
         </Card>
       </div>
 
-      {/* 3. Incomplete Breakdown - 6 Bottom Small Cards */}
+      {/* 3. Incomplete Breakdown - 6 Bottom Small Cards (hidden for now)
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           {
@@ -156,6 +156,7 @@ export const AnalyticsStats = ({ callListItems }: AnalyticsStatsProps) => {
           </Card>
         ))}
       </div>
+      */}
     </div>
   );
 };
