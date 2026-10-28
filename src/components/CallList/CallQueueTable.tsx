@@ -178,18 +178,27 @@ export function CallQueueTable({
                 {filteredCallListItems.map((item) => {
                   const debtor = item.debtor;
                   const isCurrentlyCalling = item.status === "calling";
-                  // The transcript/audio live on the call attempt, not the item.
-                  // Only show the view/ASR buttons once the resolved attempt
-                  // actually has something to show. This hides them for rejected /
-                  // "Incomplete" calls (no conversation at all), and — just as
-                  // importantly — avoids opening an empty dialog in the window
-                  // between the item flipping to a finished status and the attempt's
-                  // transcript being fetched (which previously needed a manual
-                  // refresh to appear).
+                  // Only calls the debtor actually answered have a transcript/audio
+                  // to show. With the current webhook logic a picked-up call is
+                  // recorded as "Complete" (status success); reject / unreachable /
+                  // technical failures are "Incomplete" or a failure outcome and
+                  // never produce a transcript. We key off the item's own
+                  // picked-up/outcome (always present on the row) rather than the
+                  // attempts map, which may not have loaded yet — otherwise the
+                  // buttons would be hidden on every row until a manual refresh. The
+                  // attempt itself is still looked up from the map for the dialog.
                   const attempt = callAttemptsByItemId?.get(item.id) ?? null;
+                  const outcome = (item.call_outcome || "").toLowerCase();
+                  const isAnswered =
+                    item.picked_up === true ||
+                    outcome === "complete" ||
+                    outcome === "completed" ||
+                    outcome.includes("confirm") ||
+                    outcome.includes("ยืนยัน");
                   const hasTranscript = !!(
                     attempt?.conversation_log?.trim() || attempt?.audio_url?.trim()
                   );
+                  const showTranscriptButtons = isAnswered || hasTranscript;
 
                   // Determine outcome display
                   const getOutcomeDisplay = () => {
@@ -291,7 +300,7 @@ export function CallQueueTable({
                         item.status === "no_response" ||
                         item.status === "no_answer" ||
                         item.status === "failed" ? (
-                          hasTranscript ? (
+                          showTranscriptButtons ? (
                             <>
                               <Button
                                 variant="ghost"
