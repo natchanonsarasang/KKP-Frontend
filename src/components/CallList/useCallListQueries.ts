@@ -223,10 +223,23 @@ export function useCallListQueries({ effectiveUserId, workspaceId }: UseCallList
       return map;
     },
     enabled: !!workspaceId,
+    staleTime: 0,
+    // Keep the transcripts in step with the queue itself: poll on the same
+    // condition and cadence as call-list-items (session running, or any item
+    // still calling/pending/retrying) so a finished call's transcript/audio shows
+    // up within seconds of the item flipping status — without this they lagged by
+    // up to 30s and the view/ASR buttons opened an empty dialog until a manual
+    // refresh.
     refetchInterval: () => {
       const session = queryClient.getQueryData<CallSession | null>(["active-call-session", effectiveUserId, workspaceId]);
-      return session && ["running", "stopping"].includes(session.status) ? 30000 : false;
+      const items = queryClient.getQueryData<CallListItem[]>(["call-list-items", effectiveUserId, workspaceId]);
+      const isSessionRunning = session && ["running", "stopping"].includes(session.status);
+      const hasActiveItem = items?.some((it) =>
+        ["calling", "pending", "retry_pending"].includes(it.status),
+      );
+      return isSessionRunning || hasActiveItem ? 2000 : false;
     },
+    refetchIntervalInBackground: true,
   });
 
   // Fetch available debtors (not already in pending call list)

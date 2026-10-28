@@ -217,6 +217,10 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       else if (rawOutcome === "voicemail") outcome = "voicemail";
       else if (rawOutcome === "busy") outcome = "busy";
       else if (rawOutcome === "failed") outcome = "failed";
+      // A call the debtor never actually answered (reject/unreachable): the
+      // webhook records it as "Incomplete". Keep it as its own bucket rather than
+      // letting it fall through to the picked_up===false "No Answer" default.
+      else if (rawOutcome === "incomplete") outcome = "incomplete";
       else if (rawStatus.includes("hang")) outcome = "hangup";
       else if (item.picked_up === false) outcome = "no_answer";
       else if (rawStatus === "no answer") outcome = "no_answer";
@@ -235,6 +239,7 @@ export const OutcomeDistributionChart = ({ callListItems }: { callListItems: Cal
       pending: "Pending",
       failed: "Failed",
       completed: "Completed",
+      incomplete: "Incomplete",
       busy: "Busy",
       voicemail: "Voicemail",
       hangup: "Hang up",

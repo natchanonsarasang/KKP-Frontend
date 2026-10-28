@@ -17,8 +17,7 @@ import { useDateRangeFilter } from "./useDateRangeFilter";
 import { useAnalyticsData } from "./useAnalyticsData";
 import { usePdfExport } from "./usePdfExport";
 import { DateRangePicker } from "./DateRangePicker";
-import { CallHistoryTab } from "./CallHistoryTab";
-import { WebhookSettingsTab } from "./WebhookSettingsTab";
+import { AIAnalysisTab } from "./AIAnalysisTab";
 import { PdfExportLayout } from "./PdfExportLayout";
 import { exportCallHistoryToExcel } from "./utils";
 import type { Template } from "./types";
@@ -85,8 +84,7 @@ const CallDashboard = () => {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="time-analysis">Time Analysis</TabsTrigger>
-            <TabsTrigger value="history">Call History</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="history">AI Analysis</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -112,16 +110,12 @@ const CallDashboard = () => {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
-            <CallHistoryTab
+            <AIAnalysisTab
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
               filteredRecords={filteredRecords}
               onExportExcel={() => exportCallHistoryToExcel(filteredRecords, debtorByPhone)}
             />
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <WebhookSettingsTab />
           </TabsContent>
         </Tabs>
       )}
