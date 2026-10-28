@@ -1,5 +1,6 @@
 import { api } from "./client";
 import { getToken } from "./authToken";
+import { cleanConversationLog } from "@/lib/conversationLog";
 
 // Botnoi conversation logs, read through the Go API proxy (/api/v1/botnoi-logs),
 // which forwards to the Botnoi Voicebot API with the server-side token. The
@@ -91,7 +92,7 @@ function toRole(value: unknown): BotnoiChatTurn["role"] {
  */
 export function parseBotnoiLog(data: unknown): BotnoiChatTurn[] | null {
   if (typeof data === "string") {
-    const turns = data
+    const turns = cleanConversationLog(data)
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)

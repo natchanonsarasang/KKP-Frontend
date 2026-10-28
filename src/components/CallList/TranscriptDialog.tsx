@@ -5,6 +5,7 @@ import { Download, FileText, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadAudioViaProxy } from "@/api/audioProxy";
 import { ProxyAudioPlayer } from "@/components/ProxyAudioPlayer";
+import { cleanConversationLog } from "@/lib/conversationLog";
 import { downloadConversationAsText } from "./utils";
 import type { TranscriptData } from "./types";
 
@@ -30,7 +31,7 @@ export function TranscriptDialog({ open, onOpenChange, transcriptData }: Transcr
                 {transcriptData.conversationLog ? (
                   (() => {
                     // Parse conversation log: "YYYY-MM-DD HH:MM:SS Bot/User: message"
-                    const lines = transcriptData.conversationLog.split("\n").filter((line) => line.trim());
+                    const lines = cleanConversationLog(transcriptData.conversationLog).split("\n").filter((line) => line.trim());
                     return lines.map((line, idx) => {
                       const match = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(Bot|User):\s*(.*)$/i);
                       if (!match) return null;

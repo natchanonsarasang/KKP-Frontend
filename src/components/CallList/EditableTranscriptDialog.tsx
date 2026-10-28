@@ -11,6 +11,7 @@ import { ProxyAudioPlayer } from "@/components/ProxyAudioPlayer";
 import { downloadConversationAsText } from "./utils";
 import { updateCallAttempt } from "@/api/callAttempts";
 import type { CallAttempt } from "@/api/types";
+import { cleanConversationLog } from "@/lib/conversationLog";
 
 // Editable copy of the Call Queue transcript. Visually mirrors TranscriptDialog
 // (the read-only "View conversation" in the Completed tab) but each turn is
@@ -36,9 +37,10 @@ const TURN_RE = new RegExp(
 
 function parseConversation(log: string): EditableTurn[] {
   const turns: EditableTurn[] = [];
+  const clean = cleanConversationLog(log);
   TURN_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = TURN_RE.exec(log)) !== null) {
+  while ((m = TURN_RE.exec(clean)) !== null) {
     const role = m[2].toLowerCase() === "user" ? "user" : "bot";
     const text = m[3].replace(/\s+/g, " ").trim();
     if (!text) continue;

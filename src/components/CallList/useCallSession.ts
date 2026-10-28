@@ -124,22 +124,7 @@ export function useCallSession({
     }
   }, [callListItems, settings, effectiveUserId, workspaceId, isWithinBusinessHours, refetchSession]);
 
-  // Pause the active session
-  const pauseCalling = useCallback(async () => {
-    if (!activeSession) return;
-
-    try {
-      await processCallSession({ session_id: activeSession.id, action: "pause" });
-
-      toast.info("Pausing calls...");
-      refetchSession();
-    } catch (error) {
-      console.error("Error pausing call session:", error);
-      toast.error("Failed to pause call session");
-    }
-  }, [activeSession, refetchSession]);
-
-  // Resume a paused session
+  // Resume a paused session (e.g. one auto-paused outside business hours)
   const resumeCalling = useCallback(async () => {
     if (!activeSession || activeSession.status !== "paused") return;
 
@@ -176,7 +161,6 @@ export function useCallSession({
   return {
     isWithinBusinessHours,
     startCalling,
-    pauseCalling,
     resumeCalling,
     stopCalling,
   };
