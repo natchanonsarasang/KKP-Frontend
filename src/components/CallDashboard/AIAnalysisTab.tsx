@@ -3,17 +3,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, PhoneCall, Search } from "lucide-react";
-import { getAICategoryBadge, getConfidenceMeter, getOutcomeBadge, getStatusBadge } from "./StatusBadges";
+import { getAICategoryBadge, getConfidenceMeter } from "./StatusBadges";
 import type { EnrichedCallRecord } from "./types";
 
-interface CallHistoryTabProps {
+interface AIAnalysisTabProps {
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
   filteredRecords: EnrichedCallRecord[];
   onExportExcel: () => void;
 }
 
-export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecords, onExportExcel }: CallHistoryTabProps) {
+export function AIAnalysisTab({ searchQuery, onSearchQueryChange, filteredRecords, onExportExcel }: AIAnalysisTabProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -45,11 +45,9 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                   <TableHead className="text-xs">เบอร์โทร</TableHead>
                   <TableHead className="text-xs">ชื่อ</TableHead>
                   <TableHead className="text-xs">ยอด</TableHead>
-                  <TableHead className="text-xs">ผลการโทร</TableHead>
                   <TableHead className="text-xs">ผล AI</TableHead>
                   <TableHead className="text-xs">ความมั่นใจ</TableHead>
                   <TableHead className="text-xs">เหตุผล AI</TableHead>
-                  <TableHead className="text-xs">สถานะ</TableHead>
                   <TableHead className="text-xs">เวลา</TableHead>
                 </TableRow>
               </TableHeader>
@@ -68,7 +66,6 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                           : "-";
                       })()}
                     </TableCell>
-                    <TableCell>{getOutcomeBadge(record.call_outcome, record.picked_up)}</TableCell>
                     <TableCell>{getAICategoryBadge(record.ai_category)}</TableCell>
                     <TableCell>
                       {record.ai_reason ? (
@@ -86,7 +83,6 @@ export function CallHistoryTab({ searchQuery, onSearchQueryChange, filteredRecor
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
-                    <TableCell>{getStatusBadge(record.status || "pending")}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(record.created_at).toLocaleString("th-TH", {
                         month: "short",

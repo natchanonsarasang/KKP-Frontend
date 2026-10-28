@@ -178,9 +178,18 @@ export function CallQueueTable({
                 {filteredCallListItems.map((item) => {
                   const debtor = item.debtor;
                   const isCurrentlyCalling = item.status === "calling";
-                  // Rejected calls have no meaningful conversation to view. Hang-ups
-                  // now deliver a webhook (transcript + audio), so they DO show it.
-                  const hasNoTranscript = /reject/i.test(item.call_outcome || "");
+                  // The transcript/audio live on the call attempt, not the item.
+                  // Only show the view/ASR buttons once the resolved attempt
+                  // actually has something to show. This hides them for rejected /
+                  // "Incomplete" calls (no conversation at all), and — just as
+                  // importantly — avoids opening an empty dialog in the window
+                  // between the item flipping to a finished status and the attempt's
+                  // transcript being fetched (which previously needed a manual
+                  // refresh to appear).
+                  const attempt = callAttemptsByItemId?.get(item.id) ?? null;
+                  const hasTranscript = !!(
+                    attempt?.conversation_log?.trim() || attempt?.audio_url?.trim()
+                  );
 
                   // Determine outcome display
                   const getOutcomeDisplay = () => {
@@ -282,15 +291,13 @@ export function CallQueueTable({
                         item.status === "no_response" ||
                         item.status === "no_answer" ||
                         item.status === "failed" ? (
-                          hasNoTranscript ? (
-                            <span className="text-muted-foreground text-xs px-2">-</span>
-                          ) : (
+                          hasTranscript ? (
                             <>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-primary"
-                                onClick={() => onViewTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                                onClick={() => onViewTranscript(attempt)}
                                 title="View conversation"
                               >
                                 <FileText className="w-3.5 h-3.5" />
@@ -299,12 +306,14 @@ export function CallQueueTable({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-primary"
-                                onClick={() => onEditTranscript(callAttemptsByItemId?.get(item.id) ?? null)}
+                                onClick={() => onEditTranscript(attempt)}
                                 title="ASR Correction (แก้ไขบทสนทนา)"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </Button>
                             </>
+                          ) : (
+                            <span className="text-muted-foreground text-xs px-2">-</span>
                           )
                         ) : null}
                         {(item.status === "pending" || item.status === "retry_pending") && (
