@@ -5,13 +5,9 @@ import { listCallAttemptsByWorkspace, deleteCallAttempt } from "@/api/callAttemp
 import { deleteCallRecord } from "@/api/callRecords";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
 import { debtorMatchesStatusFilter, getDebtorDebt } from "./utils";
+import { COMPLETED_STATUSES } from "./constants";
 import type { CallListItem, Debtor, Template } from "./types";
 import type { PhoneStats } from "./useCallListQueries";
-
-// Queue-only statuses — these are the active queue. Completed/historical
-// statuses are intentionally excluded so clearing the queue never wipes
-// Latest Call Status / call history shown on the Debtor List.
-const QUEUE_STATUSES = ["pending", "retry_pending", "calling", "scheduled"] as const;
 
 interface UseCallListMutationsArgs {
   effectiveUserId: string | null | undefined;
@@ -222,7 +218,7 @@ export function useCallListMutations({
   const clearCompletedMutation = useMutation({
     mutationFn: async () => {
       if (!workspaceId) throw new Error("No workspace selected");
-      const done = ["completed", "confirmed", "declined", "no_answer", "failed", "no_response", "success"];
+      const done = COMPLETED_STATUSES as readonly string[];
       const ids = (callListItems || []).filter((i) => done.includes(i.status)).map((i) => i.id);
       const idSet = new Set(ids);
 
@@ -246,24 +242,6 @@ export function useCallListMutations({
       queryClient.invalidateQueries({ queryKey: ["call-attempts-analytics"] });
       queryClient.invalidateQueries({ queryKey: ["call-records"] });
       toast.success("Cleared completed calls");
-    },
-  });
-
-  // Clear the active queue only. Preserves completed/failed history so the
-  // Debtor List "Latest Call Status" remains intact.
-  const clearAllMutation = useMutation({
-    mutationFn: async () => {
-      if (!workspaceId) throw new Error("No workspace selected");
-
-      const queue = QUEUE_STATUSES as unknown as string[];
-      const ids = (callListItems || []).filter((i) => queue.includes(i.status)).map((i) => i.id);
-      await Promise.all(ids.map((id) => deleteCallListItem(id, workspaceId)));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
-      queryClient.invalidateQueries({ queryKey: ["available-debtors-for-call"] });
-      queryClient.invalidateQueries({ queryKey: ["all-active-debtors"] });
-      toast.success("Queue cleared (call history preserved)");
     },
   });
 
@@ -394,7 +372,6 @@ export function useCallListMutations({
     removeFromListMutation,
     clearPendingMutation,
     clearCompletedMutation,
-    clearAllMutation,
     retryFailedMutation,
     queueFilteredDebtorsMutation,
   };
