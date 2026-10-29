@@ -6,7 +6,7 @@ import { ListPlus, RefreshCw, Settings, Clock } from "lucide-react";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { FilterConditions } from "@/components/DebtorFilterPanel";
-import { DEFAULT_SETTINGS, statusConfig } from "./constants";
+import { COMPLETED_STATUSES, DEFAULT_SETTINGS, statusConfig } from "./constants";
 import { exportCompletedCallsToExcel, debtorMatchesStatusFilter, getDebtorDebt } from "./utils";
 import type { CallAttempt } from "@/api/types";
 import { useCallListQueries } from "./useCallListQueries";
@@ -131,7 +131,6 @@ const CallList = () => {
     removeFromListMutation,
     clearPendingMutation,
     clearCompletedMutation,
-    clearAllMutation,
     retryFailedMutation,
     queueFilteredDebtorsMutation,
   } = useCallListMutations({
@@ -196,14 +195,13 @@ const CallList = () => {
     );
   };
 
-  // processCount / Completed Call in DB is success, failed, completed
+  // processedCount counts every finished call (COMPLETED_STATUSES) so it matches
+  // the Completed tab's contents and gates Clear Completed consistently.
   const pendingCount =
     callListItems?.filter((item) => item.status === "pending" || item.status === "retry_pending").length || 0;
   const callingCount = callListItems?.filter((item) => item.status === "calling").length || 0;
   const processedCount =
-    callListItems?.filter(
-      (item) => item.status === "completed" || item.status === "failed" || item.status === "success",
-    ).length || 0;
+    callListItems?.filter((item) => (COMPLETED_STATUSES as readonly string[]).includes(item.status)).length || 0;
 
   // Auto-switch to "calling" tab when a call starts
   useEffect(() => {
@@ -288,9 +286,7 @@ const CallList = () => {
       case "calling":
         return item.status === "calling";
       case "completed":
-        return ["completed", "success", "confirmed", "declined", "no_answer", "failed", "no_response"].includes(
-          item.status,
-        );
+        return (COMPLETED_STATUSES as readonly string[]).includes(item.status);
       default:
         return false;
     }
@@ -487,7 +483,6 @@ const CallList = () => {
         activeSession={activeSession}
         settings={settings}
         isWithinBusinessHours={isWithinBusinessHours}
-        callListItems={callListItems}
         pendingCount={pendingCount}
         processedCount={processedCount}
         failedCount={failedCount}
@@ -511,8 +506,6 @@ const CallList = () => {
         isClearPendingPending={clearPendingMutation.isPending}
         onClearCompleted={() => clearCompletedMutation.mutate()}
         isClearCompletedPending={clearCompletedMutation.isPending}
-        onClearAll={() => clearAllMutation.mutate()}
-        isClearAllPending={clearAllMutation.isPending}
       />
 
       <CallQueueTable

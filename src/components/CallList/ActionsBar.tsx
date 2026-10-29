@@ -1,13 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Filter, Loader2, Play, RotateCcw, Trash2, Users, Zap } from "lucide-react";
-import type { AutoDialSettings, CallListItem, CallSession } from "./types";
+import type { AutoDialSettings, CallSession } from "./types";
 
 interface ActionsBarProps {
   activeSession: CallSession | null | undefined;
   settings: AutoDialSettings;
   isWithinBusinessHours: () => boolean;
-  callListItems: CallListItem[] | undefined;
   pendingCount: number;
   processedCount: number;
   failedCount: number;
@@ -26,15 +25,12 @@ interface ActionsBarProps {
   isClearPendingPending: boolean;
   onClearCompleted: () => void;
   isClearCompletedPending: boolean;
-  onClearAll: () => void;
-  isClearAllPending: boolean;
 }
 
 export function ActionsBar({
   activeSession,
   settings,
   isWithinBusinessHours,
-  callListItems,
   pendingCount,
   processedCount,
   failedCount,
@@ -53,8 +49,6 @@ export function ActionsBar({
   isClearPendingPending,
   onClearCompleted,
   isClearCompletedPending,
-  onClearAll,
-  isClearAllPending,
 }: ActionsBarProps) {
   return (
     <Card>
@@ -122,17 +116,6 @@ export function ActionsBar({
             <Button variant="outline" onClick={onClearCompleted} disabled={isClearCompletedPending}>
               <Trash2 className="w-4 h-4 mr-2" />
               Clear Completed
-            </Button>
-          )}
-
-          {callListItems && callListItems.length > 0 && !activeSession && (
-            <Button variant="destructive" onClick={onClearAll} disabled={isClearAllPending}>
-              {isClearAllPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Clear All
             </Button>
           )}
         </div>

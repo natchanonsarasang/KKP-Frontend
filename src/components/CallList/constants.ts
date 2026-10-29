@@ -30,5 +30,18 @@ export const statusConfig: Record<string, { label: string; color: string; icon: 
   retry_pending: { label: "Retry Pending", color: "bg-warning/10 text-warning", icon: RotateCcw },
 };
 
+// Statuses that count as a finished/processed call. Single source of truth for
+// the Completed tab, its count badge (processedCount), and Clear Completed — keep
+// these in sync so the button never hides rows the Completed tab still shows.
+export const COMPLETED_STATUSES = [
+  "completed",
+  "success",
+  "confirmed",
+  "declined",
+  "no_answer",
+  "failed",
+  "no_response",
+] as const;
+
 // BOTNOI TEMPLATE ID - registered with "{Appointment Date}" placeholder
 export const BOTNOI_TEMPLATE_ID = "2015208747";
