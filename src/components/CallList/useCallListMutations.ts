@@ -220,19 +220,37 @@ export function useCallListMutations({
       if (!workspaceId) throw new Error("No workspace selected");
       const done = COMPLETED_STATUSES as readonly string[];
       const ids = (callListItems || []).filter((i) => done.includes(i.status)).map((i) => i.id);
+      if (ids.length === 0) return;
       const idSet = new Set(ids);
 
-      // The Analytics "Recent Calls" history is sourced from call_attempts, not
-      // call_list_items, so deleting the items alone leaves orphaned history rows
-      // (shown with a "-" debtor). Cascade-delete the attempts — and their
-      // call_records — belonging to the cleared items too.
-      const attempts = await listCallAttemptsByWorkspace(workspaceId);
-      const relatedAttempts = attempts.filter((a) => a.call_list_item_id && idSet.has(a.call_list_item_id));
-      const recordIds = new Set(relatedAttempts.map((a) => a.call_record_id).filter((rid): rid is string => !!rid));
+      // Delete the queue items FIRST — this is the user-visible "Clear Completed"
+      // action and must never be blocked by the history cleanup below. Use
+      // allSettled so one bad row doesn't abort the rest, then report failures.
+      const itemResults = await Promise.allSettled(ids.map((id) => deleteCallListItem(id, workspaceId)));
+      const itemFailures = itemResults.filter((r) => r.status === "rejected").length;
 
-      await Promise.all(relatedAttempts.map((a) => deleteCallAttempt(a.id, workspaceId)));
-      await Promise.all([...recordIds].map((rid) => deleteCallRecord(rid)));
-      await Promise.all(ids.map((id) => deleteCallListItem(id, workspaceId)));
+      // Best-effort cascade: the Analytics "Recent Calls" history is sourced from
+      // call_attempts (and their call_records), so clear those tied to the removed
+      // items too, else they linger as orphaned rows with a "-" debtor. These are
+      // tolerant of individual failures — a record already gone or owned by another
+      // user returns 400 (DeleteByUser → ErrNoDocuments) and must not undo the clear.
+      try {
+        const attempts = await listCallAttemptsByWorkspace(workspaceId);
+        const relatedAttempts = attempts.filter((a) => a.call_list_item_id && idSet.has(a.call_list_item_id));
+        const recordIds = new Set(relatedAttempts.map((a) => a.call_record_id).filter((rid): rid is string => !!rid));
+
+        await Promise.allSettled(relatedAttempts.map((a) => deleteCallAttempt(a.id, workspaceId)));
+        await Promise.allSettled([...recordIds].map((rid) => deleteCallRecord(rid)));
+      } catch {
+        // Listing attempts failed — the queue items are already cleared; history
+        // cleanup will catch up on the next clear. Don't fail the whole action.
+      }
+
+      if (itemFailures > 0) {
+        throw new Error(
+          `Cleared ${ids.length - itemFailures} of ${ids.length} — ${itemFailures} could not be removed`,
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
@@ -242,6 +260,12 @@ export function useCallListMutations({
       queryClient.invalidateQueries({ queryKey: ["call-attempts-analytics"] });
       queryClient.invalidateQueries({ queryKey: ["call-records"] });
       toast.success("Cleared completed calls");
+    },
+    onError: (error: Error) => {
+      // Surface failures instead of silently swallowing them (the old behavior,
+      // which is why clicking Clear Completed looked like it did nothing).
+      queryClient.invalidateQueries({ queryKey: ["call-list-items"] });
+      toast.error(error.message || "Failed to clear completed calls");
     },
   });
 
